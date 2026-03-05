@@ -55,7 +55,7 @@ For a single user, no multi-user, no accounts
 
 ### 1. Pre-Workout Check-In
 - User records soreness ratings for fixed muscle groups, and general state (0-3):
-  - quads, hamstrings, abs, chest, upper back, lower back, biceps, triceps, traps, forearms, glutes, calves, shoulders
+  - quads, hamstrings, abs, chest, back, biceps, triceps, traps, forearms, glutes, calves, shoulders
   - sleep, flatness/vigger
 - Check-in persists to local storage immediately.
 - Check-in data is available to recommendation logic.
@@ -378,13 +378,13 @@ enum SkipReason {
 
 ### week_template
 - id: int
-- mesoTemplateId: int (fk -> meso_template.id, unique)
+- mesoTemplateId: int (fk -> meso_template.id)
 - name: string
 - workoutCount: int
 
 ### workout_template
 - id: int
-- weekTemplateId: int (fk -> week_template.id, unique)
+- weekTemplateId: int (fk -> week_template.id)
 - name: string
 - isRestDay: bool
 - dayIndex: int
@@ -409,7 +409,7 @@ Movements
 - note2: null
 - muscleGroup: Chest
 - subMuscleGroup: null
-- isRequiredSets: true
+- isRequiredWeight: true
 - isRequiredReps: true
 - isRequiredTime: false
 
@@ -421,7 +421,7 @@ Movements
 - note2: null
 - muscleGroup: Chest
 - subMuscleGroup: null
-- isRequiredSets: true
+- isRequiredWeight: true
 - isRequiredReps: true
 - isRequiredTime: false
 
@@ -433,7 +433,7 @@ Movements
 - note2: null
 - muscleGroup: Back
 - subMuscleGroup: null
-- isRequiredSets: true
+- isRequiredWeight: true
 - isRequiredReps: true
 - isRequiredTime: false
 
@@ -445,7 +445,7 @@ Movements
 - note2: null
 - muscleGroup: Back
 - subMuscleGroup: null
-- isRequiredSets: true
+- isRequiredWeight: true
 - isRequiredReps: true
 - isRequiredTime: false
 
@@ -457,7 +457,7 @@ Movements
 - note2: null
 - muscleGroup: Biceps
 - subMuscleGroup: null
-- isRequiredSets: true
+- isRequiredWeight: true
 - isRequiredReps: true
 - isRequiredTime: false
 
