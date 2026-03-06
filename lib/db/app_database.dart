@@ -254,17 +254,27 @@ class AppDatabase extends _$AppDatabase {
           ),
       ];
 
+      final postExCheckin = await (select(postExerciseCheckins)
+            ..where((c) => c.completedExerciseId.equals(ce.id)))
+          .getSingleOrNull();
+
       exerciseDataList.add(ExerciseData(
         completed: ce,
         movement: movement,
         sets: sets,
+        postExerciseCheckin: postExCheckin,
       ));
     }
+
+    final mgCheckins = await (select(postMuscleGroupCheckins)
+          ..where((c) => c.completedWorkoutId.equals(completedWorkoutId)))
+        .get();
 
     return WorkoutData(
       completedWorkout: cw,
       workout: workout,
       exercises: exerciseDataList,
+      postMuscleGroupCheckins: mgCheckins,
     );
   }
 
@@ -290,6 +300,14 @@ class AppDatabase extends _$AppDatabase {
           time: Value(null),
         ),
       );
+
+  Future<void> savePostExerciseCheckin(
+          PostExerciseCheckinsCompanion checkin) =>
+      into(postExerciseCheckins).insert(checkin);
+
+  Future<void> savePostMuscleGroupCheckin(
+          PostMuscleGroupCheckinsCompanion checkin) =>
+      into(postMuscleGroupCheckins).insert(checkin);
 
   Future<void> finishWorkout(int completedWorkoutId) async {
     await transaction(() async {

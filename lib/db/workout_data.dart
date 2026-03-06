@@ -3,7 +3,7 @@ import 'app_database.dart';
 class SetData {
   const SetData({required this.completed, this.planned});
   final CompletedSet completed;
-  final PlannedSet? planned; // null for user-added sets
+  final PlannedSet? planned;
 }
 
 class ExerciseData {
@@ -11,10 +11,12 @@ class ExerciseData {
     required this.completed,
     required this.movement,
     required this.sets,
+    this.postExerciseCheckin,
   });
   final CompletedExercise completed;
   final Movement movement;
   final List<SetData> sets;
+  final PostExerciseCheckin? postExerciseCheckin;
 }
 
 class WorkoutData {
@@ -22,14 +24,12 @@ class WorkoutData {
     required this.completedWorkout,
     required this.workout,
     required this.exercises,
+    required this.postMuscleGroupCheckins,
   });
   final CompletedWorkout completedWorkout;
   final Workout workout;
   final List<ExerciseData> exercises;
-
-  bool get isFinishable => exercises.every(
-        (e) => e.sets.every((s) => setIsDone(s, e.movement)),
-      );
+  final List<PostMuscleGroupCheckin> postMuscleGroupCheckins;
 
   static bool setIsDone(SetData s, Movement m) {
     final cs = s.completed;
