@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import 'mesocycles.dart';
+import 'workouts.dart';
 
 // Singleton table — always has exactly one row with id = 1.
 class AppStates extends Table {
@@ -10,6 +11,8 @@ class AppStates extends Table {
   IntColumn get id => integer()();
   IntColumn get currentMesocycleId =>
       integer().nullable().references(Mesocycles, #id)();
+  IntColumn get currentCompletedWorkoutId =>
+      integer().nullable().references(CompletedWorkouts, #id)();
   DateTimeColumn get updatedAt => dateTime()();
 
   @override

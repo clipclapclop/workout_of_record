@@ -6947,6 +6947,20 @@ class $AppStatesTable extends AppStates
       'REFERENCES mesocycles (id)',
     ),
   );
+  static const VerificationMeta _currentCompletedWorkoutIdMeta =
+      const VerificationMeta('currentCompletedWorkoutId');
+  @override
+  late final GeneratedColumn<int> currentCompletedWorkoutId =
+      GeneratedColumn<int>(
+        'current_completed_workout_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'REFERENCES completed_workouts (id)',
+        ),
+      );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -6959,7 +6973,12 @@ class $AppStatesTable extends AppStates
     requiredDuringInsert: true,
   );
   @override
-  List<GeneratedColumn> get $columns => [id, currentMesocycleId, updatedAt];
+  List<GeneratedColumn> get $columns => [
+    id,
+    currentMesocycleId,
+    currentCompletedWorkoutId,
+    updatedAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -6981,6 +7000,15 @@ class $AppStatesTable extends AppStates
         currentMesocycleId.isAcceptableOrUnknown(
           data['current_mesocycle_id']!,
           _currentMesocycleIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('current_completed_workout_id')) {
+      context.handle(
+        _currentCompletedWorkoutIdMeta,
+        currentCompletedWorkoutId.isAcceptableOrUnknown(
+          data['current_completed_workout_id']!,
+          _currentCompletedWorkoutIdMeta,
         ),
       );
     }
@@ -7009,6 +7037,10 @@ class $AppStatesTable extends AppStates
         DriftSqlType.int,
         data['${effectivePrefix}current_mesocycle_id'],
       ),
+      currentCompletedWorkoutId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}current_completed_workout_id'],
+      ),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -7025,10 +7057,12 @@ class $AppStatesTable extends AppStates
 class AppState extends DataClass implements Insertable<AppState> {
   final int id;
   final int? currentMesocycleId;
+  final int? currentCompletedWorkoutId;
   final DateTime updatedAt;
   const AppState({
     required this.id,
     this.currentMesocycleId,
+    this.currentCompletedWorkoutId,
     required this.updatedAt,
   });
   @override
@@ -7037,6 +7071,11 @@ class AppState extends DataClass implements Insertable<AppState> {
     map['id'] = Variable<int>(id);
     if (!nullToAbsent || currentMesocycleId != null) {
       map['current_mesocycle_id'] = Variable<int>(currentMesocycleId);
+    }
+    if (!nullToAbsent || currentCompletedWorkoutId != null) {
+      map['current_completed_workout_id'] = Variable<int>(
+        currentCompletedWorkoutId,
+      );
     }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -7048,6 +7087,10 @@ class AppState extends DataClass implements Insertable<AppState> {
       currentMesocycleId: currentMesocycleId == null && nullToAbsent
           ? const Value.absent()
           : Value(currentMesocycleId),
+      currentCompletedWorkoutId:
+          currentCompletedWorkoutId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(currentCompletedWorkoutId),
       updatedAt: Value(updatedAt),
     );
   }
@@ -7060,6 +7103,9 @@ class AppState extends DataClass implements Insertable<AppState> {
     return AppState(
       id: serializer.fromJson<int>(json['id']),
       currentMesocycleId: serializer.fromJson<int?>(json['currentMesocycleId']),
+      currentCompletedWorkoutId: serializer.fromJson<int?>(
+        json['currentCompletedWorkoutId'],
+      ),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -7069,6 +7115,9 @@ class AppState extends DataClass implements Insertable<AppState> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'currentMesocycleId': serializer.toJson<int?>(currentMesocycleId),
+      'currentCompletedWorkoutId': serializer.toJson<int?>(
+        currentCompletedWorkoutId,
+      ),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -7076,12 +7125,16 @@ class AppState extends DataClass implements Insertable<AppState> {
   AppState copyWith({
     int? id,
     Value<int?> currentMesocycleId = const Value.absent(),
+    Value<int?> currentCompletedWorkoutId = const Value.absent(),
     DateTime? updatedAt,
   }) => AppState(
     id: id ?? this.id,
     currentMesocycleId: currentMesocycleId.present
         ? currentMesocycleId.value
         : this.currentMesocycleId,
+    currentCompletedWorkoutId: currentCompletedWorkoutId.present
+        ? currentCompletedWorkoutId.value
+        : this.currentCompletedWorkoutId,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   AppState copyWithCompanion(AppStatesCompanion data) {
@@ -7090,6 +7143,9 @@ class AppState extends DataClass implements Insertable<AppState> {
       currentMesocycleId: data.currentMesocycleId.present
           ? data.currentMesocycleId.value
           : this.currentMesocycleId,
+      currentCompletedWorkoutId: data.currentCompletedWorkoutId.present
+          ? data.currentCompletedWorkoutId.value
+          : this.currentCompletedWorkoutId,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -7099,45 +7155,54 @@ class AppState extends DataClass implements Insertable<AppState> {
     return (StringBuffer('AppState(')
           ..write('id: $id, ')
           ..write('currentMesocycleId: $currentMesocycleId, ')
+          ..write('currentCompletedWorkoutId: $currentCompletedWorkoutId, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, currentMesocycleId, updatedAt);
+  int get hashCode =>
+      Object.hash(id, currentMesocycleId, currentCompletedWorkoutId, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is AppState &&
           other.id == this.id &&
           other.currentMesocycleId == this.currentMesocycleId &&
+          other.currentCompletedWorkoutId == this.currentCompletedWorkoutId &&
           other.updatedAt == this.updatedAt);
 }
 
 class AppStatesCompanion extends UpdateCompanion<AppState> {
   final Value<int> id;
   final Value<int?> currentMesocycleId;
+  final Value<int?> currentCompletedWorkoutId;
   final Value<DateTime> updatedAt;
   const AppStatesCompanion({
     this.id = const Value.absent(),
     this.currentMesocycleId = const Value.absent(),
+    this.currentCompletedWorkoutId = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
   AppStatesCompanion.insert({
     this.id = const Value.absent(),
     this.currentMesocycleId = const Value.absent(),
+    this.currentCompletedWorkoutId = const Value.absent(),
     required DateTime updatedAt,
   }) : updatedAt = Value(updatedAt);
   static Insertable<AppState> custom({
     Expression<int>? id,
     Expression<int>? currentMesocycleId,
+    Expression<int>? currentCompletedWorkoutId,
     Expression<DateTime>? updatedAt,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (currentMesocycleId != null)
         'current_mesocycle_id': currentMesocycleId,
+      if (currentCompletedWorkoutId != null)
+        'current_completed_workout_id': currentCompletedWorkoutId,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
   }
@@ -7145,11 +7210,14 @@ class AppStatesCompanion extends UpdateCompanion<AppState> {
   AppStatesCompanion copyWith({
     Value<int>? id,
     Value<int?>? currentMesocycleId,
+    Value<int?>? currentCompletedWorkoutId,
     Value<DateTime>? updatedAt,
   }) {
     return AppStatesCompanion(
       id: id ?? this.id,
       currentMesocycleId: currentMesocycleId ?? this.currentMesocycleId,
+      currentCompletedWorkoutId:
+          currentCompletedWorkoutId ?? this.currentCompletedWorkoutId,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
@@ -7163,6 +7231,11 @@ class AppStatesCompanion extends UpdateCompanion<AppState> {
     if (currentMesocycleId.present) {
       map['current_mesocycle_id'] = Variable<int>(currentMesocycleId.value);
     }
+    if (currentCompletedWorkoutId.present) {
+      map['current_completed_workout_id'] = Variable<int>(
+        currentCompletedWorkoutId.value,
+      );
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -7174,6 +7247,7 @@ class AppStatesCompanion extends UpdateCompanion<AppState> {
     return (StringBuffer('AppStatesCompanion(')
           ..write('id: $id, ')
           ..write('currentMesocycleId: $currentMesocycleId, ')
+          ..write('currentCompletedWorkoutId: $currentCompletedWorkoutId, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
@@ -11476,6 +11550,26 @@ final class $$CompletedWorkoutsTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$AppStatesTable, List<AppState>>
+  _appStatesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.appStates,
+    aliasName: $_aliasNameGenerator(
+      db.completedWorkouts.id,
+      db.appStates.currentCompletedWorkoutId,
+    ),
+  );
+
+  $$AppStatesTableProcessedTableManager get appStatesRefs {
+    final manager = $$AppStatesTableTableManager($_db, $_db.appStates).filter(
+      (f) => f.currentCompletedWorkoutId.id.sqlEquals($_itemColumn<int>('id')!),
+    );
+
+    final cache = $_typedResult.readTableOrNull(_appStatesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$CompletedWorkoutsTableFilterComposer
@@ -11585,6 +11679,31 @@ class $$CompletedWorkoutsTableFilterComposer
                     $removeJoinBuilderFromRootComposer,
               ),
         );
+    return f(composer);
+  }
+
+  Expression<bool> appStatesRefs(
+    Expression<bool> Function($$AppStatesTableFilterComposer f) f,
+  ) {
+    final $$AppStatesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.appStates,
+      getReferencedColumn: (t) => t.currentCompletedWorkoutId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AppStatesTableFilterComposer(
+            $db: $db,
+            $table: $db.appStates,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
     return f(composer);
   }
 }
@@ -11751,6 +11870,31 @@ class $$CompletedWorkoutsTableAnnotationComposer
         );
     return f(composer);
   }
+
+  Expression<T> appStatesRefs<T extends Object>(
+    Expression<T> Function($$AppStatesTableAnnotationComposer a) f,
+  ) {
+    final $$AppStatesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.appStates,
+      getReferencedColumn: (t) => t.currentCompletedWorkoutId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AppStatesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.appStates,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$CompletedWorkoutsTableTableManager
@@ -11770,6 +11914,7 @@ class $$CompletedWorkoutsTableTableManager
             bool workoutId,
             bool completedExercisesRefs,
             bool postMuscleGroupCheckinsRefs,
+            bool appStatesRefs,
           })
         > {
   $$CompletedWorkoutsTableTableManager(
@@ -11833,12 +11978,14 @@ class $$CompletedWorkoutsTableTableManager
                 workoutId = false,
                 completedExercisesRefs = false,
                 postMuscleGroupCheckinsRefs = false,
+                appStatesRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (completedExercisesRefs) db.completedExercises,
                     if (postMuscleGroupCheckinsRefs) db.postMuscleGroupCheckins,
+                    if (appStatesRefs) db.appStates,
                   ],
                   addJoins:
                       <
@@ -11918,6 +12065,27 @@ class $$CompletedWorkoutsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (appStatesRefs)
+                        await $_getPrefetchedData<
+                          CompletedWorkout,
+                          $CompletedWorkoutsTable,
+                          AppState
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CompletedWorkoutsTableReferences
+                              ._appStatesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CompletedWorkoutsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).appStatesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.currentCompletedWorkoutId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -11942,6 +12110,7 @@ typedef $$CompletedWorkoutsTableProcessedTableManager =
         bool workoutId,
         bool completedExercisesRefs,
         bool postMuscleGroupCheckinsRefs,
+        bool appStatesRefs,
       })
     >;
 typedef $$PlannedExercisesTableCreateCompanionBuilder =
@@ -14989,12 +15158,14 @@ typedef $$AppStatesTableCreateCompanionBuilder =
     AppStatesCompanion Function({
       Value<int> id,
       Value<int?> currentMesocycleId,
+      Value<int?> currentCompletedWorkoutId,
       required DateTime updatedAt,
     });
 typedef $$AppStatesTableUpdateCompanionBuilder =
     AppStatesCompanion Function({
       Value<int> id,
       Value<int?> currentMesocycleId,
+      Value<int?> currentCompletedWorkoutId,
       Value<DateTime> updatedAt,
     });
 
@@ -15015,6 +15186,31 @@ final class $$AppStatesTableReferences
       $_db.mesocycles,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_currentMesocycleIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $CompletedWorkoutsTable _currentCompletedWorkoutIdTable(
+    _$AppDatabase db,
+  ) => db.completedWorkouts.createAlias(
+    $_aliasNameGenerator(
+      db.appStates.currentCompletedWorkoutId,
+      db.completedWorkouts.id,
+    ),
+  );
+
+  $$CompletedWorkoutsTableProcessedTableManager? get currentCompletedWorkoutId {
+    final $_column = $_itemColumn<int>('current_completed_workout_id');
+    if ($_column == null) return null;
+    final manager = $$CompletedWorkoutsTableTableManager(
+      $_db,
+      $_db.completedWorkouts,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(
+      _currentCompletedWorkoutIdTable($_db),
+    );
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -15055,6 +15251,29 @@ class $$AppStatesTableFilterComposer
           }) => $$MesocyclesTableFilterComposer(
             $db: $db,
             $table: $db.mesocycles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$CompletedWorkoutsTableFilterComposer get currentCompletedWorkoutId {
+    final $$CompletedWorkoutsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.currentCompletedWorkoutId,
+      referencedTable: $db.completedWorkouts,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompletedWorkoutsTableFilterComposer(
+            $db: $db,
+            $table: $db.completedWorkouts,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -15106,6 +15325,29 @@ class $$AppStatesTableOrderingComposer
     );
     return composer;
   }
+
+  $$CompletedWorkoutsTableOrderingComposer get currentCompletedWorkoutId {
+    final $$CompletedWorkoutsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.currentCompletedWorkoutId,
+      referencedTable: $db.completedWorkouts,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompletedWorkoutsTableOrderingComposer(
+            $db: $db,
+            $table: $db.completedWorkouts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$AppStatesTableAnnotationComposer
@@ -15145,6 +15387,30 @@ class $$AppStatesTableAnnotationComposer
     );
     return composer;
   }
+
+  $$CompletedWorkoutsTableAnnotationComposer get currentCompletedWorkoutId {
+    final $$CompletedWorkoutsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.currentCompletedWorkoutId,
+          referencedTable: $db.completedWorkouts,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$CompletedWorkoutsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.completedWorkouts,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
 }
 
 class $$AppStatesTableTableManager
@@ -15160,7 +15426,10 @@ class $$AppStatesTableTableManager
           $$AppStatesTableUpdateCompanionBuilder,
           (AppState, $$AppStatesTableReferences),
           AppState,
-          PrefetchHooks Function({bool currentMesocycleId})
+          PrefetchHooks Function({
+            bool currentMesocycleId,
+            bool currentCompletedWorkoutId,
+          })
         > {
   $$AppStatesTableTableManager(_$AppDatabase db, $AppStatesTable table)
     : super(
@@ -15177,20 +15446,24 @@ class $$AppStatesTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<int?> currentMesocycleId = const Value.absent(),
+                Value<int?> currentCompletedWorkoutId = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => AppStatesCompanion(
                 id: id,
                 currentMesocycleId: currentMesocycleId,
+                currentCompletedWorkoutId: currentCompletedWorkoutId,
                 updatedAt: updatedAt,
               ),
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
                 Value<int?> currentMesocycleId = const Value.absent(),
+                Value<int?> currentCompletedWorkoutId = const Value.absent(),
                 required DateTime updatedAt,
               }) => AppStatesCompanion.insert(
                 id: id,
                 currentMesocycleId: currentMesocycleId,
+                currentCompletedWorkoutId: currentCompletedWorkoutId,
                 updatedAt: updatedAt,
               ),
           withReferenceMapper: (p0) => p0
@@ -15201,47 +15474,65 @@ class $$AppStatesTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({currentMesocycleId = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [],
-              addJoins:
-                  <
-                    T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic
-                    >
-                  >(state) {
-                    if (currentMesocycleId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.currentMesocycleId,
-                                referencedTable: $$AppStatesTableReferences
-                                    ._currentMesocycleIdTable(db),
-                                referencedColumn: $$AppStatesTableReferences
-                                    ._currentMesocycleIdTable(db)
-                                    .id,
-                              )
-                              as T;
-                    }
+          prefetchHooksCallback:
+              ({
+                currentMesocycleId = false,
+                currentCompletedWorkoutId = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (currentMesocycleId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.currentMesocycleId,
+                                    referencedTable: $$AppStatesTableReferences
+                                        ._currentMesocycleIdTable(db),
+                                    referencedColumn: $$AppStatesTableReferences
+                                        ._currentMesocycleIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
+                        if (currentCompletedWorkoutId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn:
+                                        table.currentCompletedWorkoutId,
+                                    referencedTable: $$AppStatesTableReferences
+                                        ._currentCompletedWorkoutIdTable(db),
+                                    referencedColumn: $$AppStatesTableReferences
+                                        ._currentCompletedWorkoutIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
 
-                    return state;
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [];
                   },
-              getPrefetchedDataCallback: (items) async {
-                return [];
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -15258,7 +15549,10 @@ typedef $$AppStatesTableProcessedTableManager =
       $$AppStatesTableUpdateCompanionBuilder,
       (AppState, $$AppStatesTableReferences),
       AppState,
-      PrefetchHooks Function({bool currentMesocycleId})
+      PrefetchHooks Function({
+        bool currentMesocycleId,
+        bool currentCompletedWorkoutId,
+      })
     >;
 
 class $AppDatabaseManager {

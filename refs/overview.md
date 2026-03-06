@@ -462,11 +462,57 @@ Movements
 - isRequiredTime: false
 
 
+Meso template:
+
+Workout 1: "Day 1"
+Exercise 1: Cable fly
+Exercise 2: Dumbell press (incline)
+Exercise 3: Cable Overhead Tricep Extension
+
+Workout 2: "Day 2"
+Rest day
+
+Workout 3: "Day 3"
+Exercise 1: Barbell Bent Over Row
+Exercise 2: Dumblell Pullover
+Exercise 3: Lying Dumbell Curl
+
+Workout 4: "Day 4"
+Rest day
+
+Workout 5: "Day 5"
+Rest day
+
 A basic planned_workout
 
-Cable fly: 5 x 7lb
-Cable fly: 6 x 10.5lb
-Dumbell press (incline): 7 x 15lb
-Dumbell press (incline): 8 x 20lb
-Dumbell press (incline): 9 x 25lb
-Lying Dumbell Curl: 3 x 10lb
+Workout 1: "Day 1"
+Exercise 1:
+Set 1: Cable fly: 5 x 7lb
+Set 2: Cable fly: 6 x 10.5lb
+Exercise 2:
+Set 1: Dumbell press (incline): 7 x 15lb
+Set 2: Dumbell press (incline): 8 x 20lb
+Set 3: Dumbell press (incline): 9 x 25lb
+Exercise 3:
+Set 1: Cable Overhead Tricep Extension: 3 x 10lb
+
+Workout 2: "Day 2"
+Rest day
+
+Workout 3: "Day 3"
+Exercise 1:
+Set 1: Barbell Bent Over Row: 8 x 50lb
+Set 2: Barbell Bent Over Row: 9 x 55lb
+Set 3: Barbell Bent Over Row: 10 x 55lb
+Exercise 2:
+Set 1: Dumblell Pullover: 6 x 35lb
+Set 2: Dumblell Pullover: 7 x 45lb
+Exercise 3:
+Set 1: Lying Dumbell Curl: 3 x 10lb
+Set 2: Lying Dumbell Curl: 4 x 15lb
+
+Workout 4: "Day 4"
+Rest day
+
+Workout 5: "Day 5"
+Rest day
