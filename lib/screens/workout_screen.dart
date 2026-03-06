@@ -4,6 +4,7 @@ import '../db/app_database.dart';
 import '../db/db.dart';
 import '../db/tables/enums.dart';
 import '../db/workout_data.dart';
+import '../widgets/app_nav_menu.dart';
 import 'home_screen.dart';
 
 class WorkoutScreen extends StatefulWidget {
@@ -585,8 +586,16 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     if (_loading) {
       return Scaffold(
         appBar: AppBar(
-            title: Text(widget.workoutName),
-            automaticallyImplyLeading: false),
+          title: Text(widget.workoutName),
+          automaticallyImplyLeading: false,
+          actions: [
+            AppNavMenu(
+              current: AppScreen.workout,
+              activeWorkoutId: widget.completedWorkoutId,
+              activeWorkoutName: widget.workoutName,
+            ),
+          ],
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -598,6 +607,13 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       appBar: AppBar(
         title: Text(widget.workoutName),
         automaticallyImplyLeading: false,
+        actions: [
+          AppNavMenu(
+            current: AppScreen.workout,
+            activeWorkoutId: widget.completedWorkoutId,
+            activeWorkoutName: widget.workoutName,
+          ),
+        ],
       ),
       body: Column(
         children: [

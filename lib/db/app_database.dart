@@ -368,6 +368,18 @@ class AppDatabase extends _$AppDatabase {
   Future<void> deleteSet(int completedSetId) =>
       (delete(completedSets)..where((s) => s.id.equals(completedSetId))).go();
 
+  Future<List<Movement>> getMovements() =>
+      (select(movements)
+        ..orderBy([
+          (m) => OrderingTerm.asc(m.muscleGroup),
+          (m) => OrderingTerm.asc(m.name),
+        ]))
+          .get();
+
+  Future<void> updateMovement(MovementsCompanion companion) =>
+      (update(movements)..where((m) => m.id.equals(companion.id.value)))
+          .write(companion);
+
   Future<void> finishWorkout(int completedWorkoutId) async {
     await transaction(() async {
       await (update(completedWorkouts)

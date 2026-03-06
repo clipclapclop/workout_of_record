@@ -7,80 +7,6 @@ Tracks all remaining work. Each task includes enough context to execute without 
 
 ---
 
-## Current State (what's done)
-
-- DB schema (18 tables, schema v2) with drift code generation
-- Seed data: 1 mesocycle, 5 workouts (3 training + 2 rest), 6 movements, planned sets with weights/reps
-- `HomeScreen`: shows next non-rest-day workout, handles crash-resume via `app_state.currentCompletedWorkoutId`
-- `PreWorkoutCheckinScreen`: soreness (12 muscle groups) + status (sleep/energy/mental), submits and navigates
-- `WorkoutScreen`: full implementation — set text inputs (reps/weight/time per movement's isRequired* flags), checkbox per set (active only when fields valid), immediate DB persist on check, null-on-uncheck, pre-populated from planned values, post-exercise check-in (joint pain modal), post-muscle-group check-in (effort + volume modal), finish workout (visible only when all sets checked + all check-ins done)
-- Rest day auto-advance with squish algorithm (`!candidate.isAfter(today)`)
-- 8 DB integration tests (`test/db/workout_flow_test.dart`)
-
-**Key files:**
-- `lib/db/app_database.dart` — all DB methods on `AppDatabase`
-- `lib/db/workout_data.dart` — `WorkoutData`, `ExerciseData`, `SetData` model classes
-- `lib/db/tables/enums.dart` — all enums: `MuscleGroup`, `Soreness`, `CurrentState`, `Effort`, `Volume`, `SkipReason`, `WorkoutStatus`, `WorkoutSkipReason`, `WeekGoal`
-- `lib/screens/workout_screen.dart` — `_SetUiState`, `_postExDone`, `_postMgDone`, `_isFinishable`
-- `lib/db/db.dart` — global `AppDatabase db = AppDatabase()`
-
----
-
-## Backlog
-
-### 1. Set Skip
-
-**Goal:** User can skip any yet to be completed set (and implicity all addition sets for the exercise) with a required reason instead of entering values. 
-
-**UX:** on the right side of the set of each exercise, make little settings/dropdown menue, and to each add a "Skip" button/link, and if the set isn't yet completed, have the "Skip" button/link be active. Tapping it opens a bottom sheet or dialog with `SkipReason` options (time / tired / joint pain / muscle pain / connective tissue pain). Selecting a reason immediately saves `skipReason` to `completed_set` and marks the set and any following set within the same exercise as done for `_isFinishable` purposes. Unchecking a skipped set should null both values and skipReason. skipping a set should clear the associated textbox inputs and check the associated Completed checkbox, unchecking the checkbox of a skipped set should unskip the set (may need a function that isn't covered below) and following sets within that exercise.
-
-**Schema:** `completed_set.skipReason: SkipReason?` — already in schema. `SkipReason` enum already in `lib/db/tables/enums.dart`.
-
-**DB:** Add `skipSet(int completedSetId, SkipReason reason)` to `AppDatabase` — sets `skipReason`, nulls reps/weight/time. Extend `clearCompletedSet` to also null `skipReason`.
-
-**`_SetUiState`:** Add `isSkipped` bool. In `_isFinishable` and `canCheck`, treat skipped sets as done. In `_onToggle` (uncheck path), also clear skip state.
-
-**`WorkoutData.setIsDone`:** Update to return true if `skipReason != null`.
-
----
-
-### 2. Exercise Skip
-
-**Goal:** User can skip an entire exercise (all its sets) with a required reason assuming none of it's sets have been completed (then the user should use the skip set button)
-
-**UX:** Each exercise header has a "Skip Exercise" option (e.g., trailing TextButton). Tapping opens a reason picker (same `SkipReason` enum). Confirming: sets `completed_exercise.skipReason`, marks all sets as skipped. The post-exercise check-in (joint pain) should still be triggered
-
-**Schema:** `completed_exercise.skipReason: SkipReason?` — already in schema.
-
-**DB:** Add `skipExercise(int completedExerciseId, SkipReason reason)` to `AppDatabase`.
-
-**`ExerciseData`:** Expose `skipReason`. In `WorkoutScreen._isFinishable`, a skipped exercise counts as done. Post-exercise check-in should still be shown (user may want to record joint pain as the reason).
-
----
-
-### 3. Add / Remove Sets During Workout
-
-**Goal:** User can add extra sets to any exercise, and delete sets they added.
-
-**Rules (from overview.md):**
-- User-added sets append to the end.
-- User can only delete sets they added (not planned sets, they must be skipped).
-
-**UX:**
-- "Add Set" button within the little dropdown within each set
-- regardless of which "add set" button is tapped within an exercise (each existing set will add one), the set will be added to the end of the list of sets for said exercise
-- Delete icon (trailing) on user-added set rows only; tapping deletes immediately; delete icon should be in the previously mentioned dropdown that's on the right of each row.
-
-**DB:**
-- `addSet(int completedExerciseId) → Future<int>` — inserts a `completed_set` with all nulls, returns new id.
-- `deleteSet(int completedSetId) → Future<void>` — deletes the row.
-
-**`WorkoutScreen._load()`:** Reload after add/delete (call `_load()` but preserve existing `_setStates` via `putIfAbsent`).
-
-**`SetData.planned`:** Already nullable; `null` means user-added. Use this to gate the delete icon.
-
----
-
 ### 4. Movement Notes Display
 
 **Goal:** Show `movement.note1` on the workout screen.
@@ -246,10 +172,15 @@ Tracks all remaining work. Each task includes enough context to execute without 
 
 **Goal:** Let user view, edit, and add movements.
 
-**Screens:**
-- `MovementsScreen`: list of all `Movement` rows.
-- `MovementDetailScreen`: view/edit a movement's fields (name, muscle group, isRequired*, note1, note2, link, minWeight, weightDelta).
-- Add new movement form.
+**Done:**
+- `MovementsScreen` (`lib/screens/movements_screen.dart`): movements grouped by muscle group (alphabetical), alpha within group. Tap → `MovementDetailScreen`.
+- `MovementDetailScreen` (`lib/screens/movement_detail_screen.dart`): fully editable (name, muscle group, subMuscleGroup, isRequired*, note1, note2, link, minWeight, weightDelta). Save writes via `db.updateMovement()`.
+- `AppNavMenu` (`lib/widgets/app_nav_menu.dart`): persistent nav dropdown in every AppBar. `enum AppScreen { workout, exercises }` — hides current screen's item. Passes `activeWorkoutId`/`activeWorkoutName` so "Workout" navigates to the active workout or `HomeScreen` if none.
+- `db.getMovements()`: returns all movements ordered by muscleGroup then name.
+- `db.updateMovement(MovementsCompanion)`: updates movement by id.
+
+**Remaining:**
+- Add new movement form (create flow, not just edit).
 
 **Note:** Movements are global, not per-mesocycle. Editing a movement affects future planned workouts only (planned/completed rows already store movementId, so history is unaffected).
 
@@ -263,16 +194,6 @@ Tracks all remaining work. Each task includes enough context to execute without 
 - AI recommendations: on/off toggle
 - Anthropic API key: text field (stored securely via `flutter_secure_storage`)
 - (Future) units: lbs / kg
-
----
-
-### 17. Navigation / App Shell
-
-**Goal:** Add persistent bottom navigation or drawer for secondary screens.
-
-**Tabs / destinations:** Home | History | Exercises | Settings
-
-**Note:** During an active workout, the bottom nav should be hidden or disabled (workout screen is a full takeover). The workout screen already sets `automaticallyImplyLeading: false`.
 
 ---
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../db/app_database.dart';
 import '../db/db.dart';
+import '../widgets/app_nav_menu.dart';
 import 'pre_workout_checkin_screen.dart';
 import 'workout_screen.dart';
 
@@ -75,7 +76,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Workout of Record')),
+      appBar: AppBar(
+        title: const Text('Workout of Record'),
+        actions: [
+          AppNavMenu(current: AppScreen.workout),
+        ],
+      ),
       body: FutureBuilder<Workout?>(
         future: _nextWorkoutFuture,
         builder: (context, snapshot) {
