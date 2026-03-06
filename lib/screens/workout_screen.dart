@@ -494,6 +494,36 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     });
   }
 
+  Future<void> _addSet(ExerciseData exercise) async {
+    if (_postExDone[exercise.completed.id] == true) {
+      await db.clearPostExerciseCheckin(exercise.completed.id);
+      setState(() => _postExDone[exercise.completed.id] = false);
+    }
+    final mg = exercise.movement.muscleGroup;
+    if (_postMgDone[mg] == true) {
+      await db.clearPostMuscleGroupCheckin(widget.completedWorkoutId, mg);
+      setState(() => _postMgDone[mg] = false);
+    }
+    await db.addSet(exercise.completed.id);
+    await _load();
+  }
+
+  Future<void> _deleteSet(SetData setData, ExerciseData exercise) async {
+    await db.deleteSet(setData.completed.id);
+    _setStates.remove(setData.completed.id)?.dispose();
+    await _load();
+    if (!mounted) return;
+    final updatedEx = _data!.exercises
+        .firstWhere((e) => e.completed.id == exercise.completed.id);
+    if (_postExDone[updatedEx.completed.id] != true) {
+      final allSetsDone = updatedEx.sets
+          .every((s) => _setStates[s.completed.id]?.isChecked ?? false);
+      if (allSetsDone) {
+        await _showPostExerciseSheet(updatedEx);
+      }
+    }
+  }
+
   Future<void> _unskipExercise(ExerciseData exercise) async {
     await db.unskipExercise(exercise.completed.id);
     final mg = exercise.movement.muscleGroup;
@@ -627,18 +657,39 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         onPressed: () => _unskipExercise(exercise),
         child: const Text('Unskip'),
       );
-    } else if (showPostExReopen) {
-      headerTrailing = TextButton(
-        onPressed: () => _showPostExerciseSheet(exercise),
-        child: const Text('Rate joint pain'),
-      );
-    } else if (!anySetChecked) {
-      headerTrailing = TextButton(
-        onPressed: () => _showExerciseSkipSheet(exercise),
-        child: const Text('Skip'),
-      );
     } else {
-      headerTrailing = const SizedBox.shrink();
+      headerTrailing = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showPostExReopen)
+            TextButton(
+              onPressed: () => _showPostExerciseSheet(exercise),
+              child: const Text('Rate joint pain'),
+            ),
+          PopupMenuButton<_ExMenuAction>(
+            iconSize: 18,
+            padding: EdgeInsets.zero,
+            onSelected: (action) {
+              if (action == _ExMenuAction.skipExercise) {
+                _showExerciseSkipSheet(exercise);
+              } else {
+                _addSet(exercise);
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: _ExMenuAction.skipExercise,
+                enabled: !anySetChecked,
+                child: const Text('Skip Exercise'),
+              ),
+              PopupMenuItem(
+                value: _ExMenuAction.addSet,
+                child: const Text('Add Set'),
+              ),
+            ],
+          ),
+        ],
+      );
     }
 
     final header = Padding(
@@ -746,6 +797,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
             onSelected: (action) {
               if (action == _SetMenuAction.skip) {
                 _showSkipReasonSheet(setData, exercise);
+              } else if (action == _SetMenuAction.delete) {
+                _deleteSet(setData, exercise);
               }
             },
             itemBuilder: (_) => [
@@ -754,6 +807,12 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                 enabled: !state.isChecked && !isExSkipped,
                 child: const Text('Skip'),
               ),
+              if (setData.planned == null)
+                PopupMenuItem(
+                  value: _SetMenuAction.delete,
+                  enabled: !state.isChecked,
+                  child: const Text('Delete'),
+                ),
             ],
           ),
         ],
@@ -787,7 +846,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   }
 }
 
-enum _SetMenuAction { skip }
+enum _SetMenuAction { skip, delete }
+
+enum _ExMenuAction { skipExercise, addSet }
 
 class _SetUiState {
   _SetUiState({

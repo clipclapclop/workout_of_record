@@ -64,11 +64,11 @@ Tracks all remaining work. Each task includes enough context to execute without 
 
 **Rules (from overview.md):**
 - User-added sets append to the end.
-- User can only delete sets they added (not planned sets).
-- A user-added set is one where `completed_set` has no corresponding `planned_set` (i.e., `SetData.planned == null`).
+- User can only delete sets they added (not planned sets, they must be skipped).
 
 **UX:**
-- "Add Set" button at the bottom of each exercise's set list.
+- "Add Set" button within the little dropdown within each set
+- regardless of which "add set" button is tapped within an exercise (each existing set will add one), the set will be added to the end of the list of sets for said exercise
 - Delete icon (trailing) on user-added set rows only; tapping deletes immediately; delete icon should be in the previously mentioned dropdown that's on the right of each row.
 
 **DB:**

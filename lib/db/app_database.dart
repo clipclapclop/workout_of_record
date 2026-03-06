@@ -361,6 +361,13 @@ class AppDatabase extends _$AppDatabase {
           PostMuscleGroupCheckinsCompanion checkin) =>
       into(postMuscleGroupCheckins).insert(checkin);
 
+  Future<int> addSet(int completedExerciseId) =>
+      into(completedSets).insert(
+        CompletedSetsCompanion.insert(completedExerciseId: completedExerciseId));
+
+  Future<void> deleteSet(int completedSetId) =>
+      (delete(completedSets)..where((s) => s.id.equals(completedSetId))).go();
+
   Future<void> finishWorkout(int completedWorkoutId) async {
     await transaction(() async {
       await (update(completedWorkouts)
