@@ -312,6 +312,47 @@ class AppDatabase extends _$AppDatabase {
         ),
       );
 
+  Future<void> skipExercise(int completedExerciseId, SkipReason reason) async {
+    await transaction(() async {
+      await (update(completedExercises)
+            ..where((e) => e.id.equals(completedExerciseId)))
+          .write(CompletedExercisesCompanion(skipReason: Value(reason)));
+      final sets = await (select(completedSets)
+            ..where((s) => s.completedExerciseId.equals(completedExerciseId)))
+          .get();
+      for (final s in sets) {
+        await skipSet(s.id, reason);
+      }
+    });
+  }
+
+  Future<void> unskipExercise(int completedExerciseId) async {
+    await transaction(() async {
+      await (update(completedExercises)
+            ..where((e) => e.id.equals(completedExerciseId)))
+          .write(const CompletedExercisesCompanion(skipReason: Value(null)));
+      final sets = await (select(completedSets)
+            ..where((s) => s.completedExerciseId.equals(completedExerciseId)))
+          .get();
+      for (final s in sets) {
+        await clearCompletedSet(s.id);
+      }
+    });
+  }
+
+  Future<void> clearPostExerciseCheckin(int completedExerciseId) =>
+      (delete(postExerciseCheckins)
+            ..where((c) => c.completedExerciseId.equals(completedExerciseId)))
+          .go();
+
+  Future<void> clearPostMuscleGroupCheckin(
+          int completedWorkoutId, MuscleGroup muscleGroup) =>
+      (delete(postMuscleGroupCheckins)
+            ..where((c) =>
+                c.completedWorkoutId.equals(completedWorkoutId) &
+                c.muscleGroup.equals(muscleGroup.name)))
+          .go();
+
   Future<void> savePostExerciseCheckin(
           PostExerciseCheckinsCompanion checkin) =>
       into(postExerciseCheckins).insert(checkin);
