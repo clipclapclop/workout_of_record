@@ -70,7 +70,8 @@ class AppDatabase extends _$AppDatabase {
           completedWorkouts, completedWorkouts.workoutId.equalsExp(workouts.id)),
     ])
       ..where(weeks.mesocycleId.equals(mesocycleId) &
-          completedWorkouts.id.isNull())
+          completedWorkouts.id.isNull() &
+          workouts.isRestDay.equals(false))
       ..orderBy([
         OrderingTerm.asc(weeks.weekNumber),
         OrderingTerm.asc(workouts.orderIndex),
