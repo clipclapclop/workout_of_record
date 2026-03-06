@@ -56,6 +56,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           weight: _fmt(cs.weight ?? ps?.weight),
           time: _fmt(cs.time ?? ps?.time),
           isChecked: WorkoutData.setIsDone(s, ex.movement),
+          isSkipped: cs.skipReason != null,
         );
       }
       _postExDone.putIfAbsent(
@@ -122,10 +123,40 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
             ? double.parse(state.timeCtrl.text.trim())
             : null,
       );
+      setState(() => _setStates[setId]!.isChecked = true);
     } else {
-      await db.clearCompletedSet(setId);
+      // Collect all sets to clear: walk backwards from this set while skipped.
+      final setIndex =
+          exercise.sets.indexWhere((s) => s.completed.id == setId);
+      final toClear = <int>[];
+      for (var i = setIndex; i >= 0; i--) {
+        final id = exercise.sets[i].completed.id;
+        if (_setStates[id]?.isSkipped == true || id == setId) {
+          toClear.add(id);
+        } else {
+          break;
+        }
+      }
+      for (final id in toClear) {
+        await db.clearCompletedSet(id);
+      }
+      setState(() {
+        for (final id in toClear) {
+          final state = _setStates[id]!;
+          final wasSkipped = state.isSkipped;
+          state.isChecked = false;
+          state.isSkipped = false;
+          if (wasSkipped) {
+            final setData =
+                exercise.sets.firstWhere((s) => s.completed.id == id);
+            final ps = setData.planned;
+            state.repsCtrl.text = ps?.reps?.toString() ?? '';
+            state.weightCtrl.text = _fmt(ps?.weight);
+            state.timeCtrl.text = _fmt(ps?.time);
+          }
+        }
+      });
     }
-    setState(() => _setStates[setId]!.isChecked = checked);
 
     // After checking, see if the exercise's last set was just completed.
     if (checked && _postExDone[exercise.completed.id] != true) {
@@ -138,73 +169,57 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   }
 
   Future<void> _showPostExerciseSheet(ExerciseData exercise) async {
-    var jointPain = Soreness.none;
-    var submitted = false;
-
-    await showModalBottomSheet<void>(
+    final jointPain = await showModalBottomSheet<Soreness>(
       context: context,
       isDismissible: false,
       enableDrag: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => Padding(
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 24,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(exercise.movement.name,
-                  style: Theme.of(ctx).textTheme.titleMedium),
-              const SizedBox(height: 4),
-              const Text('Any joint pain?'),
-              const SizedBox(height: 12),
-              SegmentedButton<Soreness>(
-                segments: const [
-                  ButtonSegment(value: Soreness.none, label: Text('None')),
-                  ButtonSegment(
-                      value: Soreness.aLittle, label: Text('A Little')),
-                  ButtonSegment(value: Soreness.some, label: Text('Some')),
-                  ButtonSegment(value: Soreness.lots, label: Text('Lots')),
-                ],
-                selected: {jointPain},
-                onSelectionChanged: (v) =>
-                    setSheet(() => jointPain = v.first),
-                showSelectedIcon: false,
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Cancel'),
-                  ),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: () async {
-                      await db.savePostExerciseCheckin(
-                        PostExerciseCheckinsCompanion.insert(
-                          completedExerciseId: exercise.completed.id,
-                          jointPain: jointPain,
-                        ),
-                      );
-                      submitted = true;
-                      if (ctx.mounted) Navigator.pop(ctx);
-                    },
-                    child: const Text('Submit'),
-                  ),
-                ],
-              ),
-            ],
-          ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(exercise.movement.name,
+                style: Theme.of(ctx).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            const Text('Any joint pain?'),
+            const SizedBox(height: 12),
+            SegmentedButton<Soreness>(
+              segments: const [
+                ButtonSegment(value: Soreness.none, label: Text('None')),
+                ButtonSegment(
+                    value: Soreness.aLittle, label: Text('A Little')),
+                ButtonSegment(value: Soreness.some, label: Text('Some')),
+                ButtonSegment(value: Soreness.lots, label: Text('Lots')),
+              ],
+              selected: const {},
+              emptySelectionAllowed: true,
+              onSelectionChanged: (v) => Navigator.pop(ctx, v.first),
+              showSelectedIcon: false,
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+          ],
         ),
       ),
     );
 
-    if (!submitted || !mounted) return;
+    if (jointPain == null || !mounted) return;
+
+    await db.savePostExerciseCheckin(
+      PostExerciseCheckinsCompanion.insert(
+        completedExerciseId: exercise.completed.id,
+        jointPain: jointPain,
+      ),
+    );
 
     setState(() => _postExDone[exercise.completed.id] = true);
 
@@ -219,11 +234,12 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   }
 
   Future<void> _showPostMuscleGroupSheet(MuscleGroup muscleGroup) async {
-    var effort = Effort.hard;
-    var volume = Volume.good;
-    var submitted = false;
+    Effort? effort;
+    Volume? volume;
+    var effortSet = false;
+    var volumeSet = false;
 
-    await showModalBottomSheet<void>(
+    final result = await showModalBottomSheet<(Effort, Volume)>(
       context: context,
       isDismissible: false,
       enableDrag: false,
@@ -253,8 +269,13 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                   ButtonSegment(
                       value: Effort.tooHard, label: Text('Too Hard')),
                 ],
-                selected: {effort},
-                onSelectionChanged: (v) => setSheet(() => effort = v.first),
+                selected: effort != null ? {effort!} : const {},
+                emptySelectionAllowed: true,
+                onSelectionChanged: (v) {
+                  setSheet(() => effort = v.first);
+                  effortSet = true;
+                  if (volumeSet) Navigator.pop(ctx, (effort!, volume!));
+                },
                 showSelectedIcon: false,
               ),
               const SizedBox(height: 16),
@@ -269,34 +290,19 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                   ButtonSegment(
                       value: Volume.wayTooMuch, label: Text('Way Too Much')),
                 ],
-                selected: {volume},
-                onSelectionChanged: (v) => setSheet(() => volume = v.first),
+                selected: volume != null ? {volume!} : const {},
+                emptySelectionAllowed: true,
+                onSelectionChanged: (v) {
+                  setSheet(() => volume = v.first);
+                  volumeSet = true;
+                  if (effortSet) Navigator.pop(ctx, (effort!, volume!));
+                },
                 showSelectedIcon: false,
               ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Cancel'),
-                  ),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: () async {
-                      await db.savePostMuscleGroupCheckin(
-                        PostMuscleGroupCheckinsCompanion.insert(
-                          completedWorkoutId: widget.completedWorkoutId,
-                          muscleGroup: muscleGroup,
-                          effortLevel: effort,
-                          volumeLevel: volume,
-                        ),
-                      );
-                      submitted = true;
-                      if (ctx.mounted) Navigator.pop(ctx);
-                    },
-                    child: const Text('Submit'),
-                  ),
-                ],
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
               ),
             ],
           ),
@@ -304,8 +310,103 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       ),
     );
 
-    if (!submitted || !mounted) return;
+    if (result == null || !mounted) return;
+
+    await db.savePostMuscleGroupCheckin(
+      PostMuscleGroupCheckinsCompanion.insert(
+        completedWorkoutId: widget.completedWorkoutId,
+        muscleGroup: muscleGroup,
+        effortLevel: result.$1,
+        volumeLevel: result.$2,
+      ),
+    );
+
     setState(() => _postMgDone[muscleGroup] = true);
+  }
+
+  String _skipReasonLabel(SkipReason r) => switch (r) {
+        SkipReason.systemicFatigue => 'Systemic Fatigue',
+        SkipReason.muscleFatigue => 'Muscle Fatigue',
+        SkipReason.jointPain => 'Joint Pain',
+        SkipReason.time => 'Time',
+        SkipReason.musclePain => 'Muscle Pain',
+        SkipReason.softTissuePainOther => 'Soft Tissue / Other',
+        SkipReason.dontLikeTheExercise => "Don't Like the Exercise",
+      };
+
+  Future<void> _showSkipReasonSheet(
+      SetData setData, ExerciseData exercise) async {
+    SkipReason? selected;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SingleChildScrollView(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Skip Reason', style: Theme.of(ctx).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            for (final reason in SkipReason.values)
+              ListTile(
+                title: Text(_skipReasonLabel(reason)),
+                contentPadding: EdgeInsets.zero,
+                onTap: () {
+                  selected = reason;
+                  Navigator.pop(ctx);
+                },
+              ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (selected == null || !mounted) return;
+    await _skipSets(setData, exercise, selected!);
+  }
+
+  Future<void> _skipSets(
+      SetData setData, ExerciseData exercise, SkipReason reason) async {
+    final setIndex =
+        exercise.sets.indexWhere((s) => s.completed.id == setData.completed.id);
+    final toSkip = [
+      for (var i = setIndex; i < exercise.sets.length; i++)
+        if (!(_setStates[exercise.sets[i].completed.id]?.isChecked ?? false))
+          exercise.sets[i].completed.id,
+    ];
+
+    for (final id in toSkip) {
+      await db.skipSet(id, reason);
+    }
+
+    setState(() {
+      for (final id in toSkip) {
+        final state = _setStates[id]!;
+        state.isSkipped = true;
+        state.isChecked = true;
+        state.repsCtrl.clear();
+        state.weightCtrl.clear();
+        state.timeCtrl.clear();
+      }
+    });
+
+    if (_postExDone[exercise.completed.id] != true) {
+      final allSetsDone = exercise.sets
+          .every((s) => _setStates[s.completed.id]?.isChecked ?? false);
+      if (allSetsDone && mounted) {
+        await _showPostExerciseSheet(exercise);
+      }
+    }
   }
 
   Future<void> _finishWorkout() async {
@@ -446,7 +547,13 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     final state = _setStates[setData.completed.id]!;
     final canCheck = state.canCheck(movement);
 
-    return Padding(
+    return Container(
+      decoration: state.isSkipped
+          ? BoxDecoration(
+              color: Theme.of(context).colorScheme.error.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(6),
+            )
+          : null,
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
@@ -476,6 +583,22 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
             onChanged: (canCheck || state.isChecked)
                 ? (v) => _onToggle(setData.completed.id, movement, v!, exercise)
                 : null,
+          ),
+          PopupMenuButton<_SetMenuAction>(
+            iconSize: 18,
+            padding: EdgeInsets.zero,
+            onSelected: (action) {
+              if (action == _SetMenuAction.skip) {
+                _showSkipReasonSheet(setData, exercise);
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: _SetMenuAction.skip,
+                enabled: !state.isChecked,
+                child: const Text('Skip'),
+              ),
+            ],
           ),
         ],
       ),
@@ -508,9 +631,12 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   }
 }
 
+enum _SetMenuAction { skip }
+
 class _SetUiState {
   _SetUiState({
     required this.isChecked,
+    required this.isSkipped,
     String reps = '',
     String weight = '',
     String time = '',
@@ -522,6 +648,7 @@ class _SetUiState {
   final TextEditingController weightCtrl;
   final TextEditingController timeCtrl;
   bool isChecked;
+  bool isSkipped;
 
   bool canCheck(Movement m) {
     if (m.isRequiredReps) {

@@ -292,12 +292,23 @@ class AppDatabase extends _$AppDatabase {
         ),
       );
 
+  Future<void> skipSet(int id, SkipReason reason) =>
+      (update(completedSets)..where((s) => s.id.equals(id))).write(
+        CompletedSetsCompanion(
+          skipReason: Value(reason),
+          reps: const Value(null),
+          weight: const Value(null),
+          time: const Value(null),
+        ),
+      );
+
   Future<void> clearCompletedSet(int id) =>
       (update(completedSets)..where((s) => s.id.equals(id))).write(
         const CompletedSetsCompanion(
           reps: Value(null),
           weight: Value(null),
           time: Value(null),
+          skipReason: Value(null),
         ),
       );
 
