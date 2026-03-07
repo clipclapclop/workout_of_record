@@ -7,29 +7,6 @@ Tracks all remaining work. Each task includes enough context to execute without 
 
 ---
 
-### 4. Movement Notes Display
-
-**Goal:** Show `movement.note1` on the workout screen.
-
-**Rules:**
-- `note1` (short) — display inline, below the exercise header, if non-null.
-
-**Where to add:** `WorkoutScreen._buildExercise()` — already builds exercise headers and set rows.
-
-**Data:** `ExerciseData.movement` already carries the full `Movement` object. `Movement.note1` is already in the schema (`lib/db/tables/movements.dart`).
-
----
-
-### 5. Movement Link Display
-
-**Goal:** Show `movement.link` (URL to video/description) in the exercise header if non-null.
-
-**UX:** Small link icon button in exercise header. Tapping launches the URL in the device browser (`url_launcher` package).
-
-**Package:** Add `url_launcher` to `pubspec.yaml`. Add Android intent in `AndroidManifest.xml`.
-
----
-
 ### 6. Week 2+ Workout Planning (Template Generation from Prior Week)
 
 **Goal:** When week N+1 starts, auto-generate `planned_workout` / `planned_exercises` / `planned_sets` for each training day using last week's completed workout as the template.

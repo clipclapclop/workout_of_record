@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../db/app_database.dart';
 import '../db/db.dart';
@@ -720,6 +721,16 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
               style: Theme.of(context).textTheme.titleMedium,
             ),
           ),
+          if (exercise.movement.link != null)
+            IconButton(
+              icon: const Icon(Icons.play_circle_outline, size: 20),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: () => launchUrl(
+                Uri.parse(exercise.movement.link!),
+                mode: LaunchMode.externalApplication,
+              ),
+            ),
           headerTrailing,
         ],
       ),
@@ -735,6 +746,14 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         header,
+        if (exercise.movement.note1 != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              exercise.movement.note1!,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
         ...setRows,
         if (showPostMgReopen)
           Padding(
