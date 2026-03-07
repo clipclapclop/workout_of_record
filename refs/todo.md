@@ -7,7 +7,62 @@ Tracks all remaining work. Each task includes enough context to execute without 
 
 ---
 
-### 6. Week 2+ Workout Planning (Template Generation from Prior Week)
+### 1. Meso Template Builder
+
+**Goal:** Let the user create new `meso_template` rows in-app (name, days per week, which movements per day, order).
+
+**UX Flow:**
+1. Entry point from `MesocycleSetupScreen` — "Create new template" button.
+2. User names the template and picks number of training days per week.
+3. For each training day, user adds movements (via movement picker / search). Order is drag-reorderable.
+4. Save creates `meso_template` + `workout_template` + `exercise_template` rows.
+
+**DB methods needed:**
+- `createMesoTemplate(String name) → Future<int>`
+- `addWorkoutTemplate(int mesoTemplateId, int orderIndex) → Future<int>`
+- `addExerciseTemplate(int workoutTemplateId, int movementId, int orderIndex) → Future<void>`
+- `getMesoTemplates()` — already needed by task 8.
+
+**Note:** Movements are created/managed separately (Movement screens already exist). Template builder just picks from existing movements.
+
+---
+
+### 2. Cold Boot / Mesocycle Selection UI
+
+**Goal:** When `app_state.currentMesocycleId` is null (fresh install or end of mesocycle), guide the user through selecting/creating a mesocycle.
+
+**UX Flow:**
+1. `HomeScreen` detects `currentMesocycleId == null` → navigates to `MesocycleSetupScreen`.
+2. `MesocycleSetupScreen` lists available `meso_templates` (from DB) for user to pick. Includes "Create new template" → task 5.
+3. User picks a template and sets total week count (hard weeks + 1 deload).
+4. App creates `mesocycle`, week 1 `week`,
+4.5. all `workout` rows from the template's `workout_template` rows, and `planned_workout` / `planned_exercises` / `planned_sets` for week 1 training days (values: 2 sets, blank reps/weight — cold start default) will be created after each respective workout preworkout questionaire is submitted (if it's not presently done this way, that'll need to change) (eventually this will be done more inteligently base based on each days' )
+5. `app_state.currentMesocycleId` is set to the new mesocycle.
+6. Navigate to `HomeScreen` (which now shows the first workout).
+
+**DB methods needed:**
+- `getMesoTemplates() → Future<List<MesoTemplate>>`
+- `createMesocycle(int templateId, int totalWeeks) → Future<int>` — full transaction creating the meso + week, but the workout creations will need to reference the meso template... so above methods may need adjusting
+
+**Cold start values:** 2 sets per exercise, `reps = null`, `weight = null` (user fills in first time).
+
+---
+
+### 3. Deterministic Fallback Heuristics
+
+**Goal:** When AI is off/unavailable, still generate reasonable planned set values.
+
+**Hard week heuristic:** Use last completed values directly (same reps/weight as last week).
+
+**Deload heuristic:** Reduce volume — e.g., 2 sets, 60–70% of last weight, same reps.
+
+**Cold start (no history):** 2 sets, reps/weight blank (null) — user fills in manually.
+
+**Implementation:** Pure Dart function `PlannedSetValues computeHeuristic(ExerciseHistory history, WeekGoal goal)` — no DB writes, called from `generatePlannedWorkout`.
+
+---
+
+### 4. Week 2+ Workout Planning (Template Generation from Prior Week)
 
 **Goal:** When week N+1 starts, auto-generate `planned_workout` / `planned_exercises` / `planned_sets` for each training day using last week's completed workout as the template.
 
@@ -26,7 +81,19 @@ Tracks all remaining work. Each task includes enough context to execute without 
 
 ---
 
-### 7. Workout Skip
+### 5. `isPersistent` Flag in Workout Screen
+
+**Goal:** Let user toggle whether a completed exercise carries forward to next week's planned workout.
+
+**Current state:** `completed_exercise.isPersistent` is set to `true` for all exercises in `initializeWorkout`. User has no way to change it.
+
+**UX:** Toggle in exercise header (e.g., a bookmark icon). Default `true`. If user sets to `false`, the exercise won't appear in week N+1's planned workout.
+
+**DB:** `setExercisePersistence(int completedExerciseId, bool isPersistent)` — simple update.
+
+---
+
+### 6. Workout Skip
 
 **Goal:** User can skip the current prescribed workout and advance to the next one.
 
@@ -42,28 +109,7 @@ Tracks all remaining work. Each task includes enough context to execute without 
 
 ---
 
-### 8. Cold Boot / Mesocycle Selection UI
-
-**Goal:** When `app_state.currentMesocycleId` is null (fresh install or end of mesocycle), guide the user through selecting/creating a mesocycle.
-
-**UX Flow:**
-1. `HomeScreen` detects `currentMesocycleId == null` → navigates to `MesocycleSetupScreen`.
-2. `MesocycleSetupScreen` lists available `meso_templates` (from DB) for user to pick.
-3. User picks a template and sets total week count (hard weeks + 1 deload).
-4. App creates `mesocycle`, week 1 `week`, 
-4.5. all `workout` rows from the template's `workout_template` rows, and `planned_workout` / `planned_exercises` / `planned_sets` for week 1 training days (values: 2 sets, blank reps/weight — cold start default) will be created after each respective workout preworkout questionaire is submitted (if it's not presently done this way, that'll need to change) (eventually this will be done more inteligently base based on each days' )
-5. `app_state.currentMesocycleId` is set to the new mesocycle.
-6. Navigate to `HomeScreen` (which now shows the first workout).
-
-**DB methods needed:**
-- `getMesoTemplates() → Future<List<MesoTemplate>>`
-- `createMesocycle(int templateId, int totalWeeks) → Future<int>` — full transaction creating the meso + week, but the workout creations will need to reference the meso template... so above methods may need adjusting
-
-**Cold start values:** 2 sets per exercise, `reps = null`, `weight = null` (user fills in first time).
-
----
-
-### 9. End of Mesocycle Handling
+### 7. End of Mesocycle Handling
 
 **Goal:** When `getNextWorkout` returns null (all workouts completed), the mesocycle is done.
 
@@ -73,13 +119,46 @@ Tracks all remaining work. Each task includes enough context to execute without 
 
 ---
 
-### 10. Inactivity Reminder
+### 8. User Profile
 
-**Goal:** Nudge user if workout has been active for ~1 hour with no interaction.
+**Goal:** Store user profile fields used by the recommendation engine.
 
-**Implementation:** In `WorkoutScreen`, track last interaction timestamp in state. Use a `Timer.periodic` (check every few minutes). If elapsed > 1 hour, show a `SnackBar` or notification: "Still working out? Don't forget to log your sets."
+**Fields:** age (int), weight (double, kg), training goal (enum: strength / hypertrophy / endurance / general).
 
-**Note:** Keep it simple — in-app only for now (no system notifications required).
+**DB:** Add `user_profile` table (singleton like `app_state`). Schema migration required (version bump).
+
+**UI:** `ProfileScreen` with form fields. Link from Settings or app drawer.
+
+---
+
+### 9. Settings Screen
+
+**Goal:** Central settings hub.
+
+**Initial settings:**
+- AI recommendations: on/off toggle
+- Anthropic API key: text field (stored securely via `flutter_secure_storage`)
+- (Future) units: lbs / kg
+
+---
+
+### 10. History / Analytics Screens
+
+**Goal:** Let user review past workouts.
+
+**Screens:**
+- `HistoryScreen`: list of `completed_workouts` ordered by `startedAt` desc. Tap → `WorkoutHistoryDetailScreen`.
+- `WorkoutHistoryDetailScreen`: shows all exercises + sets with planned vs completed values side by side.
+- (Future) Per-movement trend charts.
+
+**DB methods:**
+- `getCompletedWorkouts() → Future<List<CompletedWorkout>>`
+- `getWorkoutData(int completedWorkoutId)` — already implemented, reuse.
+
+**Remaining:**
+- Add new movement form (create flow, not just edit).
+
+**Note:** Movements are global, not per-mesocycle. Editing a movement affects future planned workouts only (planned/completed rows already store movementId, so history is unaffected).
 
 ---
 
@@ -104,89 +183,17 @@ Tracks all remaining work. Each task includes enough context to execute without 
 
 ---
 
-### 12. Deterministic Fallback Heuristics
+### 12. Inactivity Reminder
 
-**Goal:** When AI is off/unavailable, still generate reasonable planned set values.
+**Goal:** Nudge user if workout has been active for ~1 hour with no interaction.
 
-**Hard week heuristic:** Use last completed values directly (same reps/weight as last week).
+**Implementation:** In `WorkoutScreen`, track last interaction timestamp in state. Use a `Timer.periodic` (check every few minutes). If elapsed > 1 hour, show a `SnackBar` or notification: "Still working out? Don't forget to log your sets."
 
-**Deload heuristic:** Reduce volume — e.g., 2 sets, 60–70% of last weight, same reps.
-
-**Cold start (no history):** 2 sets, reps/weight blank (null) — user fills in manually.
-
-**Implementation:** Pure Dart function `PlannedSetValues computeHeuristic(ExerciseHistory history, WeekGoal goal)` — no DB writes, called from `generatePlannedWorkout`.
+**Note:** Keep it simple — in-app only for now (no system notifications required).
 
 ---
 
-### 13. User Profile
-
-**Goal:** Store user profile fields used by the recommendation engine.
-
-**Fields:** age (int), weight (double, kg), training goal (enum: strength / hypertrophy / endurance / general).
-
-**DB:** Add `user_profile` table (singleton like `app_state`). Schema migration required (version bump).
-
-**UI:** `ProfileScreen` with form fields. Link from Settings or app drawer.
-
----
-
-### 14. History / Analytics Screens
-
-**Goal:** Let user review past workouts.
-
-**Screens:**
-- `HistoryScreen`: list of `completed_workouts` ordered by `startedAt` desc. Tap → `WorkoutHistoryDetailScreen`.
-- `WorkoutHistoryDetailScreen`: shows all exercises + sets with planned vs completed values side by side.
-- (Future) Per-movement trend charts.
-
-**DB methods:**
-- `getCompletedWorkouts() → Future<List<CompletedWorkout>>`
-- `getWorkoutData(int completedWorkoutId)` — already implemented, reuse.
-
----
-
-### 15. Exercise Management Screen
-
-**Goal:** Let user view, edit, and add movements.
-
-**Done:**
-- `MovementsScreen` (`lib/screens/movements_screen.dart`): movements grouped by muscle group (alphabetical), alpha within group. Tap → `MovementDetailScreen`.
-- `MovementDetailScreen` (`lib/screens/movement_detail_screen.dart`): fully editable (name, muscle group, subMuscleGroup, isRequired*, note1, note2, link, minWeight, weightDelta). Save writes via `db.updateMovement()`.
-- `AppNavMenu` (`lib/widgets/app_nav_menu.dart`): persistent nav dropdown in every AppBar. `enum AppScreen { workout, exercises }` — hides current screen's item. Passes `activeWorkoutId`/`activeWorkoutName` so "Workout" navigates to the active workout or `HomeScreen` if none.
-- `db.getMovements()`: returns all movements ordered by muscleGroup then name.
-- `db.updateMovement(MovementsCompanion)`: updates movement by id.
-
-**Remaining:**
-- Add new movement form (create flow, not just edit).
-
-**Note:** Movements are global, not per-mesocycle. Editing a movement affects future planned workouts only (planned/completed rows already store movementId, so history is unaffected).
-
----
-
-### 16. Settings Screen
-
-**Goal:** Central settings hub.
-
-**Initial settings:**
-- AI recommendations: on/off toggle
-- Anthropic API key: text field (stored securely via `flutter_secure_storage`)
-- (Future) units: lbs / kg
-
----
-
-### 18. `isPersistent` Flag in Workout Screen
-
-**Goal:** Let user toggle whether a completed exercise carries forward to next week's planned workout.
-
-**Current state:** `completed_exercise.isPersistent` is set to `true` for all exercises in `initializeWorkout`. User has no way to change it.
-
-**UX:** Toggle in exercise header (e.g., a bookmark icon). Default `true`. If user sets to `false`, the exercise won't appear in week N+1's planned workout.
-
-**DB:** `setExercisePersistence(int completedExerciseId, bool isPersistent)` — simple update.
-
----
-
-### 19. Additional Test Coverage
+### 13. Additional Test Coverage
 
 **Current:** 8 tests in `test/db/workout_flow_test.dart` covering core DB flow.
 
