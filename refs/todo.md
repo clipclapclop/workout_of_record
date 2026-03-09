@@ -7,53 +7,15 @@ Tracks all remaining work. Each task includes enough context to execute without 
 
 ---
 
-### 5. `isPersistent` Flag in Workout Screen
-
-**Goal:** Let user toggle whether a completed exercise carries forward to next week's planned workout.
-
-**Current state:** `completed_exercise.isPersistent` is set to `true` for all exercises in `initializeWorkout`. User has no way to change it.
-
-**UX:** Toggle exercise dropdown (e.g., a bookmark icon). Default `true`. If user sets to `false`, the exercise won't appear in week N+1's planned workout.
-
-**DB:** `setExercisePersistence(int completedExerciseId, bool isPersistent)` — simple update.
-
----
-
-### 6. Workout Skip
-
-**Goal:** User can skip the current prescribed workout and advance to the next one.
-
-**Rules (from overview.md):** Workouts within a week can be skipped but not reordered. Skipping creates a `completed_workout` with `status = abandoned` and a `WorkoutSkipReason`.
-
-**UX:** On `HomeScreen`, add a "Skip" option (e.g., secondary button or overflow menu item) alongside "Start Workout." Needs a popup to ensure user wants to skip the workout
-
-**DB:** Add `skipWorkout(int workoutId, WorkoutSkipReason reason) → Future<void>` — inserts `completed_workout(status=abandoned, startedAt=now, completedAt=now)`, no exercises/sets. Then re-fetch next workout.
-
-**`WorkoutSkipReason` enum:** Already in `lib/db/tables/enums.dart`.
-
-**`getNextWorkout`:** Already filters on "no completed_workout row at all" — abandoned workouts have a row, so they're naturally excluded. Verify this works correctly.
-
----
-
-### 7. End of Mesocycle Handling
-
-**Goal:** When `getNextWorkout` returns null (all workouts completed), the mesocycle is done.
-
-**UX:** `HomeScreen` shows a "Mesocycle Complete" state with a "Start New Mesocycle" button.
-
-**Flow:** Button → set `app_state.currentMesocycleId = null`, `currentCompletedWorkoutId = null` → navigate to `MesocycleSetupScreen` (task 8).
-
----
-
 ### 8. User Profile
 
 **Goal:** Store user profile fields used by the recommendation engine.
 
-**Fields:** age (int), weight (double, kg), training goal (enum: strength / hypertrophy / endurance / general).
+**Fields:** age (int), weight (double, kg), training goal (enum: strength / hypertrophy / endurance / general), daily calories are meant to (gain / maintain / loose) weight.
 
 **DB:** Add `user_profile` table (singleton like `app_state`). Schema migration required (version bump).
 
-**UI:** `ProfileScreen` with form fields. Link from Settings or app drawer.
+**UI:** `ProfileScreen` with form fields. Link in top right 3-dot dropdown.
 
 ---
 

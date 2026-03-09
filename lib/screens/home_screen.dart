@@ -8,6 +8,25 @@ import 'mesocycle_setup_screen.dart';
 import 'pre_workout_checkin_screen.dart';
 import 'workout_screen.dart';
 
+// ── Home state ───────────────────────────────────────────────────────────────
+
+sealed class _HomeResult {}
+
+/// Navigation is about to happen via addPostFrameCallback — show spinner.
+class _Redirecting extends _HomeResult {}
+
+/// All workouts in the mesocycle are complete.
+class _MesoComplete extends _HomeResult {}
+
+/// A workout is ready to start or scheduled.
+class _WorkoutReady extends _HomeResult {
+  final Workout workout;
+  final DateTime? expectedDate;
+  _WorkoutReady(this.workout, this.expectedDate);
+}
+
+// ── Screen ───────────────────────────────────────────────────────────────────
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -16,19 +35,20 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late Future<(Workout?, DateTime?)> _nextWorkoutFuture;
+  late Future<_HomeResult> _resultFuture;
 
   @override
   void initState() {
     super.initState();
-    _nextWorkoutFuture = _init();
+    _resultFuture = _init();
   }
 
-  /// Resolves app state and returns the next workout + expected date, or nulls.
+  /// Resolves app state and returns a [_HomeResult] describing what to show.
   ///
-  /// Side-effects (routing) are deferred via addPostFrameCallback so this
-  /// method is safe to call from initState.
-  Future<(Workout?, DateTime?)> _init() async {
+  /// Redirect cases schedule navigation via addPostFrameCallback (safe from
+  /// initState) and return [_Redirecting] so the spinner stays visible until
+  /// the route transition fires — no flash of the wrong screen.
+  Future<_HomeResult> _init() async {
     final appState = await db.getAppState();
 
     // Resume in-progress workout if one exists.
@@ -48,7 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         });
       }
-      return (null, null);
+      return _Redirecting();
     }
 
     // No active mesocycle — send to setup.
@@ -62,14 +82,14 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         });
       }
-      return (null, null);
+      return _Redirecting();
     }
 
     final workout = await db.getOrCreateNextWorkout(mesocycleId);
-    final date = workout != null
-        ? await db.getExpectedWorkoutDate(mesocycleId)
-        : null;
-    return (workout, date);
+    if (workout == null) return _MesoComplete();
+
+    final date = await db.getExpectedWorkoutDate(mesocycleId);
+    return _WorkoutReady(workout, date);
   }
 
   Future<void> _startWorkout(Workout workout) async {
@@ -82,7 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-    setState(() => _nextWorkoutFuture = _init());
+    setState(() => _resultFuture = _init());
   }
 
   Future<void> _skipWorkout(Workout workout) async {
@@ -123,7 +143,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (selected == null || !mounted) return;
     await db.skipWorkout(workout.id, selected!);
-    setState(() => _nextWorkoutFuture = _init());
+    setState(() => _resultFuture = _init());
   }
 
   String _formatExpectedDate(DateTime date) {
@@ -165,8 +185,8 @@ class _HomeScreenState extends State<HomeScreen> {
           AppNavMenu(current: AppScreen.workout),
         ],
       ),
-      body: FutureBuilder<(Workout?, DateTime?)>(
-        future: _nextWorkoutFuture,
+      body: FutureBuilder<_HomeResult>(
+        future: _resultFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
@@ -175,56 +195,55 @@ class _HomeScreenState extends State<HomeScreen> {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
 
-          final (workout, expectedDate) = snapshot.data ?? (null, null);
-
-          // null means either routing is in progress (resume/setup) or meso complete.
-          if (workout == null) {
-            // If we got here without a redirect, the mesocycle is complete.
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Mesocycle Complete!',
-                      style: Theme.of(context).textTheme.headlineMedium),
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: _startNewMesocycle,
-                    child: const Text('Start New Mesocycle'),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(workout.name,
-                    style: Theme.of(context).textTheme.headlineMedium),
-                if (expectedDate != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      _formatExpectedDate(expectedDate),
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+          return switch (snapshot.data!) {
+            _Redirecting() => const Center(child: CircularProgressIndicator()),
+            _MesoComplete() => Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Mesocycle Complete!',
+                        style: Theme.of(context).textTheme.headlineMedium),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: _startNewMesocycle,
+                      child: const Text('Start New Mesocycle'),
                     ),
-                  ),
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: () => _startWorkout(workout),
-                  child: const Text('Start Workout'),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                OutlinedButton(
-                  onPressed: () => _skipWorkout(workout),
-                  child: const Text('Skip Workout'),
+              ),
+            _WorkoutReady(:final workout, :final expectedDate) => Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(workout.name,
+                        style: Theme.of(context).textTheme.headlineMedium),
+                    if (expectedDate != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          _formatExpectedDate(expectedDate),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                        ),
+                      ),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: () => _startWorkout(workout),
+                      child: const Text('Start Workout'),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton(
+                      onPressed: () => _skipWorkout(workout),
+                      child: const Text('Skip Workout'),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          );
+              ),
+          };
         },
       ),
     );
