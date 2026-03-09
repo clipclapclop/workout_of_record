@@ -93,7 +93,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 24),
 
           // ── API Key ───────────────────────────────────────────────────────
-          Text('Anthropic API Key',
+          Text('OpenRouter API Key',
               style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
           if (_apiKeyLoading)
@@ -104,7 +104,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               obscureText: _obscureApiKey,
               decoration: InputDecoration(
                 border: const OutlineInputBorder(),
-                hintText: 'sk-ant-...',
+                hintText: 'sk-or-...',
                 suffixIcon: IconButton(
                   icon: Icon(
                     _obscureApiKey ? Icons.visibility : Icons.visibility_off,
