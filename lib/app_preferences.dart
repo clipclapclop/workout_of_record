@@ -35,9 +35,13 @@ class AppPreferences {
 
   // ── User profile ───────────────────────────────────────────────────────────
 
-  static int? getAge() => _prefs.getInt(_kProfileAge);
-  static Future<void> setAge(int? v) =>
-      v == null ? _prefs.remove(_kProfileAge) : _prefs.setInt(_kProfileAge, v);
+  static DateTime? getDateOfBirth() {
+    final s = _prefs.getString(_kProfileDateOfBirth);
+    return s == null ? null : DateTime.parse(s);
+  }
+  static Future<void> setDateOfBirth(DateTime? v) => v == null
+      ? _prefs.remove(_kProfileDateOfBirth)
+      : _prefs.setString(_kProfileDateOfBirth, v.toIso8601String());
 
   static double? getWeight() => _prefs.getDouble(_kProfileWeight);
   static Future<void> setWeight(double? v) =>
@@ -62,6 +66,10 @@ class AppPreferences {
   static bool getAiEnabled() => _prefs.getBool(_kSettingsAiEnabled) ?? true;
   static Future<void> setAiEnabled(bool v) => _prefs.setBool(_kSettingsAiEnabled, v);
 
+  /// True = metric (kg), false = imperial (lbs). Defaults to imperial.
+  static bool getUnitsMetric() => _prefs.getBool(_kSettingsUnitsMetric) ?? false;
+  static Future<void> setUnitsMetric(bool v) => _prefs.setBool(_kSettingsUnitsMetric, v);
+
   static Future<String?> getApiKey() => _secure.read(key: _kSettingsApiKey);
   static Future<void> setApiKey(String? v) => v == null
       ? _secure.delete(key: _kSettingsApiKey)
@@ -72,10 +80,11 @@ class AppPreferences {
   static const _kCurrentMesocycleId = 'current_mesocycle_id';
   static const _kCurrentCompletedWorkoutId = 'current_completed_workout_id';
   static const _kHasSeenProfilePrompt = 'has_seen_profile_prompt';
-  static const _kProfileAge = 'profile_age';
+  static const _kProfileDateOfBirth = 'profile_date_of_birth';
   static const _kProfileWeight = 'profile_weight_kg';
   static const _kProfileTrainingGoal = 'profile_training_goal';
   static const _kProfileCalorieState = 'profile_calorie_state';
   static const _kSettingsAiEnabled = 'settings_ai_enabled';
+  static const _kSettingsUnitsMetric = 'settings_units_metric';
   static const _kSettingsApiKey = 'settings_api_key';
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_preferences.dart';
 import '../widgets/app_nav_menu.dart';
+import 'home_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -12,6 +13,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   late bool _aiEnabled;
+  late bool _unitsMetric;
   final _apiKeyController = TextEditingController();
   bool _apiKeyLoading = true;
   bool _obscureApiKey = true;
@@ -20,6 +22,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _aiEnabled = AppPreferences.getAiEnabled();
+    _unitsMetric = AppPreferences.getUnitsMetric();
     _loadApiKey();
   }
 
@@ -39,12 +42,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _saveApiKey() async {
+  Future<void> _save() async {
     final value = _apiKeyController.text.trim();
     await AppPreferences.setApiKey(value.isEmpty ? null : value);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('API key saved.')),
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (_) => false,
       );
     }
   }
@@ -60,6 +65,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
+          // ── Units ─────────────────────────────────────────────────────────
+          SwitchListTile(
+            title: const Text('Use metric units'),
+            subtitle: Text(_unitsMetric ? 'kg' : 'lbs'),
+            value: _unitsMetric,
+            contentPadding: EdgeInsets.zero,
+            onChanged: (v) async {
+              setState(() => _unitsMetric = v);
+              await AppPreferences.setUnitsMetric(v);
+            },
+          ),
+          const SizedBox(height: 8),
+
           // ── AI Recommendations ────────────────────────────────────────────
           SwitchListTile(
             title: const Text('AI Recommendations'),
@@ -96,12 +114,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
             child: FilledButton(
-              onPressed: _apiKeyLoading ? null : _saveApiKey,
-              child: const Text('Save API Key'),
+              onPressed: _apiKeyLoading ? null : _save,
+              child: const Text('Save'),
             ),
           ),
         ],

@@ -846,7 +846,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           ],
           if (movement.isRequiredWeight) ...[
             const SizedBox(width: 8),
-            _inputField(state.weightCtrl, 'Weight', enabled: !state.isChecked),
+            _inputField(
+              state.weightCtrl,
+              AppPreferences.getUnitsMetric() ? 'kg' : 'lbs',
+              enabled: !state.isChecked,
+            ),
           ],
           if (movement.isRequiredTime) ...[
             const SizedBox(width: 8),

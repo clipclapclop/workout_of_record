@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_preferences.dart';
 import '../db/tables/enums.dart';
 import '../widgets/app_nav_menu.dart';
+import 'home_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -12,7 +13,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _ageController = TextEditingController();
+  DateTime? _dateOfBirth;
   final _weightController = TextEditingController();
   TrainingGoal? _trainingGoal;
   CalorieState? _calorieState;
@@ -20,9 +21,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    final age = AppPreferences.getAge();
+    _dateOfBirth = AppPreferences.getDateOfBirth();
     final weight = AppPreferences.getWeight();
-    if (age != null) _ageController.text = age.toString();
     if (weight != null) _weightController.text = weight.toString();
     _trainingGoal = AppPreferences.getTrainingGoal();
     _calorieState = AppPreferences.getCalorieState();
@@ -30,21 +30,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   void dispose() {
-    _ageController.dispose();
     _weightController.dispose();
     super.dispose();
   }
 
+  Future<void> _pickDateOfBirth() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dateOfBirth ?? DateTime(now.year - 30),
+      firstDate: DateTime(now.year - 100),
+      lastDate: DateTime(now.year - 10),
+      helpText: 'Select Date of Birth',
+    );
+    if (picked != null) setState(() => _dateOfBirth = picked);
+  }
+
   Future<void> _save() async {
-    final age = int.tryParse(_ageController.text.trim());
     final weight = double.tryParse(_weightController.text.trim());
-    await AppPreferences.setAge(age);
+    await AppPreferences.setDateOfBirth(_dateOfBirth);
     await AppPreferences.setWeight(weight);
     await AppPreferences.setTrainingGoal(_trainingGoal);
     await AppPreferences.setCalorieState(_calorieState);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile saved.')),
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (_) => false,
       );
     }
   }
@@ -78,6 +90,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  String _formatDob(DateTime dob) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    final now = DateTime.now();
+    var age = now.year - dob.year;
+    if (now.month < dob.month ||
+        (now.month == dob.month && now.day < dob.day)) {
+      age--;
+    }
+    return '${months[dob.month - 1]} ${dob.day}, ${dob.year}  (age $age)';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -89,25 +115,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          // ── Age ──────────────────────────────────────────────────────────
-          TextField(
-            controller: _ageController,
-            decoration: const InputDecoration(
-              labelText: 'Age',
-              border: OutlineInputBorder(),
-              suffixText: 'years',
+          // ── Date of Birth ─────────────────────────────────────────────────
+          InkWell(
+            onTap: _pickDateOfBirth,
+            borderRadius: BorderRadius.circular(4),
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Date of Birth',
+                border: OutlineInputBorder(),
+                suffixIcon: Icon(Icons.calendar_today, size: 18),
+              ),
+              child: Text(
+                _dateOfBirth != null
+                    ? _formatDob(_dateOfBirth!)
+                    : 'Tap to select',
+                style: _dateOfBirth == null
+                    ? Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        )
+                    : null,
+              ),
             ),
-            keyboardType: TextInputType.number,
           ),
           const SizedBox(height: 16),
 
           // ── Weight ───────────────────────────────────────────────────────
           TextField(
             controller: _weightController,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Weight',
-              border: OutlineInputBorder(),
-              suffixText: 'kg',
+              border: const OutlineInputBorder(),
+              suffixText: AppPreferences.getUnitsMetric() ? 'kg' : 'lbs',
             ),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
           ),
