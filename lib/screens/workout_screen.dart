@@ -28,6 +28,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   // keyed by completedExercise.id
   final Map<int, bool> _postExDone = {};
   final Map<int, SkipReason?> _exerciseSkipReasons = {};
+  final Map<int, bool> _isPersistent = {};
   // keyed by MuscleGroup
   final Map<MuscleGroup, bool> _postMgDone = {};
   bool _loading = true;
@@ -66,6 +67,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           ex.completed.id, () => ex.postExerciseCheckin != null);
       _exerciseSkipReasons.putIfAbsent(
           ex.completed.id, () => ex.completed.skipReason);
+      _isPersistent.putIfAbsent(
+          ex.completed.id, () => ex.completed.isPersistent);
       _postMgDone.putIfAbsent(ex.movement.muscleGroup, () => false);
     }
     for (final mgCheckin in data.postMuscleGroupCheckins) {
@@ -548,6 +551,12 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     });
   }
 
+  Future<void> _togglePersistence(ExerciseData exercise) async {
+    final next = !(_isPersistent[exercise.completed.id] ?? true);
+    await db.setExercisePersistence(exercise.completed.id, next);
+    setState(() => _isPersistent[exercise.completed.id] = next);
+  }
+
   Future<void> _finishWorkout() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -668,11 +677,29 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     final showPostMgReopen =
         isLastForMg && allMgExDone && _postMgDone[mg] != true;
 
+    final persistent = _isPersistent[exercise.completed.id] ?? true;
+
     Widget headerTrailing;
     if (isExSkipped) {
-      headerTrailing = TextButton(
-        onPressed: () => _unskipExercise(exercise),
-        child: const Text('Unskip'),
+      headerTrailing = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextButton(
+            onPressed: () => _unskipExercise(exercise),
+            child: const Text('Unskip'),
+          ),
+          PopupMenuButton<_ExMenuAction>(
+            iconSize: 18,
+            padding: EdgeInsets.zero,
+            onSelected: (_) => _togglePersistence(exercise),
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: _ExMenuAction.togglePersistent,
+                child: Text(persistent ? "Don't carry forward" : 'Carry forward'),
+              ),
+            ],
+          ),
+        ],
       );
     } else {
       headerTrailing = Row(
@@ -689,8 +716,10 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
             onSelected: (action) {
               if (action == _ExMenuAction.skipExercise) {
                 _showExerciseSkipSheet(exercise);
-              } else {
+              } else if (action == _ExMenuAction.addSet) {
                 _addSet(exercise);
+              } else {
+                _togglePersistence(exercise);
               }
             },
             itemBuilder: (_) => [
@@ -702,6 +731,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
               PopupMenuItem(
                 value: _ExMenuAction.addSet,
                 child: const Text('Add Set'),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                value: _ExMenuAction.togglePersistent,
+                child: Text(persistent ? "Don't carry forward" : 'Carry forward'),
               ),
             ],
           ),
@@ -883,7 +917,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
 enum _SetMenuAction { skip, delete }
 
-enum _ExMenuAction { skipExercise, addSet }
+enum _ExMenuAction { skipExercise, addSet, togglePersistent }
 
 class _SetUiState {
   _SetUiState({

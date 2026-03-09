@@ -5,13 +5,15 @@ Tracks all remaining work. Each task includes enough context to execute without 
 **Stack:** Flutter (Android-first), Drift ORM (SQLite), Navigator 1.0, FutureBuilder + manual re-fetch.
 **Key invariant:** Every in-workout user action persists to DB immediately (crash-safe).
 
+---
+
 ### 5. `isPersistent` Flag in Workout Screen
 
 **Goal:** Let user toggle whether a completed exercise carries forward to next week's planned workout.
 
 **Current state:** `completed_exercise.isPersistent` is set to `true` for all exercises in `initializeWorkout`. User has no way to change it.
 
-**UX:** Toggle in exercise header (e.g., a bookmark icon). Default `true`. If user sets to `false`, the exercise won't appear in week N+1's planned workout.
+**UX:** Toggle exercise dropdown (e.g., a bookmark icon). Default `true`. If user sets to `false`, the exercise won't appear in week N+1's planned workout.
 
 **DB:** `setExercisePersistence(int completedExerciseId, bool isPersistent)` — simple update.
 

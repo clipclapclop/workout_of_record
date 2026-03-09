@@ -780,6 +780,32 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
+  Future<void> skipWorkout(int workoutId, WorkoutSkipReason reason) async {
+    final now = DateTime.now();
+    await into(completedWorkouts).insert(CompletedWorkoutsCompanion.insert(
+      workoutId: workoutId,
+      startedAt: now,
+      completedAt: Value(now),
+      status: WorkoutStatus.skipped,
+      skipReason: Value(reason),
+    ));
+  }
+
+  Future<void> setExercisePersistence(
+          int completedExerciseId, bool isPersistent) =>
+      (update(completedExercises)
+            ..where((e) => e.id.equals(completedExerciseId)))
+          .write(CompletedExercisesCompanion(isPersistent: Value(isPersistent)));
+
+  /// Returns the expected date for the next workout: the day after the most
+  /// recently completed workout in this mesocycle. Falls back to today.
+  Future<DateTime> getExpectedWorkoutDate(int mesocycleId) async {
+    final last = await _lastCompletedDate(mesocycleId);
+    if (last == null) return DateTime.now();
+    final lastDay = DateTime(last.year, last.month, last.day);
+    return lastDay.add(const Duration(days: 1));
+  }
+
   // ── Private helpers ─────────────────────────────────────────────────────────
 
   Future<int> _createWeek(
