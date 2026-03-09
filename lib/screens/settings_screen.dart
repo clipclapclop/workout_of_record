@@ -93,7 +93,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 24),
 
           // ── API Key ───────────────────────────────────────────────────────
-          Text('OpenRouter API Key',
+          Text('OpenRouter API Key (not implimented)',
               style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
           if (_apiKeyLoading)
