@@ -44,7 +44,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.withExecutor(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -56,6 +56,9 @@ class AppDatabase extends _$AppDatabase {
           if (from < 2) {
             await m.addColumn(appStates, appStates.currentCompletedWorkoutId);
           }
+          if (from < 3) {
+            await m.addColumn(mesoTemplates, mesoTemplates.createdAt);
+          }
         },
       );
 
@@ -64,86 +67,180 @@ class AppDatabase extends _$AppDatabase {
   Future<AppState> getAppState() =>
       (select(appStates)..where((s) => s.id.equals(1))).getSingle();
 
-  Future<Workout?> getNextWorkout(int mesocycleId) {
-    final query = select(workouts).join([
-      innerJoin(weeks, weeks.id.equalsExp(workouts.weekId)),
-      leftOuterJoin(
-          completedWorkouts, completedWorkouts.workoutId.equalsExp(workouts.id)),
-    ])
-      ..where(weeks.mesocycleId.equals(mesocycleId) &
-          completedWorkouts.id.isNull() &
-          workouts.isRestDay.equals(false))
-      ..orderBy([
-        OrderingTerm.asc(weeks.weekNumber),
-        OrderingTerm.asc(workouts.orderIndex),
-      ])
-      ..limit(1);
-    return query.map((row) => row.readTable(workouts)).getSingleOrNull();
+  /// Creates a new mesocycle from the given template and sets it as current.
+  /// No weeks, workouts, or planned rows are created here — everything is lazy.
+  Future<int> createMesocycle(
+      int templateId, String name, int totalWeeks) async {
+    return await transaction(() async {
+      final mesocycleId = await into(mesocycles).insert(
+        MesocyclesCompanion.insert(
+          mesoTemplateId: templateId,
+          name: name,
+          totalWeekCount: totalWeeks,
+          createdAt: DateTime.now(),
+        ),
+      );
+      await (update(appStates)..where((s) => s.id.equals(1))).write(
+        AppStatesCompanion(
+          currentMesocycleId: Value(mesocycleId),
+          currentCompletedWorkoutId: const Value(null),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+      return mesocycleId;
+    });
   }
 
-  Future<void> advanceRestDays(int mesocycleId, {DateTime? now}) async {
-    await transaction(() async {
-      // Find last completed workout for this mesocycle.
-      final lastRow = await (select(completedWorkouts).join([
-        innerJoin(workouts, workouts.id.equalsExp(completedWorkouts.workoutId)),
-        innerJoin(weeks, weeks.id.equalsExp(workouts.weekId)),
-      ])
-            ..where(weeks.mesocycleId.equals(mesocycleId))
-            ..orderBy([
-              OrderingTerm.desc(weeks.weekNumber),
-              OrderingTerm.desc(workouts.orderIndex),
-            ])
-            ..limit(1))
-          .getSingleOrNull();
+  /// Returns the next workout to perform, creating week/workout rows as needed.
+  ///
+  /// This is the single entry point for all lazy materialization:
+  /// - First call ever: creates week 1 + first training day workout row.
+  /// - Subsequent calls: advances rest days, creates next training day row, or
+  ///   creates the next week when the current one is training-complete.
+  /// - Returns null when all weeks are done (mesocycle complete).
+  Future<Workout?> getOrCreateNextWorkout(int mesocycleId) async {
+    return await transaction(() async {
+      final meso = await (select(mesocycles)
+            ..where((m) => m.id.equals(mesocycleId)))
+          .getSingle();
 
-      if (lastRow == null) return; // No completed workouts yet — first day is a training day.
-
-      final lastCompleted = lastRow.readTable(completedWorkouts);
-      final lastDate = lastCompleted.completedAt!;
-      final lastDay =
-          DateTime(lastDate.year, lastDate.month, lastDate.day);
-
-      // Find all pending (no completed_workout) items for this mesocycle in order.
-      final pendingRows = await (select(workouts).join([
-        innerJoin(weeks, weeks.id.equalsExp(workouts.weekId)),
-        leftOuterJoin(completedWorkouts,
-            completedWorkouts.workoutId.equalsExp(workouts.id)),
-      ])
-            ..where(weeks.mesocycleId.equals(mesocycleId) &
-                completedWorkouts.id.isNull())
-            ..orderBy([
-              OrderingTerm.asc(weeks.weekNumber),
-              OrderingTerm.asc(workouts.orderIndex),
-            ]))
+      final existingWeeks = await (select(weeks)
+            ..where((w) => w.mesocycleId.equals(mesocycleId))
+            ..orderBy([(w) => OrderingTerm.asc(w.weekNumber)]))
           .get();
 
-      // Collect leading rest days only — stop at first training day.
-      final restDays = <Workout>[];
-      for (final row in pendingRows) {
-        final w = row.readTable(workouts);
-        if (!w.isRestDay) break;
-        restDays.add(w);
+      // ── No weeks yet: bootstrap week 1 ─────────────────────────────────────
+      if (existingWeeks.isEmpty) {
+        final goal =
+            meso.totalWeekCount == 1 ? WeekGoal.deload : WeekGoal.hard;
+        final weekId = await _createWeek(mesocycleId, 1, goal);
+        return await _materializeFirstTrainingDay(weekId, mesocycleId, null);
       }
 
-      if (restDays.isEmpty) return;
+      final currentWeek = existingWeeks.last;
+      final currentWeekWorkouts = await (select(workouts)
+            ..where((w) => w.weekId.equals(currentWeek.id))
+            ..orderBy([(w) => OrderingTerm.asc(w.orderIndex)]))
+          .get();
 
-      final effectiveNow = now ?? DateTime.now();
-      final today = DateTime(effectiveNow.year, effectiveNow.month, effectiveNow.day);
+      // ── Find first workout without a completed_workout row ──────────────────
+      for (final w in currentWeekWorkouts) {
+        final completed = await (select(completedWorkouts)
+              ..where((cw) => cw.workoutId.equals(w.id)))
+            .getSingleOrNull();
+        if (completed == null) return w; // In-progress or ready to start.
+      }
 
-      // Squish algorithm: assign timestamps, clamping to yesterday at latest.
-      var currentDay = lastDay;
-      for (final restDay in restDays) {
-        final candidate = currentDay.add(const Duration(days: 1));
-        if (!candidate.isAfter(today)) {
-          currentDay = candidate;
-        }
-        final timestamp =
-            DateTime(currentDay.year, currentDay.month, currentDay.day, 12);
-        await into(completedWorkouts).insert(CompletedWorkoutsCompanion.insert(
-          workoutId: restDay.id,
-          startedAt: timestamp,
-          completedAt: Value(timestamp),
-          status: WorkoutStatus.completed,
+      // All materialized workouts in this week are done.
+      // Count training days done vs. expected from template/prior week.
+      final templateSlots =
+          await _getWeekTemplateSlots(currentWeek, existingWeeks);
+      final trainingSlots =
+          templateSlots.where((s) => !s.isRestDay).toList();
+      final doneTraining =
+          currentWeekWorkouts.where((w) => !w.isRestDay).length;
+
+      // ── More training days left in this week ────────────────────────────────
+      if (doneTraining < trainingSlots.length) {
+        final nextSlot = trainingSlots[doneTraining];
+        final lastCompleted = await _lastCompletedDate(mesocycleId);
+        await _advanceRestDaysBefore(
+          currentWeek.id,
+          nextSlot.orderIndex,
+          templateSlots,
+          currentWeekWorkouts,
+          lastCompleted,
+        );
+        return await _materializeTrainingDay(
+          currentWeek.id,
+          nextSlot.orderIndex,
+          nextSlot.name,
+        );
+      }
+
+      // ── All training done for this week ─────────────────────────────────────
+      if (currentWeek.weekNumber >= meso.totalWeekCount) {
+        return null; // Mesocycle complete.
+      }
+
+      // Advance any remaining rest days for the completed week.
+      final lastCompleted = await _lastCompletedDate(mesocycleId);
+      await _advanceRestDaysBefore(
+        currentWeek.id,
+        templateSlots.last.orderIndex + 1, // "past the end"
+        templateSlots,
+        currentWeekWorkouts,
+        lastCompleted,
+      );
+
+      // Create the next week, using current week's rows as the structural template.
+      final nextWeekNumber = currentWeek.weekNumber + 1;
+      final goal = nextWeekNumber == meso.totalWeekCount
+          ? WeekGoal.deload
+          : WeekGoal.hard;
+      final nextWeekId = await _createWeek(mesocycleId, nextWeekNumber, goal);
+      return await _materializeFirstTrainingDay(
+          nextWeekId, mesocycleId, currentWeek.id);
+    });
+  }
+
+  /// Generates planned_workout + planned_exercises + planned_sets for a workout.
+  ///
+  /// Idempotent — safe to call even if already generated.
+  /// Week 1 cold start: 2 sets per exercise, reps/weight null.
+  /// Week 2+ will be implemented in task 4 (for now falls back to cold start).
+  Future<void> generatePlannedWorkout(int workoutId) async {
+    await transaction(() async {
+      // Idempotency check.
+      final existing = await (select(plannedWorkouts)
+            ..where((pw) => pw.workoutId.equals(workoutId)))
+          .getSingleOrNull();
+      if (existing != null) return;
+
+      final workout =
+          await (select(workouts)..where((w) => w.id.equals(workoutId)))
+              .getSingle();
+      final week =
+          await (select(weeks)..where((w) => w.id.equals(workout.weekId)))
+              .getSingle();
+      final meso = await (select(mesocycles)
+            ..where((m) => m.id.equals(week.mesocycleId)))
+          .getSingle();
+
+      // Find exercise templates for this workout's slot (by orderIndex = dayIndex).
+      final wts = await (select(workoutTemplates).join([
+        innerJoin(weekTemplates,
+            weekTemplates.id.equalsExp(workoutTemplates.weekTemplateId)),
+      ])
+            ..where(weekTemplates.mesoTemplateId.equals(meso.mesoTemplateId) &
+                workoutTemplates.dayIndex.equals(workout.orderIndex))
+            ..limit(1))
+          .map((row) => row.readTable(workoutTemplates))
+          .getSingleOrNull();
+
+      final plannedWorkoutId = await into(plannedWorkouts)
+          .insert(PlannedWorkoutsCompanion.insert(workoutId: workoutId));
+
+      if (wts == null) return; // Rest day or no template match — empty plan.
+
+      final exTemplates = await (select(exerciseTemplates)
+            ..where((et) => et.workoutTemplateId.equals(wts.id))
+            ..orderBy([(et) => OrderingTerm.asc(et.exerciseIndex)]))
+          .get();
+
+      for (final et in exTemplates) {
+        final peId = await into(plannedExercises).insert(
+          PlannedExercisesCompanion.insert(
+            plannedWorkoutId: plannedWorkoutId,
+            movementId: et.movementId,
+          ),
+        );
+        // Cold-start default: 2 sets, reps/weight null.
+        await into(plannedSets).insert(PlannedSetsCompanion.insert(
+          plannedExerciseId: peId,
+        ));
+        await into(plannedSets).insert(PlannedSetsCompanion.insert(
+          plannedExerciseId: peId,
         ));
       }
     });
@@ -210,7 +307,6 @@ class AppDatabase extends _$AppDatabase {
           ..where((w) => w.id.equals(cw.workoutId)))
         .getSingle();
 
-    // Find the planned workout so we can reach planned sets.
     final plannedWorkout = await (select(plannedWorkouts)
           ..where((pw) => pw.workoutId.equals(cw.workoutId)))
         .getSingleOrNull();
@@ -231,7 +327,6 @@ class AppDatabase extends _$AppDatabase {
             ..orderBy([(s) => OrderingTerm.asc(s.id)]))
           .get();
 
-      // Find matching planned exercise (by movementId within this planned workout).
       List<PlannedSet> plannedSetsForEx = [];
       if (plannedWorkout != null) {
         final plannedEx = await (select(plannedExercises)
@@ -374,12 +469,27 @@ class AppDatabase extends _$AppDatabase {
   Future<List<MesoTemplate>> getMesoTemplates() =>
       (select(mesoTemplates)..orderBy([(t) => OrderingTerm.asc(t.name)])).get();
 
+  /// Returns all templates with their associated mesocycle history.
+  Future<List<MesoTemplateWithHistory>> getMesoTemplatesWithHistory() async {
+    final templates = await (select(mesoTemplates)
+          ..orderBy([(t) => OrderingTerm.asc(t.name)]))
+        .get();
+    final result = <MesoTemplateWithHistory>[];
+    for (final t in templates) {
+      final past = await (select(mesocycles)
+            ..where((m) => m.mesoTemplateId.equals(t.id))
+            ..orderBy([(m) => OrderingTerm.desc(m.createdAt)]))
+          .get();
+      result.add(MesoTemplateWithHistory(template: t, pastMesos: past));
+    }
+    return result;
+  }
+
   Future<MesoTemplateData> getMesoTemplateData(int mesoTemplateId) async {
     final template = await (select(mesoTemplates)
           ..where((t) => t.id.equals(mesoTemplateId)))
         .getSingle();
 
-    // All workout templates for this meso (via the single week template).
     final wts = await (select(workoutTemplates).join([
       innerJoin(weekTemplates, weekTemplates.id.equalsExp(workoutTemplates.weekTemplateId)),
     ])
@@ -409,7 +519,10 @@ class AppDatabase extends _$AppDatabase {
   Future<int> createMesoTemplate(String name, List<WorkoutDaySpec> days) async {
     return await transaction(() async {
       final mesoTemplateId = await into(mesoTemplates).insert(
-        MesoTemplatesCompanion.insert(name: name),
+        MesoTemplatesCompanion.insert(
+          name: name,
+          createdAt: Value(DateTime.now()),
+        ),
       );
       await _insertTemplateStructure(mesoTemplateId, days);
       return mesoTemplateId;
@@ -419,11 +532,9 @@ class AppDatabase extends _$AppDatabase {
   Future<void> updateMesoTemplate(
       int id, String name, List<WorkoutDaySpec> days) async {
     await transaction(() async {
-      // Update the name.
       await (update(mesoTemplates)..where((t) => t.id.equals(id)))
           .write(MesoTemplatesCompanion(name: Value(name)));
 
-      // Delete old structure (exercise templates → workout templates → week templates).
       final oldWeekTemplates = await (select(weekTemplates)
             ..where((wt) => wt.mesoTemplateId.equals(id)))
           .get();
@@ -480,8 +591,6 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
-  /// Inserts a single WeekTemplate + WorkoutTemplates + ExerciseTemplates
-  /// for the given mesoTemplateId. Used by both create and update.
   Future<void> _insertTemplateStructure(
       int mesoTemplateId, List<WorkoutDaySpec> days) async {
     final weekTemplateId = await into(weekTemplates).insert(
@@ -527,6 +636,15 @@ class AppDatabase extends _$AppDatabase {
       (update(movements)..where((m) => m.id.equals(companion.id.value)))
           .write(companion);
 
+  /// Clears the current mesocycle so the app enters cold-boot / setup state.
+  Future<void> clearCurrentMesocycle() =>
+      (update(appStates)..where((s) => s.id.equals(1))).write(
+        const AppStatesCompanion(
+          currentMesocycleId: Value(null),
+          currentCompletedWorkoutId: Value(null),
+        ),
+      );
+
   Future<void> finishWorkout(int completedWorkoutId) async {
     await transaction(() async {
       await (update(completedWorkouts)
@@ -543,12 +661,165 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
+  // ── Private helpers ─────────────────────────────────────────────────────────
+
+  Future<int> _createWeek(
+      int mesocycleId, int weekNumber, WeekGoal goal) async {
+    return into(weeks).insert(WeeksCompanion.insert(
+      mesocycleId: mesocycleId,
+      weekNumber: weekNumber,
+      goal: goal,
+      createdAt: DateTime.now(),
+    ));
+  }
+
+  /// Materializes the first training day for a newly created week.
+  ///
+  /// For week 1: reads from the meso template.
+  /// For week 2+: reads from [priorWeekId]'s workout rows.
+  Future<Workout> _materializeFirstTrainingDay(
+      int weekId, int mesocycleId, int? priorWeekId) async {
+    final slots = priorWeekId == null
+        ? await _templateSlotsForMeso(mesocycleId)
+        : await _workoutSlotsFromWeek(priorWeekId);
+
+    final first = slots.firstWhere((s) => !s.isRestDay);
+    return _materializeTrainingDay(weekId, first.orderIndex, first.name);
+  }
+
+  Future<Workout> _materializeTrainingDay(
+      int weekId, int orderIndex, String name) async {
+    final id = await into(workouts).insert(WorkoutsCompanion.insert(
+      weekId: weekId,
+      name: name,
+      orderIndex: orderIndex,
+      isRestDay: false,
+    ));
+    return (select(workouts)..where((w) => w.id.equals(id))).getSingle();
+  }
+
+  /// Creates workout rows + completed_workout rows for rest day slots that fall
+  /// before [upToOrderIndex] in the current week and haven't been created yet.
+  Future<void> _advanceRestDaysBefore(
+    int weekId,
+    int upToOrderIndex,
+    List<_WorkoutSlot> templateSlots,
+    List<Workout> existingWorkouts,
+    DateTime? lastCompletedDate,
+  ) async {
+    if (lastCompletedDate == null) return; // No prior date to squish from.
+
+    final existingOrderIndexes = existingWorkouts.map((w) => w.orderIndex).toSet();
+    final restSlots = templateSlots
+        .where((s) =>
+            s.isRestDay &&
+            s.orderIndex < upToOrderIndex &&
+            !existingOrderIndexes.contains(s.orderIndex))
+        .toList()
+      ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+
+    if (restSlots.isEmpty) return;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final lastDay = DateTime(
+      lastCompletedDate.year,
+      lastCompletedDate.month,
+      lastCompletedDate.day,
+    );
+
+    var currentDay = lastDay;
+    for (final slot in restSlots) {
+      final candidate = currentDay.add(const Duration(days: 1));
+      if (!candidate.isAfter(today)) currentDay = candidate;
+      final timestamp =
+          DateTime(currentDay.year, currentDay.month, currentDay.day, 12);
+
+      final workoutId = await into(workouts).insert(WorkoutsCompanion.insert(
+        weekId: weekId,
+        name: slot.name,
+        orderIndex: slot.orderIndex,
+        isRestDay: true,
+      ));
+      await into(completedWorkouts).insert(CompletedWorkoutsCompanion.insert(
+        workoutId: workoutId,
+        startedAt: timestamp,
+        completedAt: Value(timestamp),
+        status: WorkoutStatus.completed,
+      ));
+    }
+  }
+
+  /// Returns the most recent completedAt date for any completed workout in this meso.
+  Future<DateTime?> _lastCompletedDate(int mesocycleId) async {
+    final row = await (select(completedWorkouts).join([
+      innerJoin(workouts, workouts.id.equalsExp(completedWorkouts.workoutId)),
+      innerJoin(weeks, weeks.id.equalsExp(workouts.weekId)),
+    ])
+          ..where(weeks.mesocycleId.equals(mesocycleId) &
+              completedWorkouts.completedAt.isNotNull())
+          ..orderBy([OrderingTerm.desc(completedWorkouts.completedAt)])
+          ..limit(1))
+        .getSingleOrNull();
+    return row?.readTable(completedWorkouts).completedAt;
+  }
+
+  /// Returns ordered week slots derived from the meso template (for week 1).
+  Future<List<_WorkoutSlot>> _templateSlotsForMeso(int mesocycleId) async {
+    final meso = await (select(mesocycles)
+          ..where((m) => m.id.equals(mesocycleId)))
+        .getSingle();
+    final wts = await (select(workoutTemplates).join([
+      innerJoin(weekTemplates,
+          weekTemplates.id.equalsExp(workoutTemplates.weekTemplateId)),
+    ])
+          ..where(weekTemplates.mesoTemplateId.equals(meso.mesoTemplateId))
+          ..orderBy([OrderingTerm.asc(workoutTemplates.dayIndex)]))
+        .map((row) => row.readTable(workoutTemplates))
+        .get();
+    return wts
+        .map((wt) => _WorkoutSlot(
+              orderIndex: wt.dayIndex,
+              name: wt.name,
+              isRestDay: wt.isRestDay,
+            ))
+        .toList();
+  }
+
+  /// Returns ordered week slots derived from a prior week's actual workout rows
+  /// (for week 2+, preserving any schedule changes made in that week).
+  Future<List<_WorkoutSlot>> _workoutSlotsFromWeek(int weekId) async {
+    final ws = await (select(workouts)
+          ..where((w) => w.weekId.equals(weekId))
+          ..orderBy([(w) => OrderingTerm.asc(w.orderIndex)]))
+        .get();
+    return ws
+        .map((w) => _WorkoutSlot(
+              orderIndex: w.orderIndex,
+              name: w.name,
+              isRestDay: w.isRestDay,
+            ))
+        .toList();
+  }
+
+  /// Returns the ordered template slots for a given week, using the meso template
+  /// for week 1 and the prior week's rows for week 2+.
+  Future<List<_WorkoutSlot>> _getWeekTemplateSlots(
+      Week currentWeek, List<Week> allWeeks) async {
+    if (currentWeek.weekNumber == 1) {
+      return _templateSlotsForMeso(currentWeek.mesocycleId);
+    }
+    final priorWeek =
+        allWeeks.firstWhere((w) => w.weekNumber == currentWeek.weekNumber - 1);
+    return _workoutSlotsFromWeek(priorWeek.id);
+  }
+
   // ── Seed data ──────────────────────────────────────────────────────────────
 
   Future<void> _seedData() async {
     await transaction(() async {
       // ── Movements ──────────────────────────────────────────────────────────
-      final cableFlyId = await into(movements).insert(MovementsCompanion.insert(
+      await into(movements).insert(MovementsCompanion.insert(
         name: 'Cable Fly',
         muscleGroup: MuscleGroup.chest,
         isRequiredReps: true,
@@ -577,8 +848,7 @@ class AppDatabase extends _$AppDatabase {
         minWeight: const Value<double?>(45.0),
         weightDelta: const Value<double?>(5.0),
       ));
-      final dumbbellPulloverId =
-          await into(movements).insert(MovementsCompanion.insert(
+      await into(movements).insert(MovementsCompanion.insert(
         name: 'Dumbbell Pullover',
         muscleGroup: MuscleGroup.back,
         isRequiredReps: true,
@@ -587,8 +857,7 @@ class AppDatabase extends _$AppDatabase {
         minWeight: const Value<double?>(5.0),
         weightDelta: const Value<double?>(5.0),
       ));
-      final lyingCurlId =
-          await into(movements).insert(MovementsCompanion.insert(
+      await into(movements).insert(MovementsCompanion.insert(
         name: 'Lying Dumbbell Curl',
         muscleGroup: MuscleGroup.biceps,
         isRequiredReps: true,
@@ -610,17 +879,19 @@ class AppDatabase extends _$AppDatabase {
 
       // ── Meso template ──────────────────────────────────────────────────────
       final mesoTemplateId = await into(mesoTemplates).insert(
-        MesoTemplatesCompanion.insert(name: 'Default Template'),
+        MesoTemplatesCompanion.insert(
+          name: 'Default Template',
+          createdAt: Value(DateTime.now()),
+        ),
       );
       final weekTemplateId = await into(weekTemplates).insert(
         WeekTemplatesCompanion.insert(
           mesoTemplateId: mesoTemplateId,
           name: 'Standard Week',
-          workoutCount: 5,
+          workoutCount: 2,
         ),
       );
 
-      // Workout templates
       final wtDay1Id = await into(workoutTemplates).insert(
         WorkoutTemplatesCompanion.insert(
           weekTemplateId: weekTemplateId,
@@ -656,228 +927,43 @@ class AppDatabase extends _$AppDatabase {
         dayIndex: 4,
       ));
 
-      // Exercise templates — Day 1
       await into(exerciseTemplates).insert(ExerciseTemplatesCompanion.insert(
         workoutTemplateId: wtDay1Id,
-        movementId: cableFlyId,
+        movementId: dumbbellPressId,
         exerciseIndex: 0,
       ));
       await into(exerciseTemplates).insert(ExerciseTemplatesCompanion.insert(
         workoutTemplateId: wtDay1Id,
-        movementId: dumbbellPressId,
+        movementId: cableTriId,
         exerciseIndex: 1,
       ));
-      await into(exerciseTemplates).insert(ExerciseTemplatesCompanion.insert(
-        workoutTemplateId: wtDay1Id,
-        movementId: cableTriId,
-        exerciseIndex: 2,
-      ));
-
-      // Exercise templates — Day 3
       await into(exerciseTemplates).insert(ExerciseTemplatesCompanion.insert(
         workoutTemplateId: wtDay3Id,
         movementId: barbellRowId,
         exerciseIndex: 0,
       ));
-      await into(exerciseTemplates).insert(ExerciseTemplatesCompanion.insert(
-        workoutTemplateId: wtDay3Id,
-        movementId: dumbbellPulloverId,
-        exerciseIndex: 1,
-      ));
-      await into(exerciseTemplates).insert(ExerciseTemplatesCompanion.insert(
-        workoutTemplateId: wtDay3Id,
-        movementId: lyingCurlId,
-        exerciseIndex: 2,
-      ));
 
-      // ── Mesocycle ──────────────────────────────────────────────────────────
-      final mesocycleId = await into(mesocycles).insert(
-        MesocyclesCompanion.insert(
-          mesoTemplateId: mesoTemplateId,
-          name: 'Mesocycle 1',
-          totalWeekCount: 2,
-          createdAt: DateTime.now(),
-        ),
-      );
-      final weekId = await into(weeks).insert(WeeksCompanion.insert(
-        mesocycleId: mesocycleId,
-        weekNumber: 1,
-        goal: WeekGoal.hard,
-        createdAt: DateTime.now(),
-      ));
-
-      // ── Workouts ───────────────────────────────────────────────────────────
-      final w1Id = await into(workouts).insert(WorkoutsCompanion.insert(
-        weekId: weekId,
-        name: 'Day 1',
-        orderIndex: 0,
-        isRestDay: false,
-      ));
-      final w2Id = await into(workouts).insert(WorkoutsCompanion.insert(
-        weekId: weekId,
-        name: 'Day 2',
-        orderIndex: 1,
-        isRestDay: true,
-      ));
-      final w3Id = await into(workouts).insert(WorkoutsCompanion.insert(
-        weekId: weekId,
-        name: 'Day 3',
-        orderIndex: 2,
-        isRestDay: false,
-      ));
-      final w4Id = await into(workouts).insert(WorkoutsCompanion.insert(
-        weekId: weekId,
-        name: 'Day 4',
-        orderIndex: 3,
-        isRestDay: true,
-      ));
-      final w5Id = await into(workouts).insert(WorkoutsCompanion.insert(
-        weekId: weekId,
-        name: 'Day 5',
-        orderIndex: 4,
-        isRestDay: true,
-      ));
-
-      // ── Planned workouts ───────────────────────────────────────────────────
-      final pw1Id = await into(plannedWorkouts).insert(
-        PlannedWorkoutsCompanion.insert(workoutId: w1Id),
-      );
-      await into(plannedWorkouts)
-          .insert(PlannedWorkoutsCompanion.insert(workoutId: w2Id));
-      final pw3Id = await into(plannedWorkouts).insert(
-        PlannedWorkoutsCompanion.insert(workoutId: w3Id),
-      );
-      await into(plannedWorkouts)
-          .insert(PlannedWorkoutsCompanion.insert(workoutId: w4Id));
-      await into(plannedWorkouts)
-          .insert(PlannedWorkoutsCompanion.insert(workoutId: w5Id));
-
-      // ── Planned exercises ──────────────────────────────────────────────────
-      // Day 1
-      final pe1Id = await into(plannedExercises).insert(
-        PlannedExercisesCompanion.insert(
-          plannedWorkoutId: pw1Id,
-          movementId: cableFlyId,
-        ),
-      );
-      final pe2Id = await into(plannedExercises).insert(
-        PlannedExercisesCompanion.insert(
-          plannedWorkoutId: pw1Id,
-          movementId: dumbbellPressId,
-        ),
-      );
-      final pe3Id = await into(plannedExercises).insert(
-        PlannedExercisesCompanion.insert(
-          plannedWorkoutId: pw1Id,
-          movementId: cableTriId,
-        ),
-      );
-
-      // Day 3
-      final pe4Id = await into(plannedExercises).insert(
-        PlannedExercisesCompanion.insert(
-          plannedWorkoutId: pw3Id,
-          movementId: barbellRowId,
-        ),
-      );
-      final pe5Id = await into(plannedExercises).insert(
-        PlannedExercisesCompanion.insert(
-          plannedWorkoutId: pw3Id,
-          movementId: dumbbellPulloverId,
-        ),
-      );
-      final pe6Id = await into(plannedExercises).insert(
-        PlannedExercisesCompanion.insert(
-          plannedWorkoutId: pw3Id,
-          movementId: lyingCurlId,
-        ),
-      );
-
-      // ── Planned sets ───────────────────────────────────────────────────────
-      await batch((b) {
-        b.insertAll(plannedSets, [
-          // Day 1 — Cable Fly
-          PlannedSetsCompanion.insert(
-            plannedExerciseId: pe1Id,
-            reps: const Value<int?>(5),
-            weight: const Value<double?>(7.0),
-          ),
-          PlannedSetsCompanion.insert(
-            plannedExerciseId: pe1Id,
-            reps: const Value<int?>(6),
-            weight: const Value<double?>(10.5),
-          ),
-          // Day 1 — Dumbbell Press (Incline)
-          PlannedSetsCompanion.insert(
-            plannedExerciseId: pe2Id,
-            reps: const Value<int?>(7),
-            weight: const Value<double?>(15.0),
-          ),
-          PlannedSetsCompanion.insert(
-            plannedExerciseId: pe2Id,
-            reps: const Value<int?>(8),
-            weight: const Value<double?>(20.0),
-          ),
-          PlannedSetsCompanion.insert(
-            plannedExerciseId: pe2Id,
-            reps: const Value<int?>(9),
-            weight: const Value<double?>(25.0),
-          ),
-          // Day 1 — Cable Overhead Tricep Extension
-          PlannedSetsCompanion.insert(
-            plannedExerciseId: pe3Id,
-            reps: const Value<int?>(3),
-            weight: const Value<double?>(10.0),
-          ),
-          // Day 3 — Barbell Bent Over Row
-          PlannedSetsCompanion.insert(
-            plannedExerciseId: pe4Id,
-            reps: const Value<int?>(8),
-            weight: const Value<double?>(50.0),
-          ),
-          PlannedSetsCompanion.insert(
-            plannedExerciseId: pe4Id,
-            reps: const Value<int?>(9),
-            weight: const Value<double?>(55.0),
-          ),
-          PlannedSetsCompanion.insert(
-            plannedExerciseId: pe4Id,
-            reps: const Value<int?>(10),
-            weight: const Value<double?>(55.0),
-          ),
-          // Day 3 — Dumbbell Pullover
-          PlannedSetsCompanion.insert(
-            plannedExerciseId: pe5Id,
-            reps: const Value<int?>(6),
-            weight: const Value<double?>(35.0),
-          ),
-          PlannedSetsCompanion.insert(
-            plannedExerciseId: pe5Id,
-            reps: const Value<int?>(7),
-            weight: const Value<double?>(45.0),
-          ),
-          // Day 3 — Lying Dumbbell Curl
-          PlannedSetsCompanion.insert(
-            plannedExerciseId: pe6Id,
-            reps: const Value<int?>(3),
-            weight: const Value<double?>(10.0),
-          ),
-          PlannedSetsCompanion.insert(
-            plannedExerciseId: pe6Id,
-            reps: const Value<int?>(4),
-            weight: const Value<double?>(15.0),
-          ),
-        ]);
-      });
-
-      // ── App state ──────────────────────────────────────────────────────────
+      // ── App state (no active mesocycle — cold boot) ────────────────────────
       await into(appStates).insert(AppStatesCompanion(
         id: const Value(1),
-        currentMesocycleId: Value(mesocycleId),
+        currentMesocycleId: const Value(null),
         updatedAt: Value(DateTime.now()),
       ));
     });
   }
+}
+
+/// Lightweight slot descriptor used internally during lazy materialization.
+class _WorkoutSlot {
+  const _WorkoutSlot({
+    required this.orderIndex,
+    required this.name,
+    required this.isRestDay,
+  });
+
+  final int orderIndex;
+  final String name;
+  final bool isRestDay;
 }
 
 LazyDatabase _openConnection() {

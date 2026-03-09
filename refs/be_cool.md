@@ -7,3 +7,4 @@
 - if we have different inclinations, it can be good to compare and contrast our proposed approaches.
 - don't propegate the user's misspellings
 - never deviate from agreed upon plans; if you feel there's a compelling reason to, discuss the change and ensure you have user buyin.
+- all stopgaps should be both painful and obvious, if we simplify an implimentation detail that's hidden from site, then we have to assume that it'll slip into production which we clearly don't want, so that's not an appropreate spot for a stopgap solution, in such a spot, we should take our time to do what's right, at least to the best of our ability

@@ -32,3 +32,14 @@ class MesoTemplateData {
   final MesoTemplate template;
   final List<WorkoutDayData> days; // ordered by dayIndex
 }
+
+/// A meso template with its history of mesocycles that used it.
+class MesoTemplateWithHistory {
+  const MesoTemplateWithHistory({
+    required this.template,
+    required this.pastMesos,
+  });
+
+  final MesoTemplate template;
+  final List<Mesocycle> pastMesos; // ordered by createdAt desc
+}

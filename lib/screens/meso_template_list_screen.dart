@@ -62,7 +62,7 @@ class _MesoTemplateListScreenState extends State<MesoTemplateListScreen> {
     // Open builder with existing data but treated as new (different name pre-filled).
     await _openBuilder(
       existing: MesoTemplateData(
-        template: MesoTemplate(id: -1, name: 'Copy of ${data.template.name}'),
+        template: MesoTemplate(id: -1, name: 'Copy of ${data.template.name}', createdAt: DateTime.now()),
         days: data.days,
       ),
       isNew: true,

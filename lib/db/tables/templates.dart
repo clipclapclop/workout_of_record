@@ -5,6 +5,7 @@ import 'movements.dart';
 class MesoTemplates extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }
 
 class WeekTemplates extends Table {

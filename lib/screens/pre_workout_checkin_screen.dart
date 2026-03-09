@@ -60,6 +60,7 @@ class _PreWorkoutCheckinScreenState extends State<PreWorkoutCheckinScreen> {
       vimVigor: Value(_vimVigor),
       mentalState: Value(_mentalState),
     ));
+    await db.generatePlannedWorkout(widget.workoutId);
     final completedWorkoutId =
         await db.initializeWorkout(widget.workoutId);
     if (!mounted) return;

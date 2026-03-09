@@ -765,8 +765,20 @@ class $MesoTemplatesTable extends MesoTemplates
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, name];
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, createdAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -790,6 +802,12 @@ class $MesoTemplatesTable extends MesoTemplates
     } else if (isInserting) {
       context.missing(_nameMeta);
     }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
     return context;
   }
 
@@ -807,6 +825,10 @@ class $MesoTemplatesTable extends MesoTemplates
         DriftSqlType.string,
         data['${effectivePrefix}name'],
       )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
     );
   }
 
@@ -819,17 +841,27 @@ class $MesoTemplatesTable extends MesoTemplates
 class MesoTemplate extends DataClass implements Insertable<MesoTemplate> {
   final int id;
   final String name;
-  const MesoTemplate({required this.id, required this.name});
+  final DateTime createdAt;
+  const MesoTemplate({
+    required this.id,
+    required this.name,
+    required this.createdAt,
+  });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['name'] = Variable<String>(name);
+    map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
 
   MesoTemplatesCompanion toCompanion(bool nullToAbsent) {
-    return MesoTemplatesCompanion(id: Value(id), name: Value(name));
+    return MesoTemplatesCompanion(
+      id: Value(id),
+      name: Value(name),
+      createdAt: Value(createdAt),
+    );
   }
 
   factory MesoTemplate.fromJson(
@@ -840,6 +872,7 @@ class MesoTemplate extends DataClass implements Insertable<MesoTemplate> {
     return MesoTemplate(
       id: serializer.fromJson<int>(json['id']),
       name: serializer.fromJson<String>(json['name']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
   @override
@@ -848,15 +881,21 @@ class MesoTemplate extends DataClass implements Insertable<MesoTemplate> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'name': serializer.toJson<String>(name),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
 
-  MesoTemplate copyWith({int? id, String? name}) =>
-      MesoTemplate(id: id ?? this.id, name: name ?? this.name);
+  MesoTemplate copyWith({int? id, String? name, DateTime? createdAt}) =>
+      MesoTemplate(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        createdAt: createdAt ?? this.createdAt,
+      );
   MesoTemplate copyWithCompanion(MesoTemplatesCompanion data) {
     return MesoTemplate(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
 
@@ -864,42 +903,59 @@ class MesoTemplate extends DataClass implements Insertable<MesoTemplate> {
   String toString() {
     return (StringBuffer('MesoTemplate(')
           ..write('id: $id, ')
-          ..write('name: $name')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name);
+  int get hashCode => Object.hash(id, name, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is MesoTemplate && other.id == this.id && other.name == this.name);
+      (other is MesoTemplate &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.createdAt == this.createdAt);
 }
 
 class MesoTemplatesCompanion extends UpdateCompanion<MesoTemplate> {
   final Value<int> id;
   final Value<String> name;
+  final Value<DateTime> createdAt;
   const MesoTemplatesCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
+    this.createdAt = const Value.absent(),
   });
   MesoTemplatesCompanion.insert({
     this.id = const Value.absent(),
     required String name,
+    this.createdAt = const Value.absent(),
   }) : name = Value(name);
   static Insertable<MesoTemplate> custom({
     Expression<int>? id,
     Expression<String>? name,
+    Expression<DateTime>? createdAt,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
+      if (createdAt != null) 'created_at': createdAt,
     });
   }
 
-  MesoTemplatesCompanion copyWith({Value<int>? id, Value<String>? name}) {
-    return MesoTemplatesCompanion(id: id ?? this.id, name: name ?? this.name);
+  MesoTemplatesCompanion copyWith({
+    Value<int>? id,
+    Value<String>? name,
+    Value<DateTime>? createdAt,
+  }) {
+    return MesoTemplatesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      createdAt: createdAt ?? this.createdAt,
+    );
   }
 
   @override
@@ -911,6 +967,9 @@ class MesoTemplatesCompanion extends UpdateCompanion<MesoTemplate> {
     if (name.present) {
       map['name'] = Variable<String>(name.value);
     }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
     return map;
   }
 
@@ -918,7 +977,8 @@ class MesoTemplatesCompanion extends UpdateCompanion<MesoTemplate> {
   String toString() {
     return (StringBuffer('MesoTemplatesCompanion(')
           ..write('id: $id, ')
-          ..write('name: $name')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
@@ -7972,9 +8032,17 @@ typedef $$MovementsTableProcessedTableManager =
       })
     >;
 typedef $$MesoTemplatesTableCreateCompanionBuilder =
-    MesoTemplatesCompanion Function({Value<int> id, required String name});
+    MesoTemplatesCompanion Function({
+      Value<int> id,
+      required String name,
+      Value<DateTime> createdAt,
+    });
 typedef $$MesoTemplatesTableUpdateCompanionBuilder =
-    MesoTemplatesCompanion Function({Value<int> id, Value<String> name});
+    MesoTemplatesCompanion Function({
+      Value<int> id,
+      Value<String> name,
+      Value<DateTime> createdAt,
+    });
 
 final class $$MesoTemplatesTableReferences
     extends BaseReferences<_$AppDatabase, $MesoTemplatesTable, MesoTemplate> {
@@ -8043,6 +8111,11 @@ class $$MesoTemplatesTableFilterComposer
 
   ColumnFilters<String> get name => $composableBuilder(
     column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8115,6 +8188,11 @@ class $$MesoTemplatesTableOrderingComposer
     column: $table.name,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$MesoTemplatesTableAnnotationComposer
@@ -8131,6 +8209,9 @@ class $$MesoTemplatesTableAnnotationComposer
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
   Expression<T> weekTemplatesRefs<T extends Object>(
     Expression<T> Function($$WeekTemplatesTableAnnotationComposer a) f,
@@ -8213,10 +8294,22 @@ class $$MesoTemplatesTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
-              }) => MesoTemplatesCompanion(id: id, name: name),
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => MesoTemplatesCompanion(
+                id: id,
+                name: name,
+                createdAt: createdAt,
+              ),
           createCompanionCallback:
-              ({Value<int> id = const Value.absent(), required String name}) =>
-                  MesoTemplatesCompanion.insert(id: id, name: name),
+              ({
+                Value<int> id = const Value.absent(),
+                required String name,
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => MesoTemplatesCompanion.insert(
+                id: id,
+                name: name,
+                createdAt: createdAt,
+              ),
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
