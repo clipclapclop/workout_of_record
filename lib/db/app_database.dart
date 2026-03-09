@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'tables/app_state.dart';
+import 'planning.dart';
 import 'template_data.dart';
 import 'workout_data.dart';
 import 'tables/checkins.dart';
@@ -187,8 +188,8 @@ class AppDatabase extends _$AppDatabase {
   /// Generates planned_workout + planned_exercises + planned_sets for a workout.
   ///
   /// Idempotent — safe to call even if already generated.
-  /// Week 1 cold start: 2 sets per exercise, reps/weight null.
-  /// Week 2+ will be implemented in task 4 (for now falls back to cold start).
+  /// Week 1: seeded from the meso template (2 null sets per exercise).
+  /// Week 2+: based on prior week's persistent completed exercises via heuristic.
   Future<void> generatePlannedWorkout(int workoutId) async {
     await transaction(() async {
       // Idempotency check.
@@ -207,43 +208,161 @@ class AppDatabase extends _$AppDatabase {
             ..where((m) => m.id.equals(week.mesocycleId)))
           .getSingle();
 
-      // Find exercise templates for this workout's slot (by orderIndex = dayIndex).
-      final wts = await (select(workoutTemplates).join([
-        innerJoin(weekTemplates,
-            weekTemplates.id.equalsExp(workoutTemplates.weekTemplateId)),
-      ])
-            ..where(weekTemplates.mesoTemplateId.equals(meso.mesoTemplateId) &
-                workoutTemplates.dayIndex.equals(workout.orderIndex))
-            ..limit(1))
-          .map((row) => row.readTable(workoutTemplates))
-          .getSingleOrNull();
-
       final plannedWorkoutId = await into(plannedWorkouts)
           .insert(PlannedWorkoutsCompanion.insert(workoutId: workoutId));
 
-      if (wts == null) return; // Rest day or no template match — empty plan.
-
-      final exTemplates = await (select(exerciseTemplates)
-            ..where((et) => et.workoutTemplateId.equals(wts.id))
-            ..orderBy([(et) => OrderingTerm.asc(et.exerciseIndex)]))
-          .get();
-
-      for (final et in exTemplates) {
-        final peId = await into(plannedExercises).insert(
-          PlannedExercisesCompanion.insert(
-            plannedWorkoutId: plannedWorkoutId,
-            movementId: et.movementId,
-          ),
-        );
-        // Cold-start default: 2 sets, reps/weight null.
-        await into(plannedSets).insert(PlannedSetsCompanion.insert(
-          plannedExerciseId: peId,
-        ));
-        await into(plannedSets).insert(PlannedSetsCompanion.insert(
-          plannedExerciseId: peId,
-        ));
+      if (week.weekNumber == 1) {
+        await _generateFromTemplate(
+            plannedWorkoutId, workout.orderIndex, meso.mesoTemplateId);
+      } else {
+        await _generateFromPriorWeeks(plannedWorkoutId, workout, week);
       }
     });
+  }
+
+  /// Seeds the plan from the meso template (week 1 cold start).
+  /// 2 null sets per exercise — user fills in values during the workout.
+  Future<void> _generateFromTemplate(
+      int plannedWorkoutId, int orderIndex, int mesoTemplateId) async {
+    final wts = await (select(workoutTemplates).join([
+      innerJoin(weekTemplates,
+          weekTemplates.id.equalsExp(workoutTemplates.weekTemplateId)),
+    ])
+          ..where(weekTemplates.mesoTemplateId.equals(mesoTemplateId) &
+              workoutTemplates.dayIndex.equals(orderIndex))
+          ..limit(1))
+        .map((row) => row.readTable(workoutTemplates))
+        .getSingleOrNull();
+
+    if (wts == null) return; // Rest day or no template match — empty plan.
+
+    final exTemplates = await (select(exerciseTemplates)
+          ..where((et) => et.workoutTemplateId.equals(wts.id))
+          ..orderBy([(et) => OrderingTerm.asc(et.exerciseIndex)]))
+        .get();
+
+    for (final et in exTemplates) {
+      final peId = await into(plannedExercises).insert(
+        PlannedExercisesCompanion.insert(
+          plannedWorkoutId: plannedWorkoutId,
+          movementId: et.movementId,
+        ),
+      );
+      await into(plannedSets)
+          .insert(PlannedSetsCompanion.insert(plannedExerciseId: peId));
+      await into(plannedSets)
+          .insert(PlannedSetsCompanion.insert(plannedExerciseId: peId));
+    }
+  }
+
+  /// Seeds the plan from the prior week's persistent completed exercises (week 2+).
+  Future<void> _generateFromPriorWeeks(
+      int plannedWorkoutId, Workout workout, Week week) async {
+    final allWeeks = await (select(weeks)
+          ..where((w) => w.mesocycleId.equals(week.mesocycleId))
+          ..orderBy([(w) => OrderingTerm.asc(w.weekNumber)]))
+        .get();
+
+    // The prior week's completed_workout for this slot provides the exercise list.
+    final priorWeek =
+        allWeeks.firstWhere((w) => w.weekNumber == week.weekNumber - 1);
+    final priorWorkout = await (select(workouts)
+          ..where((w) =>
+              w.weekId.equals(priorWeek.id) &
+              w.orderIndex.equals(workout.orderIndex)))
+        .getSingleOrNull();
+
+    if (priorWorkout == null || priorWorkout.isRestDay) return;
+
+    final priorCompleted = await (select(completedWorkouts)
+          ..where((cw) => cw.workoutId.equals(priorWorkout.id)))
+        .getSingleOrNull();
+
+    if (priorCompleted == null) return; // Workout was skipped entirely.
+
+    final priorExercises = await (select(completedExercises)
+          ..where((ce) =>
+              ce.completedWorkoutId.equals(priorCompleted.id) &
+              ce.isPersistent.equals(true))
+          ..orderBy([(ce) => OrderingTerm.asc(ce.orderIndex)]))
+        .get();
+
+    for (final priorEx in priorExercises) {
+      final movement = await (select(movements)
+            ..where((m) => m.id.equals(priorEx.movementId)))
+          .getSingle();
+
+      final peId = await into(plannedExercises).insert(
+        PlannedExercisesCompanion.insert(
+          plannedWorkoutId: plannedWorkoutId,
+          movementId: priorEx.movementId,
+        ),
+      );
+
+      final plannedValues = await _resolvePlannedSets(
+        priorEx.movementId,
+        workout.orderIndex,
+        week,
+        allWeeks,
+        movement,
+      );
+
+      for (final sv in plannedValues) {
+        await into(plannedSets).insert(PlannedSetsCompanion(
+          plannedExerciseId: Value(peId),
+          reps: Value(sv.reps),
+          weight: Value(sv.weight),
+          time: Value(sv.time),
+        ));
+      }
+    }
+  }
+
+  /// Walks backward through prior weeks to find the best completed set data
+  /// for [movementId] at [workoutOrderIndex]. Skips weeks where the exercise
+  /// was skipped. Falls back to cold start (2 null sets) if no history found.
+  Future<List<PlannedSetValues>> _resolvePlannedSets(
+    int movementId,
+    int workoutOrderIndex,
+    Week currentWeek,
+    List<Week> allWeeks,
+    Movement movement,
+  ) async {
+    for (var wn = currentWeek.weekNumber - 1; wn >= 1; wn--) {
+      final priorWeek =
+          allWeeks.firstWhere((w) => w.weekNumber == wn);
+
+      final priorWorkout = await (select(workouts)
+            ..where((w) =>
+                w.weekId.equals(priorWeek.id) &
+                w.orderIndex.equals(workoutOrderIndex)))
+          .getSingleOrNull();
+      if (priorWorkout == null || priorWorkout.isRestDay) continue;
+
+      final priorCompleted = await (select(completedWorkouts)
+            ..where((cw) => cw.workoutId.equals(priorWorkout.id)))
+          .getSingleOrNull();
+      if (priorCompleted == null) continue;
+
+      final priorEx = await (select(completedExercises)
+            ..where((ce) =>
+                ce.completedWorkoutId.equals(priorCompleted.id) &
+                ce.movementId.equals(movementId)))
+          .getSingleOrNull();
+      if (priorEx == null || priorEx.skipReason != null) continue;
+
+      final allSets = await (select(completedSets)
+            ..where((s) => s.completedExerciseId.equals(priorEx.id))
+            ..orderBy([(s) => OrderingTerm.asc(s.id)]))
+          .get();
+
+      final nonSkipped = allSets.where((s) => s.skipReason == null).toList();
+
+      return computeHeuristic(nonSkipped, currentWeek.goal, movement);
+    }
+
+    // No valid history found across any prior week — cold start.
+    return [const PlannedSetValues(), const PlannedSetValues()];
   }
 
   Future<int> initializeWorkout(int workoutId) async {
