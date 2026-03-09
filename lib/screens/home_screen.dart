@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../app_preferences.dart';
 import '../db/app_database.dart';
 import '../db/db.dart';
 import '../db/tables/enums.dart';
 import '../widgets/app_nav_menu.dart';
 import 'mesocycle_setup_screen.dart';
 import 'pre_workout_checkin_screen.dart';
+import 'profile_screen.dart';
 import 'workout_screen.dart';
 
 // ── Home state ───────────────────────────────────────────────────────────────
@@ -43,16 +45,34 @@ class _HomeScreenState extends State<HomeScreen> {
     _resultFuture = _init();
   }
 
-  /// Resolves app state and returns a [_HomeResult] describing what to show.
-  ///
-  /// Redirect cases schedule navigation via addPostFrameCallback (safe from
-  /// initState) and return [_Redirecting] so the spinner stays visible until
-  /// the route transition fires — no flash of the wrong screen.
+  /// Validates the SharedPreferences acceleration pointers against DB ground
+  /// truth and clears any stale values so they are never misleading.
+  Future<void> _reconcile() async {
+    final completedWorkoutId = AppPreferences.getCurrentCompletedWorkoutId();
+    if (completedWorkoutId != null) {
+      final row = await (db.select(db.completedWorkouts)
+            ..where((w) => w.id.equals(completedWorkoutId)))
+          .getSingleOrNull();
+      final isActive = row != null &&
+          row.completedAt == null &&
+          row.status == WorkoutStatus.active;
+      if (!isActive) await AppPreferences.setCurrentCompletedWorkoutId(null);
+    }
+
+    final mesocycleId = AppPreferences.getCurrentMesocycleId();
+    if (mesocycleId != null) {
+      final row = await (db.select(db.mesocycles)
+            ..where((m) => m.id.equals(mesocycleId)))
+          .getSingleOrNull();
+      if (row == null) await AppPreferences.setCurrentMesocycleId(null);
+    }
+  }
+
   Future<_HomeResult> _init() async {
-    final appState = await db.getAppState();
+    await _reconcile();
 
     // Resume in-progress workout if one exists.
-    final activeId = appState.currentCompletedWorkoutId;
+    final activeId = AppPreferences.getCurrentCompletedWorkoutId();
     if (activeId != null) {
       final data = await db.getWorkoutData(activeId);
       if (mounted) {
@@ -71,15 +91,12 @@ class _HomeScreenState extends State<HomeScreen> {
       return _Redirecting();
     }
 
-    // No active mesocycle — send to setup.
-    final mesocycleId = appState.currentMesocycleId;
+    // No active mesocycle — cold boot or meso complete.
+    final mesocycleId = AppPreferences.getCurrentMesocycleId();
     if (mesocycleId == null) {
       if (mounted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const MesocycleSetupScreen()),
-          );
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          await _handleNomesocycle();
         });
       }
       return _Redirecting();
@@ -90,6 +107,49 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final date = await db.getExpectedWorkoutDate(mesocycleId);
     return _WorkoutReady(workout, date);
+  }
+
+  /// On fresh install (no mesocycle), optionally prompt to set up profile first.
+  Future<void> _handleNomesocycle() async {
+    if (!AppPreferences.hasSeenProfilePrompt()) {
+      await AppPreferences.setHasSeenProfilePrompt(true);
+      if (!mounted) return;
+      final goToProfile = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Set Up Your Profile'),
+          content: const Text(
+            'Your profile helps the AI make better workout recommendations '
+            '— things like your age, weight, and training goal. '
+            'Would you like to set it up now?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Skip'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Set Up Profile'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      if (goToProfile == true) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ProfileScreen()),
+        );
+        if (!mounted) return;
+      }
+    }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const MesocycleSetupScreen()),
+    );
   }
 
   Future<void> _startWorkout(Workout workout) async {
@@ -168,7 +228,8 @@ class _HomeScreenState extends State<HomeScreen> {
       };
 
   Future<void> _startNewMesocycle() async {
-    await db.clearCurrentMesocycle();
+    await AppPreferences.setCurrentMesocycleId(null);
+    await AppPreferences.setCurrentCompletedWorkoutId(null);
     if (!mounted) return;
     Navigator.pushReplacement(
       context,

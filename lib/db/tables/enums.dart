@@ -36,3 +36,7 @@ enum WorkoutStatus { active, completed, skipped }
 enum WorkoutSkipReason { time, soreness, illness, other }
 
 enum WeekGoal { hard, deload }
+
+enum TrainingGoal { strength, hypertrophy, endurance, general }
+
+enum CalorieState { surplus, maintenance, deficit }

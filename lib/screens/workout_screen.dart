@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../app_preferences.dart';
 import '../db/app_database.dart';
 import '../db/db.dart';
 import '../db/tables/enums.dart';
@@ -576,6 +577,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     if (confirmed != true || !mounted) return;
 
     await db.finishWorkout(widget.completedWorkoutId);
+    await AppPreferences.setCurrentCompletedWorkoutId(null);
 
     if (mounted) {
       Navigator.pushAndRemoveUntil(

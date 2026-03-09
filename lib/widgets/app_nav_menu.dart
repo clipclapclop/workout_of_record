@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import '../screens/home_screen.dart';
 import '../screens/meso_template_list_screen.dart';
 import '../screens/movements_screen.dart';
+import '../screens/profile_screen.dart';
+import '../screens/settings_screen.dart';
 import '../screens/workout_screen.dart';
 
-enum AppScreen { workout, exercises, mesoTemplates }
+enum AppScreen { workout, exercises, mesoTemplates, profile, settings }
 
 class AppNavMenu extends StatelessWidget {
   const AppNavMenu({
@@ -39,6 +41,16 @@ class AppNavMenu extends StatelessWidget {
             value: AppScreen.mesoTemplates,
             child: Text('Meso Templates'),
           ),
+        if (current != AppScreen.profile)
+          const PopupMenuItem(
+            value: AppScreen.profile,
+            child: Text('Profile'),
+          ),
+        if (current != AppScreen.settings)
+          const PopupMenuItem(
+            value: AppScreen.settings,
+            child: Text('Settings'),
+          ),
       ],
     );
   }
@@ -59,6 +71,8 @@ class AppNavMenu extends StatelessWidget {
           activeWorkoutId: activeWorkoutId,
           activeWorkoutName: activeWorkoutName,
         ),
+      AppScreen.profile => const ProfileScreen(),
+      AppScreen.settings => const SettingsScreen(),
     };
     Navigator.pushAndRemoveUntil(
       context,

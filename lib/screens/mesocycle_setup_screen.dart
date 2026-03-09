@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app_preferences.dart';
 import '../db/app_database.dart';
 import '../db/db.dart';
 import '../db/template_data.dart';
@@ -94,7 +95,9 @@ class _MesocycleSetupScreenState extends State<MesocycleSetupScreen> {
     }
 
     setState(() => _saving = true);
-    await db.createMesocycle(template.id, name, _totalWeeks);
+    final mesocycleId = await db.createMesocycle(template.id, name, _totalWeeks);
+    await AppPreferences.setCurrentMesocycleId(mesocycleId);
+    await AppPreferences.setCurrentCompletedWorkoutId(null);
     if (!mounted) return;
     Navigator.pushReplacement(
       context,

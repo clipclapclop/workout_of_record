@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 
+import '../app_preferences.dart';
 import '../db/app_database.dart';
 import '../db/db.dart';
 import '../db/tables/enums.dart';
@@ -61,8 +62,8 @@ class _PreWorkoutCheckinScreenState extends State<PreWorkoutCheckinScreen> {
       mentalState: Value(_mentalState),
     ));
     await db.generatePlannedWorkout(widget.workoutId);
-    final completedWorkoutId =
-        await db.initializeWorkout(widget.workoutId);
+    final completedWorkoutId = await db.initializeWorkout(widget.workoutId);
+    await AppPreferences.setCurrentCompletedWorkoutId(completedWorkoutId);
     if (!mounted) return;
     await Navigator.pushReplacement(
       context,

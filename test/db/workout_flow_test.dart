@@ -125,9 +125,7 @@ void main() {
     expect(allSets.length, 4); // 2 sets × 2 exercises
     expect(allSets.every((s) => s.reps == null && s.weight == null), true);
 
-    // app_state updated.
-    final appState = await db.getAppState();
-    expect(appState.currentCompletedWorkoutId, cwId);
+    // app_state removed; currentCompletedWorkoutId now lives in AppPreferences.
   });
 
   test('6. savePreWorkoutCheckin inserts correct row', () async {

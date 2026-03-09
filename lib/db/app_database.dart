@@ -5,7 +5,6 @@ import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-import 'tables/app_state.dart';
 import 'planning.dart';
 import 'template_data.dart';
 import 'workout_data.dart';
@@ -38,14 +37,13 @@ part 'app_database.g.dart';
   PreWorkoutCheckins,
   PostExerciseCheckins,
   PostMuscleGroupCheckins,
-  AppStates,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.withExecutor(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -53,43 +51,22 @@ class AppDatabase extends _$AppDatabase {
           await m.createAll();
           await _seedData();
         },
-        onUpgrade: (Migrator m, int from, int to) async {
-          if (from < 2) {
-            await m.addColumn(appStates, appStates.currentCompletedWorkoutId);
-          }
-          if (from < 3) {
-            await m.addColumn(mesoTemplates, mesoTemplates.createdAt);
-          }
-        },
       );
 
   // ── Public API ─────────────────────────────────────────────────────────────
 
-  Future<AppState> getAppState() =>
-      (select(appStates)..where((s) => s.id.equals(1))).getSingle();
-
-  /// Creates a new mesocycle from the given template and sets it as current.
-  /// No weeks, workouts, or planned rows are created here — everything is lazy.
+  /// Creates a new mesocycle from the given template. Returns the new ID.
+  /// Caller is responsible for updating AppPreferences with the returned ID.
   Future<int> createMesocycle(
       int templateId, String name, int totalWeeks) async {
-    return await transaction(() async {
-      final mesocycleId = await into(mesocycles).insert(
-        MesocyclesCompanion.insert(
-          mesoTemplateId: templateId,
-          name: name,
-          totalWeekCount: totalWeeks,
-          createdAt: DateTime.now(),
-        ),
-      );
-      await (update(appStates)..where((s) => s.id.equals(1))).write(
-        AppStatesCompanion(
-          currentMesocycleId: Value(mesocycleId),
-          currentCompletedWorkoutId: const Value(null),
-          updatedAt: Value(DateTime.now()),
-        ),
-      );
-      return mesocycleId;
-    });
+    return into(mesocycles).insert(
+      MesocyclesCompanion.insert(
+        mesoTemplateId: templateId,
+        name: name,
+        totalWeekCount: totalWeeks,
+        createdAt: DateTime.now(),
+      ),
+    );
   }
 
   /// Returns the next workout to perform, creating week/workout rows as needed.
@@ -403,13 +380,6 @@ class AppDatabase extends _$AppDatabase {
         }
       }
 
-      await (update(appStates)..where((s) => s.id.equals(1))).write(
-        AppStatesCompanion(
-          currentCompletedWorkoutId: Value(completedWorkoutId),
-          updatedAt: Value(DateTime.now()),
-        ),
-      );
-
       return completedWorkoutId;
     });
   }
@@ -677,11 +647,11 @@ class AppDatabase extends _$AppDatabase {
   }
 
   /// Throws [TemplateInUseException] if any active mesocycle uses this template.
-  Future<void> deleteMesoTemplate(int id) async {
-    final appState = await getAppState();
-    if (appState.currentMesocycleId != null) {
+  /// [currentMesocycleId] should come from AppPreferences.getCurrentMesocycleId().
+  Future<void> deleteMesoTemplate(int id, {int? currentMesocycleId}) async {
+    if (currentMesocycleId != null) {
       final meso = await (select(mesocycles)
-            ..where((m) => m.id.equals(appState.currentMesocycleId!)))
+            ..where((m) => m.id.equals(currentMesocycleId)))
           .getSingleOrNull();
       if (meso != null && meso.mesoTemplateId == id) {
         throw TemplateInUseException();
@@ -755,30 +725,14 @@ class AppDatabase extends _$AppDatabase {
       (update(movements)..where((m) => m.id.equals(companion.id.value)))
           .write(companion);
 
-  /// Clears the current mesocycle so the app enters cold-boot / setup state.
-  Future<void> clearCurrentMesocycle() =>
-      (update(appStates)..where((s) => s.id.equals(1))).write(
-        const AppStatesCompanion(
-          currentMesocycleId: Value(null),
-          currentCompletedWorkoutId: Value(null),
-        ),
-      );
-
-  Future<void> finishWorkout(int completedWorkoutId) async {
-    await transaction(() async {
-      await (update(completedWorkouts)
-            ..where((w) => w.id.equals(completedWorkoutId)))
+  /// Marks the workout complete in the DB.
+  /// Caller is responsible for clearing AppPreferences.currentCompletedWorkoutId.
+  Future<void> finishWorkout(int completedWorkoutId) =>
+      (update(completedWorkouts)..where((w) => w.id.equals(completedWorkoutId)))
           .write(CompletedWorkoutsCompanion(
         completedAt: Value(DateTime.now()),
         status: const Value(WorkoutStatus.completed),
       ));
-      await (update(appStates)..where((s) => s.id.equals(1))).write(
-        const AppStatesCompanion(
-          currentCompletedWorkoutId: Value(null),
-        ),
-      );
-    });
-  }
 
   Future<void> skipWorkout(int workoutId, WorkoutSkipReason reason) async {
     final now = DateTime.now();
@@ -1088,12 +1042,6 @@ class AppDatabase extends _$AppDatabase {
         exerciseIndex: 0,
       ));
 
-      // ── App state (no active mesocycle — cold boot) ────────────────────────
-      await into(appStates).insert(AppStatesCompanion(
-        id: const Value(1),
-        currentMesocycleId: const Value(null),
-        updatedAt: Value(DateTime.now()),
-      ));
     });
   }
 }
