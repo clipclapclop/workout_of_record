@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../screens/home_screen.dart';
+import '../screens/meso_template_list_screen.dart';
 import '../screens/movements_screen.dart';
 import '../screens/workout_screen.dart';
 
-enum AppScreen { workout, exercises }
+enum AppScreen { workout, exercises, mesoTemplates }
 
 class AppNavMenu extends StatelessWidget {
   const AppNavMenu({
@@ -33,6 +34,11 @@ class AppNavMenu extends StatelessWidget {
             value: AppScreen.exercises,
             child: Text('Exercises'),
           ),
+        if (current != AppScreen.mesoTemplates)
+          const PopupMenuItem(
+            value: AppScreen.mesoTemplates,
+            child: Text('Meso Templates'),
+          ),
       ],
     );
   }
@@ -46,6 +52,10 @@ class AppNavMenu extends StatelessWidget {
             )
           : const HomeScreen(),
       AppScreen.exercises => MovementsScreen(
+          activeWorkoutId: activeWorkoutId,
+          activeWorkoutName: activeWorkoutName,
+        ),
+      AppScreen.mesoTemplates => MesoTemplateListScreen(
           activeWorkoutId: activeWorkoutId,
           activeWorkoutName: activeWorkoutName,
         ),

@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'tables/app_state.dart';
+import 'template_data.dart';
 import 'workout_data.dart';
 import 'tables/checkins.dart';
 import 'tables/enums.dart';
@@ -367,6 +368,152 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> deleteSet(int completedSetId) =>
       (delete(completedSets)..where((s) => s.id.equals(completedSetId))).go();
+
+  // ── Meso template methods ───────────────────────────────────────────────────
+
+  Future<List<MesoTemplate>> getMesoTemplates() =>
+      (select(mesoTemplates)..orderBy([(t) => OrderingTerm.asc(t.name)])).get();
+
+  Future<MesoTemplateData> getMesoTemplateData(int mesoTemplateId) async {
+    final template = await (select(mesoTemplates)
+          ..where((t) => t.id.equals(mesoTemplateId)))
+        .getSingle();
+
+    // All workout templates for this meso (via the single week template).
+    final wts = await (select(workoutTemplates).join([
+      innerJoin(weekTemplates, weekTemplates.id.equalsExp(workoutTemplates.weekTemplateId)),
+    ])
+          ..where(weekTemplates.mesoTemplateId.equals(mesoTemplateId))
+          ..orderBy([OrderingTerm.asc(workoutTemplates.dayIndex)]))
+        .map((row) => row.readTable(workoutTemplates))
+        .get();
+
+    final days = <WorkoutDayData>[];
+    for (final wt in wts) {
+      final exTemplates = await (select(exerciseTemplates)
+            ..where((et) => et.workoutTemplateId.equals(wt.id))
+            ..orderBy([(et) => OrderingTerm.asc(et.exerciseIndex)]))
+          .get();
+
+      final movs = <Movement>[];
+      for (final et in exTemplates) {
+        final m = await (select(movements)..where((m) => m.id.equals(et.movementId))).getSingle();
+        movs.add(m);
+      }
+      days.add(WorkoutDayData(template: wt, movements: movs));
+    }
+
+    return MesoTemplateData(template: template, days: days);
+  }
+
+  Future<int> createMesoTemplate(String name, List<WorkoutDaySpec> days) async {
+    return await transaction(() async {
+      final mesoTemplateId = await into(mesoTemplates).insert(
+        MesoTemplatesCompanion.insert(name: name),
+      );
+      await _insertTemplateStructure(mesoTemplateId, days);
+      return mesoTemplateId;
+    });
+  }
+
+  Future<void> updateMesoTemplate(
+      int id, String name, List<WorkoutDaySpec> days) async {
+    await transaction(() async {
+      // Update the name.
+      await (update(mesoTemplates)..where((t) => t.id.equals(id)))
+          .write(MesoTemplatesCompanion(name: Value(name)));
+
+      // Delete old structure (exercise templates → workout templates → week templates).
+      final oldWeekTemplates = await (select(weekTemplates)
+            ..where((wt) => wt.mesoTemplateId.equals(id)))
+          .get();
+      for (final wt in oldWeekTemplates) {
+        final oldWorkoutTemplates = await (select(workoutTemplates)
+              ..where((t) => t.weekTemplateId.equals(wt.id)))
+            .get();
+        for (final owt in oldWorkoutTemplates) {
+          await (delete(exerciseTemplates)
+                ..where((et) => et.workoutTemplateId.equals(owt.id)))
+              .go();
+        }
+        await (delete(workoutTemplates)
+              ..where((t) => t.weekTemplateId.equals(wt.id)))
+            .go();
+        await (delete(weekTemplates)..where((t) => t.id.equals(wt.id))).go();
+      }
+
+      await _insertTemplateStructure(id, days);
+    });
+  }
+
+  /// Throws [TemplateInUseException] if any active mesocycle uses this template.
+  Future<void> deleteMesoTemplate(int id) async {
+    final appState = await getAppState();
+    if (appState.currentMesocycleId != null) {
+      final meso = await (select(mesocycles)
+            ..where((m) => m.id.equals(appState.currentMesocycleId!)))
+          .getSingleOrNull();
+      if (meso != null && meso.mesoTemplateId == id) {
+        throw TemplateInUseException();
+      }
+    }
+
+    await transaction(() async {
+      final wts = await (select(weekTemplates)
+            ..where((wt) => wt.mesoTemplateId.equals(id)))
+          .get();
+      for (final wt in wts) {
+        final owts = await (select(workoutTemplates)
+              ..where((t) => t.weekTemplateId.equals(wt.id)))
+            .get();
+        for (final owt in owts) {
+          await (delete(exerciseTemplates)
+                ..where((et) => et.workoutTemplateId.equals(owt.id)))
+              .go();
+        }
+        await (delete(workoutTemplates)
+              ..where((t) => t.weekTemplateId.equals(wt.id)))
+            .go();
+        await (delete(weekTemplates)..where((t) => t.id.equals(wt.id))).go();
+      }
+      await (delete(mesoTemplates)..where((t) => t.id.equals(id))).go();
+    });
+  }
+
+  /// Inserts a single WeekTemplate + WorkoutTemplates + ExerciseTemplates
+  /// for the given mesoTemplateId. Used by both create and update.
+  Future<void> _insertTemplateStructure(
+      int mesoTemplateId, List<WorkoutDaySpec> days) async {
+    final weekTemplateId = await into(weekTemplates).insert(
+      WeekTemplatesCompanion.insert(
+        mesoTemplateId: mesoTemplateId,
+        name: 'Week',
+        workoutCount: days.where((d) => !d.isRestDay).length,
+      ),
+    );
+
+    for (var i = 0; i < days.length; i++) {
+      final day = days[i];
+      final workoutTemplateId = await into(workoutTemplates).insert(
+        WorkoutTemplatesCompanion.insert(
+          weekTemplateId: weekTemplateId,
+          name: day.name,
+          isRestDay: day.isRestDay,
+          dayIndex: i,
+        ),
+      );
+
+      for (var j = 0; j < day.movementIds.length; j++) {
+        await into(exerciseTemplates).insert(
+          ExerciseTemplatesCompanion.insert(
+            workoutTemplateId: workoutTemplateId,
+            movementId: day.movementIds[j],
+            exerciseIndex: j,
+          ),
+        );
+      }
+    }
+  }
 
   Future<List<Movement>> getMovements() =>
       (select(movements)
