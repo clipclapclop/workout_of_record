@@ -7,49 +7,6 @@ Tracks all remaining work. Each task includes enough context to execute without 
 
 ---
 
-### 8. User Profile
-
-**Goal:** Store user profile fields used by the recommendation engine.
-
-**Fields:** age (int), weight (double, kg), training goal (enum: strength / hypertrophy / endurance / general), daily calories are meant to (gain / maintain / loose) weight.
-
-**DB:** Add `user_profile` table (singleton like `app_state`). Schema migration required (version bump).
-
-**UI:** `ProfileScreen` with form fields. Link in top right 3-dot dropdown.
-
----
-
-### 9. Settings Screen
-
-**Goal:** Central settings hub.
-
-**Initial settings:**
-- AI recommendations: on/off toggle
-- Anthropic API key: text field (stored securely via `flutter_secure_storage`)
-- (Future) units: lbs / kg
-
----
-
-### 10. History / Analytics Screens
-
-**Goal:** Let user review past workouts.
-
-**Screens:**
-- `HistoryScreen`: list of `completed_workouts` ordered by `startedAt` desc. Tap → `WorkoutHistoryDetailScreen`.
-- `WorkoutHistoryDetailScreen`: shows all exercises + sets with planned vs completed values side by side.
-- (Future) Per-movement trend charts.
-
-**DB methods:**
-- `getCompletedWorkouts() → Future<List<CompletedWorkout>>`
-- `getWorkoutData(int completedWorkoutId)` — already implemented, reuse.
-
-**Remaining:**
-- Add new movement form (create flow, not just edit).
-
-**Note:** Movements are global, not per-mesocycle. Editing a movement affects future planned workouts only (planned/completed rows already store movementId, so history is unaffected).
-
----
-
 ### 11. AI / LLM Recommendations
 
 **Goal:** Pre-fill set reps/weight/time using openrouter API based on historical data and user context.

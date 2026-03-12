@@ -75,6 +75,21 @@ class AppPreferences {
       ? _secure.delete(key: _kSettingsApiKey)
       : _secure.write(key: _kSettingsApiKey, value: v);
 
+  // ── Backup ─────────────────────────────────────────────────────────────────
+
+  static String? getBackupDirectoryPath() => _prefs.getString(_kBackupDirectoryPath);
+  static Future<void> setBackupDirectoryPath(String? v) => v == null
+      ? _prefs.remove(_kBackupDirectoryPath)
+      : _prefs.setString(_kBackupDirectoryPath, v);
+
+  static DateTime? getLastBackupTimestamp() {
+    final s = _prefs.getString(_kLastBackupTimestamp);
+    return s == null ? null : DateTime.parse(s);
+  }
+  static Future<void> setLastBackupTimestamp(DateTime? v) => v == null
+      ? _prefs.remove(_kLastBackupTimestamp)
+      : _prefs.setString(_kLastBackupTimestamp, v.toIso8601String());
+
   // ── Keys ───────────────────────────────────────────────────────────────────
 
   static const _kCurrentMesocycleId = 'current_mesocycle_id';
@@ -87,4 +102,6 @@ class AppPreferences {
   static const _kSettingsAiEnabled = 'settings_ai_enabled';
   static const _kSettingsUnitsMetric = 'settings_units_metric';
   static const _kSettingsApiKey = 'settings_api_key';
+  static const _kBackupDirectoryPath = 'backup_directory_path';
+  static const _kLastBackupTimestamp = 'backup_last_timestamp';
 }
