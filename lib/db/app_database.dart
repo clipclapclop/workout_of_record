@@ -722,6 +722,9 @@ class AppDatabase extends _$AppDatabase {
         ]))
           .get();
 
+  Future<Movement> createMovement(MovementsCompanion companion) =>
+      into(movements).insertReturning(companion);
+
   Future<void> updateMovement(MovementsCompanion companion) =>
       (update(movements)..where((m) => m.id.equals(companion.id.value)))
           .write(companion);

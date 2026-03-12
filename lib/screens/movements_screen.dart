@@ -54,6 +54,21 @@ class _MovementsScreenState extends State<MovementsScreen> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MovementDetailScreen(
+                activeWorkoutId: widget.activeWorkoutId,
+                activeWorkoutName: widget.activeWorkoutName,
+              ),
+            ),
+          );
+          _reload();
+        },
+        child: const Icon(Icons.add),
+      ),
       body: FutureBuilder<List<Movement>>(
         future: _movementsFuture,
         builder: (context, snapshot) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../db/app_database.dart';
 import '../db/tables/enums.dart';
+import '../screens/movement_detail_screen.dart';
 
 /// Shows a bottom sheet for picking a movement to add to a template day.
 /// [alreadyAdded] prevents duplicate additions (shown greyed out).
@@ -42,6 +43,13 @@ class _MovementPickerSheetState extends State<_MovementPickerSheet> {
   final _searchCtrl = TextEditingController();
   MuscleGroup? _filterMg;
   String _query = '';
+  late List<Movement> _movements;
+
+  @override
+  void initState() {
+    super.initState();
+    _movements = List.of(widget.allMovements);
+  }
 
   @override
   void dispose() {
@@ -49,8 +57,18 @@ class _MovementPickerSheetState extends State<_MovementPickerSheet> {
     super.dispose();
   }
 
+  Future<void> _createNew(BuildContext ctx) async {
+    final Movement? created = await Navigator.push(
+      ctx,
+      MaterialPageRoute(builder: (_) => const MovementDetailScreen()),
+    );
+    if (!mounted || created == null) return;
+    widget.onAdd(created);
+    Navigator.pop(context);
+  }
+
   List<Movement> get _filtered {
-    return widget.allMovements.where((m) {
+    return _movements.where((m) {
       if (_filterMg != null && m.muscleGroup != _filterMg) return false;
       if (_query.isNotEmpty &&
           !m.name.toLowerCase().contains(_query.toLowerCase())) {
@@ -114,7 +132,17 @@ class _MovementPickerSheetState extends State<_MovementPickerSheet> {
                 onChanged: (v) => setState(() => _query = v),
               ),
             ),
-            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: TextButton.icon(
+                  onPressed: () => _createNew(context),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('New exercise'),
+                ),
+              ),
+            ),
             // Muscle group filter chips
             SizedBox(
               height: 36,

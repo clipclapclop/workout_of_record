@@ -9,12 +9,13 @@ import '../widgets/app_nav_menu.dart';
 class MovementDetailScreen extends StatefulWidget {
   const MovementDetailScreen({
     super.key,
-    required this.movement,
+    this.movement,
     this.activeWorkoutId,
     this.activeWorkoutName,
   });
 
-  final Movement movement;
+  /// Null when creating a new exercise.
+  final Movement? movement;
   final int? activeWorkoutId;
   final String? activeWorkoutName;
 
@@ -42,19 +43,19 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
   void initState() {
     super.initState();
     final m = widget.movement;
-    _nameCtrl = TextEditingController(text: m.name);
-    _subMuscleCtrl = TextEditingController(text: m.subMuscleGroup ?? '');
-    _note1Ctrl = TextEditingController(text: m.note1 ?? '');
-    _note2Ctrl = TextEditingController(text: m.note2 ?? '');
-    _linkCtrl = TextEditingController(text: m.link ?? '');
+    _nameCtrl = TextEditingController(text: m?.name ?? '');
+    _subMuscleCtrl = TextEditingController(text: m?.subMuscleGroup ?? '');
+    _note1Ctrl = TextEditingController(text: m?.note1 ?? '');
+    _note2Ctrl = TextEditingController(text: m?.note2 ?? '');
+    _linkCtrl = TextEditingController(text: m?.link ?? '');
     _minWeightCtrl = TextEditingController(
-        text: m.minWeight != null ? _fmt(m.minWeight!) : '');
+        text: m?.minWeight != null ? _fmt(m!.minWeight!) : '');
     _weightDeltaCtrl = TextEditingController(
-        text: m.weightDelta != null ? _fmt(m.weightDelta!) : '');
-    _muscleGroup = m.muscleGroup;
-    _isRequiredReps = m.isRequiredReps;
-    _isRequiredWeight = m.isRequiredWeight;
-    _isRequiredTime = m.isRequiredTime;
+        text: m?.weightDelta != null ? _fmt(m!.weightDelta!) : '');
+    _muscleGroup = m?.muscleGroup ?? MuscleGroup.values.first;
+    _isRequiredReps = m?.isRequiredReps ?? true;
+    _isRequiredWeight = m?.isRequiredWeight ?? true;
+    _isRequiredTime = m?.isRequiredTime ?? false;
   }
 
   @override
@@ -77,8 +78,7 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    await db.updateMovement(MovementsCompanion(
-      id: Value(widget.movement.id),
+    final companion = MovementsCompanion(
       name: Value(_nameCtrl.text.trim()),
       muscleGroup: Value(_muscleGroup),
       subMuscleGroup: Value(
@@ -91,15 +91,21 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
       isRequiredReps: Value(_isRequiredReps),
       isRequiredWeight: Value(_isRequiredWeight),
       isRequiredTime: Value(_isRequiredTime),
-    ));
-    if (mounted) Navigator.pop(context);
+    );
+    if (widget.movement != null) {
+      await db.updateMovement(companion.copyWith(id: Value(widget.movement!.id)));
+      if (mounted) Navigator.pop(context);
+    } else {
+      final created = await db.createMovement(companion);
+      if (mounted) Navigator.pop(context, created);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.movement.name),
+        title: Text(widget.movement?.name ?? 'New Exercise'),
         automaticallyImplyLeading: true,
         actions: [
           TextButton(
