@@ -41,38 +41,56 @@ class HistoryScreen extends StatelessWidget {
             return const Center(child: Text('No workouts yet.'));
           }
           return ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             itemCount: items.length,
             itemBuilder: (context, i) {
               final item = items[i];
               final cw = item.completedWorkout;
               final d = cw.startedAt;
-              final dateStr =
-                  '${_monthName(d.month)} ${d.day}, ${d.year}';
+              final dateStr = '${_monthName(d.month)} ${d.day}, ${d.year}';
               final isSkipped = cw.status == WorkoutStatus.skipped;
 
-              return ListTile(
-                title: Text('${item.workoutName}  ·  Week ${item.weekNumber}'),
-                subtitle: Text('${item.mesoName}  ·  $dateStr'),
-                trailing: isSkipped
-                    ? Chip(
-                        label: const Text('Skipped'),
-                        backgroundColor:
-                            Theme.of(context).colorScheme.errorContainer,
-                        labelStyle: TextStyle(
-                          color: Theme.of(context).colorScheme.onErrorContainer,
+              return Card(
+                child: ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  title: Text(
+                    item.workoutName,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    '${item.mesoName}  ·  Week ${item.weekNumber}  ·  $dateStr',
+                  ),
+                  trailing: isSkipped
+                      ? Chip(
+                          label: const Text('Skipped'),
+                          backgroundColor:
+                              Theme.of(context).colorScheme.errorContainer,
+                          labelStyle: TextStyle(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onErrorContainer,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                        )
+                      : Icon(
+                          Icons.chevron_right,
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
-                        padding: EdgeInsets.zero,
-                        visualDensity: VisualDensity.compact,
-                      )
-                    : const Icon(Icons.chevron_right),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => WorkoutHistoryDetailScreen(
-                      completedWorkoutId: cw.id,
-                      title: '${item.workoutName} — Week ${item.weekNumber}',
-                      activeWorkoutId: activeWorkoutId,
-                      activeWorkoutName: activeWorkoutName,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => WorkoutHistoryDetailScreen(
+                        completedWorkoutId: cw.id,
+                        title:
+                            '${item.workoutName} — Week ${item.weekNumber}',
+                        activeWorkoutId: activeWorkoutId,
+                        activeWorkoutName: activeWorkoutName,
+                      ),
                     ),
                   ),
                 ),

@@ -258,13 +258,35 @@ class _HomeScreenState extends State<HomeScreen> {
 
           return switch (snapshot.data!) {
             _Redirecting() => const Center(child: CircularProgressIndicator()),
-            _MesoComplete() => Center(
+            _MesoComplete() => Padding(
+                padding: const EdgeInsets.all(32),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text('Mesocycle Complete!',
-                        style: Theme.of(context).textTheme.headlineMedium),
+                    Icon(
+                      Icons.emoji_events_rounded,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                     const SizedBox(height: 24),
+                    Text(
+                      'Mesocycle\nComplete!',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      "You've finished every workout in this block.",
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                    const SizedBox(height: 48),
                     FilledButton(
                       onPressed: _startNewMesocycle,
                       child: const Text('Start New Mesocycle'),
@@ -272,31 +294,54 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-            _WorkoutReady(:final workout, :final expectedDate) => Center(
+            _WorkoutReady(:final workout, :final expectedDate) => Padding(
+                padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(workout.name,
-                        style: Theme.of(context).textTheme.headlineMedium),
-                    if (expectedDate != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          _formatExpectedDate(expectedDate),
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
+                    if (expectedDate != null) ...[
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primaryContainer
+                                .withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            _formatExpectedDate(expectedDate),
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelMedium
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onPrimaryContainer,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
                         ),
                       ),
-                    const SizedBox(height: 24),
+                      const SizedBox(height: 16),
+                    ],
+                    Text(
+                      workout.name,
+                      textAlign: TextAlign.center,
+                      style:
+                          Theme.of(context).textTheme.displaySmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                    ),
+                    const SizedBox(height: 48),
                     FilledButton(
                       onPressed: () => _startWorkout(workout),
                       child: const Text('Start Workout'),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     OutlinedButton(
                       onPressed: () => _skipWorkout(workout),
                       child: const Text('Skip Workout'),

@@ -4,6 +4,7 @@ import 'package:workmanager/workmanager.dart';
 import 'app_preferences.dart';
 import 'screens/home_screen.dart';
 import 'services/backup_service.dart';
+import 'theme.dart';
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
@@ -27,7 +28,7 @@ void main() async {
     'nightly-backup',
     'backupTask',
     frequency: const Duration(hours: 24),
-    existingWorkPolicy: ExistingWorkPolicy.keep,
+    existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
   );
   runApp(const MyApp());
 }
@@ -39,15 +40,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Workout of Record',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
-          brightness: Brightness.dark,
-        ),
-      ),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.dark,
       home: const HomeScreen(),
     );

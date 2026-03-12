@@ -751,7 +751,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         children: [
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               children: [
                 for (var i = 0; i < data.exercises.length; i++)
                   _buildExercise(data.exercises[i], i, lastExIndexForMg),
@@ -866,9 +866,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     }
 
     final header = Padding(
-      padding: isExSkipped
-          ? const EdgeInsets.only(top: 8, bottom: 4)
-          : const EdgeInsets.only(top: 20, bottom: 8),
+      padding: const EdgeInsets.only(top: 8, bottom: 8),
       child: Row(
         children: [
           Expanded(
@@ -913,7 +911,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
               exercise.movement.note1!,
-              style: Theme.of(context).textTheme.bodySmall,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             ),
           ),
         ...setRows,
@@ -930,17 +930,27 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     );
 
     if (isExSkipped) {
-      return Container(
-        margin: const EdgeInsets.only(top: 20),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.error.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(8),
+      return Card(
+        margin: const EdgeInsets.only(top: 8),
+        color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3),
+          ),
         ),
-        child: column,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 8, 12),
+          child: column,
+        ),
       );
     }
-    return column;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 8, 12),
+        child: column,
+      ),
+    );
   }
 
   Widget _buildSetRow(int setNum, SetData setData, Movement movement,
@@ -948,11 +958,19 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     final state = _setStates[setData.completed.id]!;
     final canCheck = state.canCheck(movement);
 
+    Color? rowColor;
+    if (state.isSkipped) {
+      rowColor = Theme.of(context).colorScheme.error.withValues(alpha: 0.12);
+    } else if (state.isChecked) {
+      rowColor =
+          Theme.of(context).colorScheme.primary.withValues(alpha: 0.08);
+    }
+
     return Container(
-      decoration: state.isSkipped
+      decoration: rowColor != null
           ? BoxDecoration(
-              color: Theme.of(context).colorScheme.error.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(6),
+              color: rowColor,
+              borderRadius: BorderRadius.circular(8),
             )
           : null,
       padding: const EdgeInsets.symmetric(vertical: 4),
