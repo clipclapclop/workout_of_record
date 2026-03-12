@@ -5,6 +5,7 @@ import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import 'history_data.dart';
 import 'planning.dart';
 import 'template_data.dart';
 import 'workout_data.dart';
@@ -750,6 +751,70 @@ class AppDatabase extends _$AppDatabase {
       (update(completedExercises)
             ..where((e) => e.id.equals(completedExerciseId)))
           .write(CompletedExercisesCompanion(isPersistent: Value(isPersistent)));
+
+  /// Returns all non-rest-day completed workouts (excludes active/in-progress), newest first.
+  Future<List<CompletedWorkoutSummary>> getCompletedWorkoutSummaries() async {
+    final rows = await (select(completedWorkouts).join([
+      innerJoin(workouts, workouts.id.equalsExp(completedWorkouts.workoutId)),
+      innerJoin(weeks, weeks.id.equalsExp(workouts.weekId)),
+      innerJoin(mesocycles, mesocycles.id.equalsExp(weeks.mesocycleId)),
+    ])
+          ..where(workouts.isRestDay.equals(false) &
+              completedWorkouts.completedAt.isNotNull())
+          ..orderBy([OrderingTerm.desc(completedWorkouts.startedAt)]))
+        .get();
+
+    return rows.map((row) {
+      return CompletedWorkoutSummary(
+        completedWorkout: row.readTable(completedWorkouts),
+        workoutName: row.readTable(workouts).name,
+        weekNumber: row.readTable(weeks).weekNumber,
+        mesoName: row.readTable(mesocycles).name,
+        mesocycleId: row.readTable(mesocycles).id,
+      );
+    }).toList();
+  }
+
+  /// Returns all completed exercises for [movementId] (excludes active/in-progress), newest first.
+  /// Only includes sessions where the exercise was actually present (done or skipped).
+  Future<List<MovementHistoryEntry>> getMovementHistory(int movementId) async {
+    final rows = await (select(completedExercises).join([
+      innerJoin(completedWorkouts,
+          completedWorkouts.id.equalsExp(completedExercises.completedWorkoutId)),
+      innerJoin(workouts, workouts.id.equalsExp(completedWorkouts.workoutId)),
+      innerJoin(weeks, weeks.id.equalsExp(workouts.weekId)),
+      innerJoin(mesocycles, mesocycles.id.equalsExp(weeks.mesocycleId)),
+    ])
+          ..where(completedExercises.movementId.equals(movementId) &
+              completedWorkouts.completedAt.isNotNull())
+          ..orderBy([OrderingTerm.desc(completedWorkouts.startedAt)]))
+        .get();
+
+    final result = <MovementHistoryEntry>[];
+    for (final row in rows) {
+      final exercise = row.readTable(completedExercises);
+      final cw = row.readTable(completedWorkouts);
+      final w = row.readTable(workouts);
+      final week = row.readTable(weeks);
+      final meso = row.readTable(mesocycles);
+
+      final sets = await (select(completedSets)
+            ..where((s) => s.completedExerciseId.equals(exercise.id))
+            ..orderBy([(s) => OrderingTerm.asc(s.id)]))
+          .get();
+
+      result.add(MovementHistoryEntry(
+        mesoId: meso.id,
+        mesoName: meso.name,
+        weekNumber: week.weekNumber,
+        workoutName: w.name,
+        workoutDate: cw.startedAt,
+        exercise: exercise,
+        sets: sets,
+      ));
+    }
+    return result;
+  }
 
   /// Returns the expected date for the next workout: the day after the most
   /// recently completed workout in this mesocycle. Falls back to today.

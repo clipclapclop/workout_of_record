@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../screens/history_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/meso_template_list_screen.dart';
 import '../screens/movements_screen.dart';
@@ -7,7 +8,7 @@ import '../screens/profile_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/workout_screen.dart';
 
-enum AppScreen { workout, exercises, mesoTemplates, profile, settings }
+enum AppScreen { workout, exercises, mesoTemplates, history, profile, settings }
 
 class AppNavMenu extends StatelessWidget {
   const AppNavMenu({
@@ -41,6 +42,11 @@ class AppNavMenu extends StatelessWidget {
             value: AppScreen.mesoTemplates,
             child: Text('Meso Templates'),
           ),
+        if (current != AppScreen.history)
+          const PopupMenuItem(
+            value: AppScreen.history,
+            child: Text('History'),
+          ),
         if (current != AppScreen.profile)
           const PopupMenuItem(
             value: AppScreen.profile,
@@ -68,6 +74,10 @@ class AppNavMenu extends StatelessWidget {
           activeWorkoutName: activeWorkoutName,
         ),
       AppScreen.mesoTemplates => MesoTemplateListScreen(
+          activeWorkoutId: activeWorkoutId,
+          activeWorkoutName: activeWorkoutName,
+        ),
+      AppScreen.history => HistoryScreen(
           activeWorkoutId: activeWorkoutId,
           activeWorkoutName: activeWorkoutName,
         ),

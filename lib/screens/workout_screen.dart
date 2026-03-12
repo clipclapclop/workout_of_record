@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../app_preferences.dart';
 import '../db/app_database.dart';
 import '../db/db.dart';
+import '../db/history_data.dart';
 import '../db/tables/enums.dart';
 import '../db/workout_data.dart';
 import '../widgets/app_nav_menu.dart';
@@ -558,6 +559,125 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     setState(() => _isPersistent[exercise.completed.id] = next);
   }
 
+  Future<void> _showMovementHistorySheet(ExerciseData exercise) async {
+    final entries = await db.getMovementHistory(exercise.movement.id);
+
+    if (!mounted) return;
+
+    // Group by meso, preserving newest-first encounter order.
+    final mesoOrder = <int>[];
+    final byMeso = <int, List<MovementHistoryEntry>>{};
+    for (final entry in entries) {
+      if (!byMeso.containsKey(entry.mesoId)) {
+        mesoOrder.add(entry.mesoId);
+        byMeso[entry.mesoId] = [];
+      }
+      byMeso[entry.mesoId]!.add(entry);
+    }
+
+    final weightUnit = AppPreferences.getUnitsMetric() ? 'kg' : 'lbs';
+
+    String fmt(double? v) {
+      if (v == null) return '—';
+      return v == v.truncateToDouble() ? v.toInt().toString() : v.toString();
+    }
+
+    String setLine(CompletedSet s, Movement m) {
+      if (s.skipReason != null) return 'Skipped — ${_skipReasonLabel(s.skipReason!)}';
+      final parts = <String>[];
+      if (m.isRequiredReps) parts.add(s.reps != null ? '${s.reps} reps' : '—');
+      if (m.isRequiredWeight) {
+        parts.add(s.weight != null ? '${fmt(s.weight)} $weightUnit' : '—');
+      }
+      if (m.isRequiredTime) parts.add(s.time != null ? '${fmt(s.time)}s' : '—');
+      return parts.join(' × ');
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        maxChildSize: 0.92,
+        builder: (ctx, scrollCtrl) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+              child: Text(
+                exercise.movement.name,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            const Divider(height: 1),
+            if (entries.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('No history yet.'),
+              )
+            else
+              Expanded(
+                child: ListView(
+                  controller: scrollCtrl,
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                  children: [
+                    for (final mesoId in mesoOrder) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16, bottom: 4),
+                        child: Text(
+                          byMeso[mesoId]!.first.mesoName,
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                      ),
+                      for (final entry in byMeso[mesoId]!) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10, bottom: 2),
+                          child: Text(
+                            '${_fmtDate(entry.workoutDate)}  ·  Week ${entry.weekNumber}  ·  ${entry.workoutName}',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ),
+                        if (entry.exercise.skipReason != null)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 12),
+                            child: Text(
+                              'Exercise skipped — ${_skipReasonLabel(entry.exercise.skipReason!)}',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                            ),
+                          )
+                        else
+                          for (var i = 0; i < entry.sets.length; i++)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 12, top: 1),
+                              child: Text(
+                                'Set ${i + 1}: ${setLine(entry.sets[i], exercise.movement)}',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                      ],
+                    ],
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _fmtDate(DateTime d) {
+    const months = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${months[d.month]} ${d.day}';
+  }
+
   Future<void> _finishWorkout() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -767,6 +887,12 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                 mode: LaunchMode.externalApplication,
               ),
             ),
+          IconButton(
+            icon: const Icon(Icons.history, size: 20),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: () => _showMovementHistorySheet(exercise),
+          ),
           headerTrailing,
         ],
       ),
