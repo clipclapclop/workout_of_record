@@ -41,6 +41,7 @@ class _MovementPickerSheet extends StatefulWidget {
 
 class _MovementPickerSheetState extends State<_MovementPickerSheet> {
   final _searchCtrl = TextEditingController();
+  MovementCategory _filterCategory = MovementCategory.resistance;
   MuscleGroup? _filterMg;
   String _query = '';
   late List<Movement> _movements;
@@ -69,6 +70,7 @@ class _MovementPickerSheetState extends State<_MovementPickerSheet> {
 
   List<Movement> get _filtered {
     return _movements.where((m) {
+      if (m.category != _filterCategory) return false;
       if (_filterMg != null && m.muscleGroup != _filterMg) return false;
       if (_query.isNotEmpty &&
           !m.name.toLowerCase().contains(_query.toLowerCase())) {
@@ -132,15 +134,38 @@ class _MovementPickerSheetState extends State<_MovementPickerSheet> {
                 onChanged: (v) => setState(() => _query = v),
               ),
             ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: TextButton.icon(
-                  onPressed: () => _createNew(context),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('New exercise'),
-                ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Row(
+                children: [
+                  DropdownButton<MovementCategory>(
+                    value: _filterCategory,
+                    isDense: true,
+                    items: const [
+                      DropdownMenuItem(
+                        value: MovementCategory.resistance,
+                        child: Text('Resistance'),
+                      ),
+                      DropdownMenuItem(
+                        value: MovementCategory.cardio,
+                        child: Text('Cardio'),
+                      ),
+                    ],
+                    onChanged: (cat) {
+                      if (cat == null) return;
+                      setState(() {
+                        _filterCategory = cat;
+                        _filterMg = null;
+                      });
+                    },
+                  ),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () => _createNew(context),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('New exercise'),
+                  ),
+                ],
               ),
             ),
             // Muscle group filter chips

@@ -10,6 +10,7 @@ class PlannedSets extends Table {
   IntColumn get reps => integer().nullable()();
   RealColumn get weight => real().nullable()();
   RealColumn get time => real().nullable()();
+  RealColumn get distance => real().nullable()();
 }
 
 class CompletedSets extends Table {
@@ -19,5 +20,6 @@ class CompletedSets extends Table {
   IntColumn get reps => integer().nullable()();
   RealColumn get weight => real().nullable()();
   RealColumn get time => real().nullable()();
+  RealColumn get distance => real().nullable()();
   TextColumn get skipReason => textEnum<SkipReason>().nullable()();
 }

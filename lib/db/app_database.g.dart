@@ -142,6 +142,20 @@ class $MovementsTable extends Movements
       'CHECK ("is_required_time" IN (0, 1))',
     ),
   );
+  static const VerificationMeta _isRequiredDistanceMeta =
+      const VerificationMeta('isRequiredDistance');
+  @override
+  late final GeneratedColumn<bool> isRequiredDistance = GeneratedColumn<bool>(
+    'is_required_distance',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_required_distance" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   late final GeneratedColumnWithTypeConverter<MovementCategory, String>
   category = GeneratedColumn<String>(
@@ -165,6 +179,7 @@ class $MovementsTable extends Movements
     isRequiredReps,
     isRequiredWeight,
     isRequiredTime,
+    isRequiredDistance,
     category,
   ];
   @override
@@ -265,6 +280,15 @@ class $MovementsTable extends Movements
     } else if (isInserting) {
       context.missing(_isRequiredTimeMeta);
     }
+    if (data.containsKey('is_required_distance')) {
+      context.handle(
+        _isRequiredDistanceMeta,
+        isRequiredDistance.isAcceptableOrUnknown(
+          data['is_required_distance']!,
+          _isRequiredDistanceMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -328,6 +352,10 @@ class $MovementsTable extends Movements
         DriftSqlType.bool,
         data['${effectivePrefix}is_required_time'],
       )!,
+      isRequiredDistance: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_required_distance'],
+      )!,
       category: $MovementsTable.$convertercategory.fromSql(
         attachedDatabase.typeMapping.read(
           DriftSqlType.string,
@@ -363,6 +391,7 @@ class Movement extends DataClass implements Insertable<Movement> {
   final bool isRequiredReps;
   final bool isRequiredWeight;
   final bool isRequiredTime;
+  final bool isRequiredDistance;
   final MovementCategory category;
   const Movement({
     required this.id,
@@ -377,6 +406,7 @@ class Movement extends DataClass implements Insertable<Movement> {
     required this.isRequiredReps,
     required this.isRequiredWeight,
     required this.isRequiredTime,
+    required this.isRequiredDistance,
     required this.category,
   });
   @override
@@ -410,6 +440,7 @@ class Movement extends DataClass implements Insertable<Movement> {
     map['is_required_reps'] = Variable<bool>(isRequiredReps);
     map['is_required_weight'] = Variable<bool>(isRequiredWeight);
     map['is_required_time'] = Variable<bool>(isRequiredTime);
+    map['is_required_distance'] = Variable<bool>(isRequiredDistance);
     {
       map['category'] = Variable<String>(
         $MovementsTable.$convertercategory.toSql(category),
@@ -442,6 +473,7 @@ class Movement extends DataClass implements Insertable<Movement> {
       isRequiredReps: Value(isRequiredReps),
       isRequiredWeight: Value(isRequiredWeight),
       isRequiredTime: Value(isRequiredTime),
+      isRequiredDistance: Value(isRequiredDistance),
       category: Value(category),
     );
   }
@@ -466,6 +498,7 @@ class Movement extends DataClass implements Insertable<Movement> {
       isRequiredReps: serializer.fromJson<bool>(json['isRequiredReps']),
       isRequiredWeight: serializer.fromJson<bool>(json['isRequiredWeight']),
       isRequiredTime: serializer.fromJson<bool>(json['isRequiredTime']),
+      isRequiredDistance: serializer.fromJson<bool>(json['isRequiredDistance']),
       category: $MovementsTable.$convertercategory.fromJson(
         serializer.fromJson<String>(json['category']),
       ),
@@ -489,6 +522,7 @@ class Movement extends DataClass implements Insertable<Movement> {
       'isRequiredReps': serializer.toJson<bool>(isRequiredReps),
       'isRequiredWeight': serializer.toJson<bool>(isRequiredWeight),
       'isRequiredTime': serializer.toJson<bool>(isRequiredTime),
+      'isRequiredDistance': serializer.toJson<bool>(isRequiredDistance),
       'category': serializer.toJson<String>(
         $MovementsTable.$convertercategory.toJson(category),
       ),
@@ -508,6 +542,7 @@ class Movement extends DataClass implements Insertable<Movement> {
     bool? isRequiredReps,
     bool? isRequiredWeight,
     bool? isRequiredTime,
+    bool? isRequiredDistance,
     MovementCategory? category,
   }) => Movement(
     id: id ?? this.id,
@@ -524,6 +559,7 @@ class Movement extends DataClass implements Insertable<Movement> {
     isRequiredReps: isRequiredReps ?? this.isRequiredReps,
     isRequiredWeight: isRequiredWeight ?? this.isRequiredWeight,
     isRequiredTime: isRequiredTime ?? this.isRequiredTime,
+    isRequiredDistance: isRequiredDistance ?? this.isRequiredDistance,
     category: category ?? this.category,
   );
   Movement copyWithCompanion(MovementsCompanion data) {
@@ -552,6 +588,9 @@ class Movement extends DataClass implements Insertable<Movement> {
       isRequiredTime: data.isRequiredTime.present
           ? data.isRequiredTime.value
           : this.isRequiredTime,
+      isRequiredDistance: data.isRequiredDistance.present
+          ? data.isRequiredDistance.value
+          : this.isRequiredDistance,
       category: data.category.present ? data.category.value : this.category,
     );
   }
@@ -571,6 +610,7 @@ class Movement extends DataClass implements Insertable<Movement> {
           ..write('isRequiredReps: $isRequiredReps, ')
           ..write('isRequiredWeight: $isRequiredWeight, ')
           ..write('isRequiredTime: $isRequiredTime, ')
+          ..write('isRequiredDistance: $isRequiredDistance, ')
           ..write('category: $category')
           ..write(')'))
         .toString();
@@ -590,6 +630,7 @@ class Movement extends DataClass implements Insertable<Movement> {
     isRequiredReps,
     isRequiredWeight,
     isRequiredTime,
+    isRequiredDistance,
     category,
   );
   @override
@@ -608,6 +649,7 @@ class Movement extends DataClass implements Insertable<Movement> {
           other.isRequiredReps == this.isRequiredReps &&
           other.isRequiredWeight == this.isRequiredWeight &&
           other.isRequiredTime == this.isRequiredTime &&
+          other.isRequiredDistance == this.isRequiredDistance &&
           other.category == this.category);
 }
 
@@ -624,6 +666,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
   final Value<bool> isRequiredReps;
   final Value<bool> isRequiredWeight;
   final Value<bool> isRequiredTime;
+  final Value<bool> isRequiredDistance;
   final Value<MovementCategory> category;
   const MovementsCompanion({
     this.id = const Value.absent(),
@@ -638,6 +681,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
     this.isRequiredReps = const Value.absent(),
     this.isRequiredWeight = const Value.absent(),
     this.isRequiredTime = const Value.absent(),
+    this.isRequiredDistance = const Value.absent(),
     this.category = const Value.absent(),
   });
   MovementsCompanion.insert({
@@ -653,6 +697,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
     required bool isRequiredReps,
     required bool isRequiredWeight,
     required bool isRequiredTime,
+    this.isRequiredDistance = const Value.absent(),
     required MovementCategory category,
   }) : name = Value(name),
        muscleGroup = Value(muscleGroup),
@@ -673,6 +718,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
     Expression<bool>? isRequiredReps,
     Expression<bool>? isRequiredWeight,
     Expression<bool>? isRequiredTime,
+    Expression<bool>? isRequiredDistance,
     Expression<String>? category,
   }) {
     return RawValuesInsertable({
@@ -688,6 +734,8 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
       if (isRequiredReps != null) 'is_required_reps': isRequiredReps,
       if (isRequiredWeight != null) 'is_required_weight': isRequiredWeight,
       if (isRequiredTime != null) 'is_required_time': isRequiredTime,
+      if (isRequiredDistance != null)
+        'is_required_distance': isRequiredDistance,
       if (category != null) 'category': category,
     });
   }
@@ -705,6 +753,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
     Value<bool>? isRequiredReps,
     Value<bool>? isRequiredWeight,
     Value<bool>? isRequiredTime,
+    Value<bool>? isRequiredDistance,
     Value<MovementCategory>? category,
   }) {
     return MovementsCompanion(
@@ -720,6 +769,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
       isRequiredReps: isRequiredReps ?? this.isRequiredReps,
       isRequiredWeight: isRequiredWeight ?? this.isRequiredWeight,
       isRequiredTime: isRequiredTime ?? this.isRequiredTime,
+      isRequiredDistance: isRequiredDistance ?? this.isRequiredDistance,
       category: category ?? this.category,
     );
   }
@@ -765,6 +815,9 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
     if (isRequiredTime.present) {
       map['is_required_time'] = Variable<bool>(isRequiredTime.value);
     }
+    if (isRequiredDistance.present) {
+      map['is_required_distance'] = Variable<bool>(isRequiredDistance.value);
+    }
     if (category.present) {
       map['category'] = Variable<String>(
         $MovementsTable.$convertercategory.toSql(category.value),
@@ -788,6 +841,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
           ..write('isRequiredReps: $isRequiredReps, ')
           ..write('isRequiredWeight: $isRequiredWeight, ')
           ..write('isRequiredTime: $isRequiredTime, ')
+          ..write('isRequiredDistance: $isRequiredDistance, ')
           ..write('category: $category')
           ..write(')'))
         .toString();
@@ -4588,6 +4642,17 @@ class $PlannedSetsTable extends PlannedSets
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _distanceMeta = const VerificationMeta(
+    'distance',
+  );
+  @override
+  late final GeneratedColumn<double> distance = GeneratedColumn<double>(
+    'distance',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -4595,6 +4660,7 @@ class $PlannedSetsTable extends PlannedSets
     reps,
     weight,
     time,
+    distance,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4640,6 +4706,12 @@ class $PlannedSetsTable extends PlannedSets
         time.isAcceptableOrUnknown(data['time']!, _timeMeta),
       );
     }
+    if (data.containsKey('distance')) {
+      context.handle(
+        _distanceMeta,
+        distance.isAcceptableOrUnknown(data['distance']!, _distanceMeta),
+      );
+    }
     return context;
   }
 
@@ -4669,6 +4741,10 @@ class $PlannedSetsTable extends PlannedSets
         DriftSqlType.double,
         data['${effectivePrefix}time'],
       ),
+      distance: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}distance'],
+      ),
     );
   }
 
@@ -4684,12 +4760,14 @@ class PlannedSet extends DataClass implements Insertable<PlannedSet> {
   final int? reps;
   final double? weight;
   final double? time;
+  final double? distance;
   const PlannedSet({
     required this.id,
     required this.plannedExerciseId,
     this.reps,
     this.weight,
     this.time,
+    this.distance,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4705,6 +4783,9 @@ class PlannedSet extends DataClass implements Insertable<PlannedSet> {
     if (!nullToAbsent || time != null) {
       map['time'] = Variable<double>(time);
     }
+    if (!nullToAbsent || distance != null) {
+      map['distance'] = Variable<double>(distance);
+    }
     return map;
   }
 
@@ -4717,6 +4798,9 @@ class PlannedSet extends DataClass implements Insertable<PlannedSet> {
           ? const Value.absent()
           : Value(weight),
       time: time == null && nullToAbsent ? const Value.absent() : Value(time),
+      distance: distance == null && nullToAbsent
+          ? const Value.absent()
+          : Value(distance),
     );
   }
 
@@ -4731,6 +4815,7 @@ class PlannedSet extends DataClass implements Insertable<PlannedSet> {
       reps: serializer.fromJson<int?>(json['reps']),
       weight: serializer.fromJson<double?>(json['weight']),
       time: serializer.fromJson<double?>(json['time']),
+      distance: serializer.fromJson<double?>(json['distance']),
     );
   }
   @override
@@ -4742,6 +4827,7 @@ class PlannedSet extends DataClass implements Insertable<PlannedSet> {
       'reps': serializer.toJson<int?>(reps),
       'weight': serializer.toJson<double?>(weight),
       'time': serializer.toJson<double?>(time),
+      'distance': serializer.toJson<double?>(distance),
     };
   }
 
@@ -4751,12 +4837,14 @@ class PlannedSet extends DataClass implements Insertable<PlannedSet> {
     Value<int?> reps = const Value.absent(),
     Value<double?> weight = const Value.absent(),
     Value<double?> time = const Value.absent(),
+    Value<double?> distance = const Value.absent(),
   }) => PlannedSet(
     id: id ?? this.id,
     plannedExerciseId: plannedExerciseId ?? this.plannedExerciseId,
     reps: reps.present ? reps.value : this.reps,
     weight: weight.present ? weight.value : this.weight,
     time: time.present ? time.value : this.time,
+    distance: distance.present ? distance.value : this.distance,
   );
   PlannedSet copyWithCompanion(PlannedSetsCompanion data) {
     return PlannedSet(
@@ -4767,6 +4855,7 @@ class PlannedSet extends DataClass implements Insertable<PlannedSet> {
       reps: data.reps.present ? data.reps.value : this.reps,
       weight: data.weight.present ? data.weight.value : this.weight,
       time: data.time.present ? data.time.value : this.time,
+      distance: data.distance.present ? data.distance.value : this.distance,
     );
   }
 
@@ -4777,13 +4866,15 @@ class PlannedSet extends DataClass implements Insertable<PlannedSet> {
           ..write('plannedExerciseId: $plannedExerciseId, ')
           ..write('reps: $reps, ')
           ..write('weight: $weight, ')
-          ..write('time: $time')
+          ..write('time: $time, ')
+          ..write('distance: $distance')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, plannedExerciseId, reps, weight, time);
+  int get hashCode =>
+      Object.hash(id, plannedExerciseId, reps, weight, time, distance);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -4792,7 +4883,8 @@ class PlannedSet extends DataClass implements Insertable<PlannedSet> {
           other.plannedExerciseId == this.plannedExerciseId &&
           other.reps == this.reps &&
           other.weight == this.weight &&
-          other.time == this.time);
+          other.time == this.time &&
+          other.distance == this.distance);
 }
 
 class PlannedSetsCompanion extends UpdateCompanion<PlannedSet> {
@@ -4801,12 +4893,14 @@ class PlannedSetsCompanion extends UpdateCompanion<PlannedSet> {
   final Value<int?> reps;
   final Value<double?> weight;
   final Value<double?> time;
+  final Value<double?> distance;
   const PlannedSetsCompanion({
     this.id = const Value.absent(),
     this.plannedExerciseId = const Value.absent(),
     this.reps = const Value.absent(),
     this.weight = const Value.absent(),
     this.time = const Value.absent(),
+    this.distance = const Value.absent(),
   });
   PlannedSetsCompanion.insert({
     this.id = const Value.absent(),
@@ -4814,6 +4908,7 @@ class PlannedSetsCompanion extends UpdateCompanion<PlannedSet> {
     this.reps = const Value.absent(),
     this.weight = const Value.absent(),
     this.time = const Value.absent(),
+    this.distance = const Value.absent(),
   }) : plannedExerciseId = Value(plannedExerciseId);
   static Insertable<PlannedSet> custom({
     Expression<int>? id,
@@ -4821,6 +4916,7 @@ class PlannedSetsCompanion extends UpdateCompanion<PlannedSet> {
     Expression<int>? reps,
     Expression<double>? weight,
     Expression<double>? time,
+    Expression<double>? distance,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -4828,6 +4924,7 @@ class PlannedSetsCompanion extends UpdateCompanion<PlannedSet> {
       if (reps != null) 'reps': reps,
       if (weight != null) 'weight': weight,
       if (time != null) 'time': time,
+      if (distance != null) 'distance': distance,
     });
   }
 
@@ -4837,6 +4934,7 @@ class PlannedSetsCompanion extends UpdateCompanion<PlannedSet> {
     Value<int?>? reps,
     Value<double?>? weight,
     Value<double?>? time,
+    Value<double?>? distance,
   }) {
     return PlannedSetsCompanion(
       id: id ?? this.id,
@@ -4844,6 +4942,7 @@ class PlannedSetsCompanion extends UpdateCompanion<PlannedSet> {
       reps: reps ?? this.reps,
       weight: weight ?? this.weight,
       time: time ?? this.time,
+      distance: distance ?? this.distance,
     );
   }
 
@@ -4865,6 +4964,9 @@ class PlannedSetsCompanion extends UpdateCompanion<PlannedSet> {
     if (time.present) {
       map['time'] = Variable<double>(time.value);
     }
+    if (distance.present) {
+      map['distance'] = Variable<double>(distance.value);
+    }
     return map;
   }
 
@@ -4875,7 +4977,8 @@ class PlannedSetsCompanion extends UpdateCompanion<PlannedSet> {
           ..write('plannedExerciseId: $plannedExerciseId, ')
           ..write('reps: $reps, ')
           ..write('weight: $weight, ')
-          ..write('time: $time')
+          ..write('time: $time, ')
+          ..write('distance: $distance')
           ..write(')'))
         .toString();
   }
@@ -4940,6 +5043,17 @@ class $CompletedSetsTable extends CompletedSets
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _distanceMeta = const VerificationMeta(
+    'distance',
+  );
+  @override
+  late final GeneratedColumn<double> distance = GeneratedColumn<double>(
+    'distance',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   @override
   late final GeneratedColumnWithTypeConverter<SkipReason?, String> skipReason =
       GeneratedColumn<String>(
@@ -4956,6 +5070,7 @@ class $CompletedSetsTable extends CompletedSets
     reps,
     weight,
     time,
+    distance,
     skipReason,
   ];
   @override
@@ -5002,6 +5117,12 @@ class $CompletedSetsTable extends CompletedSets
         time.isAcceptableOrUnknown(data['time']!, _timeMeta),
       );
     }
+    if (data.containsKey('distance')) {
+      context.handle(
+        _distanceMeta,
+        distance.isAcceptableOrUnknown(data['distance']!, _distanceMeta),
+      );
+    }
     return context;
   }
 
@@ -5031,6 +5152,10 @@ class $CompletedSetsTable extends CompletedSets
         DriftSqlType.double,
         data['${effectivePrefix}time'],
       ),
+      distance: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}distance'],
+      ),
       skipReason: $CompletedSetsTable.$converterskipReasonn.fromSql(
         attachedDatabase.typeMapping.read(
           DriftSqlType.string,
@@ -5057,6 +5182,7 @@ class CompletedSet extends DataClass implements Insertable<CompletedSet> {
   final int? reps;
   final double? weight;
   final double? time;
+  final double? distance;
   final SkipReason? skipReason;
   const CompletedSet({
     required this.id,
@@ -5064,6 +5190,7 @@ class CompletedSet extends DataClass implements Insertable<CompletedSet> {
     this.reps,
     this.weight,
     this.time,
+    this.distance,
     this.skipReason,
   });
   @override
@@ -5079,6 +5206,9 @@ class CompletedSet extends DataClass implements Insertable<CompletedSet> {
     }
     if (!nullToAbsent || time != null) {
       map['time'] = Variable<double>(time);
+    }
+    if (!nullToAbsent || distance != null) {
+      map['distance'] = Variable<double>(distance);
     }
     if (!nullToAbsent || skipReason != null) {
       map['skip_reason'] = Variable<String>(
@@ -5097,6 +5227,9 @@ class CompletedSet extends DataClass implements Insertable<CompletedSet> {
           ? const Value.absent()
           : Value(weight),
       time: time == null && nullToAbsent ? const Value.absent() : Value(time),
+      distance: distance == null && nullToAbsent
+          ? const Value.absent()
+          : Value(distance),
       skipReason: skipReason == null && nullToAbsent
           ? const Value.absent()
           : Value(skipReason),
@@ -5116,6 +5249,7 @@ class CompletedSet extends DataClass implements Insertable<CompletedSet> {
       reps: serializer.fromJson<int?>(json['reps']),
       weight: serializer.fromJson<double?>(json['weight']),
       time: serializer.fromJson<double?>(json['time']),
+      distance: serializer.fromJson<double?>(json['distance']),
       skipReason: $CompletedSetsTable.$converterskipReasonn.fromJson(
         serializer.fromJson<String?>(json['skipReason']),
       ),
@@ -5130,6 +5264,7 @@ class CompletedSet extends DataClass implements Insertable<CompletedSet> {
       'reps': serializer.toJson<int?>(reps),
       'weight': serializer.toJson<double?>(weight),
       'time': serializer.toJson<double?>(time),
+      'distance': serializer.toJson<double?>(distance),
       'skipReason': serializer.toJson<String?>(
         $CompletedSetsTable.$converterskipReasonn.toJson(skipReason),
       ),
@@ -5142,6 +5277,7 @@ class CompletedSet extends DataClass implements Insertable<CompletedSet> {
     Value<int?> reps = const Value.absent(),
     Value<double?> weight = const Value.absent(),
     Value<double?> time = const Value.absent(),
+    Value<double?> distance = const Value.absent(),
     Value<SkipReason?> skipReason = const Value.absent(),
   }) => CompletedSet(
     id: id ?? this.id,
@@ -5149,6 +5285,7 @@ class CompletedSet extends DataClass implements Insertable<CompletedSet> {
     reps: reps.present ? reps.value : this.reps,
     weight: weight.present ? weight.value : this.weight,
     time: time.present ? time.value : this.time,
+    distance: distance.present ? distance.value : this.distance,
     skipReason: skipReason.present ? skipReason.value : this.skipReason,
   );
   CompletedSet copyWithCompanion(CompletedSetsCompanion data) {
@@ -5160,6 +5297,7 @@ class CompletedSet extends DataClass implements Insertable<CompletedSet> {
       reps: data.reps.present ? data.reps.value : this.reps,
       weight: data.weight.present ? data.weight.value : this.weight,
       time: data.time.present ? data.time.value : this.time,
+      distance: data.distance.present ? data.distance.value : this.distance,
       skipReason: data.skipReason.present
           ? data.skipReason.value
           : this.skipReason,
@@ -5174,14 +5312,22 @@ class CompletedSet extends DataClass implements Insertable<CompletedSet> {
           ..write('reps: $reps, ')
           ..write('weight: $weight, ')
           ..write('time: $time, ')
+          ..write('distance: $distance, ')
           ..write('skipReason: $skipReason')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, completedExerciseId, reps, weight, time, skipReason);
+  int get hashCode => Object.hash(
+    id,
+    completedExerciseId,
+    reps,
+    weight,
+    time,
+    distance,
+    skipReason,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -5191,6 +5337,7 @@ class CompletedSet extends DataClass implements Insertable<CompletedSet> {
           other.reps == this.reps &&
           other.weight == this.weight &&
           other.time == this.time &&
+          other.distance == this.distance &&
           other.skipReason == this.skipReason);
 }
 
@@ -5200,6 +5347,7 @@ class CompletedSetsCompanion extends UpdateCompanion<CompletedSet> {
   final Value<int?> reps;
   final Value<double?> weight;
   final Value<double?> time;
+  final Value<double?> distance;
   final Value<SkipReason?> skipReason;
   const CompletedSetsCompanion({
     this.id = const Value.absent(),
@@ -5207,6 +5355,7 @@ class CompletedSetsCompanion extends UpdateCompanion<CompletedSet> {
     this.reps = const Value.absent(),
     this.weight = const Value.absent(),
     this.time = const Value.absent(),
+    this.distance = const Value.absent(),
     this.skipReason = const Value.absent(),
   });
   CompletedSetsCompanion.insert({
@@ -5215,6 +5364,7 @@ class CompletedSetsCompanion extends UpdateCompanion<CompletedSet> {
     this.reps = const Value.absent(),
     this.weight = const Value.absent(),
     this.time = const Value.absent(),
+    this.distance = const Value.absent(),
     this.skipReason = const Value.absent(),
   }) : completedExerciseId = Value(completedExerciseId);
   static Insertable<CompletedSet> custom({
@@ -5223,6 +5373,7 @@ class CompletedSetsCompanion extends UpdateCompanion<CompletedSet> {
     Expression<int>? reps,
     Expression<double>? weight,
     Expression<double>? time,
+    Expression<double>? distance,
     Expression<String>? skipReason,
   }) {
     return RawValuesInsertable({
@@ -5232,6 +5383,7 @@ class CompletedSetsCompanion extends UpdateCompanion<CompletedSet> {
       if (reps != null) 'reps': reps,
       if (weight != null) 'weight': weight,
       if (time != null) 'time': time,
+      if (distance != null) 'distance': distance,
       if (skipReason != null) 'skip_reason': skipReason,
     });
   }
@@ -5242,6 +5394,7 @@ class CompletedSetsCompanion extends UpdateCompanion<CompletedSet> {
     Value<int?>? reps,
     Value<double?>? weight,
     Value<double?>? time,
+    Value<double?>? distance,
     Value<SkipReason?>? skipReason,
   }) {
     return CompletedSetsCompanion(
@@ -5250,6 +5403,7 @@ class CompletedSetsCompanion extends UpdateCompanion<CompletedSet> {
       reps: reps ?? this.reps,
       weight: weight ?? this.weight,
       time: time ?? this.time,
+      distance: distance ?? this.distance,
       skipReason: skipReason ?? this.skipReason,
     );
   }
@@ -5272,6 +5426,9 @@ class CompletedSetsCompanion extends UpdateCompanion<CompletedSet> {
     if (time.present) {
       map['time'] = Variable<double>(time.value);
     }
+    if (distance.present) {
+      map['distance'] = Variable<double>(distance.value);
+    }
     if (skipReason.present) {
       map['skip_reason'] = Variable<String>(
         $CompletedSetsTable.$converterskipReasonn.toSql(skipReason.value),
@@ -5288,6 +5445,7 @@ class CompletedSetsCompanion extends UpdateCompanion<CompletedSet> {
           ..write('reps: $reps, ')
           ..write('weight: $weight, ')
           ..write('time: $time, ')
+          ..write('distance: $distance, ')
           ..write('skipReason: $skipReason')
           ..write(')'))
         .toString();
@@ -7107,6 +7265,7 @@ typedef $$MovementsTableCreateCompanionBuilder =
       required bool isRequiredReps,
       required bool isRequiredWeight,
       required bool isRequiredTime,
+      Value<bool> isRequiredDistance,
       required MovementCategory category,
     });
 typedef $$MovementsTableUpdateCompanionBuilder =
@@ -7123,6 +7282,7 @@ typedef $$MovementsTableUpdateCompanionBuilder =
       Value<bool> isRequiredReps,
       Value<bool> isRequiredWeight,
       Value<bool> isRequiredTime,
+      Value<bool> isRequiredDistance,
       Value<MovementCategory> category,
     });
 
@@ -7269,6 +7429,11 @@ class $$MovementsTableFilterComposer
 
   ColumnFilters<bool> get isRequiredTime => $composableBuilder(
     column: $table.isRequiredTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isRequiredDistance => $composableBuilder(
+    column: $table.isRequiredDistance,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7423,6 +7588,11 @@ class $$MovementsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isRequiredDistance => $composableBuilder(
+    column: $table.isRequiredDistance,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get category => $composableBuilder(
     column: $table.category,
     builder: (column) => ColumnOrderings(column),
@@ -7484,6 +7654,11 @@ class $$MovementsTableAnnotationComposer
 
   GeneratedColumn<bool> get isRequiredTime => $composableBuilder(
     column: $table.isRequiredTime,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isRequiredDistance => $composableBuilder(
+    column: $table.isRequiredDistance,
     builder: (column) => column,
   );
 
@@ -7612,6 +7787,7 @@ class $$MovementsTableTableManager
                 Value<bool> isRequiredReps = const Value.absent(),
                 Value<bool> isRequiredWeight = const Value.absent(),
                 Value<bool> isRequiredTime = const Value.absent(),
+                Value<bool> isRequiredDistance = const Value.absent(),
                 Value<MovementCategory> category = const Value.absent(),
               }) => MovementsCompanion(
                 id: id,
@@ -7626,6 +7802,7 @@ class $$MovementsTableTableManager
                 isRequiredReps: isRequiredReps,
                 isRequiredWeight: isRequiredWeight,
                 isRequiredTime: isRequiredTime,
+                isRequiredDistance: isRequiredDistance,
                 category: category,
               ),
           createCompanionCallback:
@@ -7642,6 +7819,7 @@ class $$MovementsTableTableManager
                 required bool isRequiredReps,
                 required bool isRequiredWeight,
                 required bool isRequiredTime,
+                Value<bool> isRequiredDistance = const Value.absent(),
                 required MovementCategory category,
               }) => MovementsCompanion.insert(
                 id: id,
@@ -7656,6 +7834,7 @@ class $$MovementsTableTableManager
                 isRequiredReps: isRequiredReps,
                 isRequiredWeight: isRequiredWeight,
                 isRequiredTime: isRequiredTime,
+                isRequiredDistance: isRequiredDistance,
                 category: category,
               ),
           withReferenceMapper: (p0) => p0
@@ -12896,6 +13075,7 @@ typedef $$PlannedSetsTableCreateCompanionBuilder =
       Value<int?> reps,
       Value<double?> weight,
       Value<double?> time,
+      Value<double?> distance,
     });
 typedef $$PlannedSetsTableUpdateCompanionBuilder =
     PlannedSetsCompanion Function({
@@ -12904,6 +13084,7 @@ typedef $$PlannedSetsTableUpdateCompanionBuilder =
       Value<int?> reps,
       Value<double?> weight,
       Value<double?> time,
+      Value<double?> distance,
     });
 
 final class $$PlannedSetsTableReferences
@@ -12962,6 +13143,11 @@ class $$PlannedSetsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<double> get distance => $composableBuilder(
+    column: $table.distance,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$PlannedExercisesTableFilterComposer get plannedExerciseId {
     final $$PlannedExercisesTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -13015,6 +13201,11 @@ class $$PlannedSetsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get distance => $composableBuilder(
+    column: $table.distance,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$PlannedExercisesTableOrderingComposer get plannedExerciseId {
     final $$PlannedExercisesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -13059,6 +13250,9 @@ class $$PlannedSetsTableAnnotationComposer
 
   GeneratedColumn<double> get time =>
       $composableBuilder(column: $table.time, builder: (column) => column);
+
+  GeneratedColumn<double> get distance =>
+      $composableBuilder(column: $table.distance, builder: (column) => column);
 
   $$PlannedExercisesTableAnnotationComposer get plannedExerciseId {
     final $$PlannedExercisesTableAnnotationComposer composer = $composerBuilder(
@@ -13117,12 +13311,14 @@ class $$PlannedSetsTableTableManager
                 Value<int?> reps = const Value.absent(),
                 Value<double?> weight = const Value.absent(),
                 Value<double?> time = const Value.absent(),
+                Value<double?> distance = const Value.absent(),
               }) => PlannedSetsCompanion(
                 id: id,
                 plannedExerciseId: plannedExerciseId,
                 reps: reps,
                 weight: weight,
                 time: time,
+                distance: distance,
               ),
           createCompanionCallback:
               ({
@@ -13131,12 +13327,14 @@ class $$PlannedSetsTableTableManager
                 Value<int?> reps = const Value.absent(),
                 Value<double?> weight = const Value.absent(),
                 Value<double?> time = const Value.absent(),
+                Value<double?> distance = const Value.absent(),
               }) => PlannedSetsCompanion.insert(
                 id: id,
                 plannedExerciseId: plannedExerciseId,
                 reps: reps,
                 weight: weight,
                 time: time,
+                distance: distance,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -13212,6 +13410,7 @@ typedef $$CompletedSetsTableCreateCompanionBuilder =
       Value<int?> reps,
       Value<double?> weight,
       Value<double?> time,
+      Value<double?> distance,
       Value<SkipReason?> skipReason,
     });
 typedef $$CompletedSetsTableUpdateCompanionBuilder =
@@ -13221,6 +13420,7 @@ typedef $$CompletedSetsTableUpdateCompanionBuilder =
       Value<int?> reps,
       Value<double?> weight,
       Value<double?> time,
+      Value<double?> distance,
       Value<SkipReason?> skipReason,
     });
 
@@ -13284,6 +13484,11 @@ class $$CompletedSetsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<double> get distance => $composableBuilder(
+    column: $table.distance,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnWithTypeConverterFilters<SkipReason?, SkipReason, String>
   get skipReason => $composableBuilder(
     column: $table.skipReason,
@@ -13343,6 +13548,11 @@ class $$CompletedSetsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get distance => $composableBuilder(
+    column: $table.distance,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get skipReason => $composableBuilder(
     column: $table.skipReason,
     builder: (column) => ColumnOrderings(column),
@@ -13392,6 +13602,9 @@ class $$CompletedSetsTableAnnotationComposer
 
   GeneratedColumn<double> get time =>
       $composableBuilder(column: $table.time, builder: (column) => column);
+
+  GeneratedColumn<double> get distance =>
+      $composableBuilder(column: $table.distance, builder: (column) => column);
 
   GeneratedColumnWithTypeConverter<SkipReason?, String> get skipReason =>
       $composableBuilder(
@@ -13457,6 +13670,7 @@ class $$CompletedSetsTableTableManager
                 Value<int?> reps = const Value.absent(),
                 Value<double?> weight = const Value.absent(),
                 Value<double?> time = const Value.absent(),
+                Value<double?> distance = const Value.absent(),
                 Value<SkipReason?> skipReason = const Value.absent(),
               }) => CompletedSetsCompanion(
                 id: id,
@@ -13464,6 +13678,7 @@ class $$CompletedSetsTableTableManager
                 reps: reps,
                 weight: weight,
                 time: time,
+                distance: distance,
                 skipReason: skipReason,
               ),
           createCompanionCallback:
@@ -13473,6 +13688,7 @@ class $$CompletedSetsTableTableManager
                 Value<int?> reps = const Value.absent(),
                 Value<double?> weight = const Value.absent(),
                 Value<double?> time = const Value.absent(),
+                Value<double?> distance = const Value.absent(),
                 Value<SkipReason?> skipReason = const Value.absent(),
               }) => CompletedSetsCompanion.insert(
                 id: id,
@@ -13480,6 +13696,7 @@ class $$CompletedSetsTableTableManager
                 reps: reps,
                 weight: weight,
                 time: time,
+                distance: distance,
                 skipReason: skipReason,
               ),
           withReferenceMapper: (p0) => p0

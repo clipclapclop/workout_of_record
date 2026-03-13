@@ -6,6 +6,7 @@ class MovementSeedEntry {
   final bool isRequiredReps;
   final bool isRequiredWeight;
   final bool isRequiredTime;
+  final bool isRequiredDistance;
   final double? minWeight;
   final double? weightDelta;
 
@@ -15,6 +16,7 @@ class MovementSeedEntry {
     this.isRequiredReps = true,
     this.isRequiredWeight = true,
     this.isRequiredTime = false,
+    this.isRequiredDistance = false,
     this.minWeight,
     this.weightDelta,
   });
@@ -53,6 +55,16 @@ MovementSeedEntry _mc(String name, MuscleGroup mg) =>
 /// Plate-loaded machine (hack squat, leg press, etc.): min 45, step 5
 MovementSeedEntry _pm(String name, MuscleGroup mg) =>
     MovementSeedEntry(name: name, muscleGroup: mg, minWeight: 45, weightDelta: 5);
+
+/// Cardio: time + distance only, no reps/weight
+MovementSeedEntry _cardio(String name) => MovementSeedEntry(
+      name: name,
+      muscleGroup: MuscleGroup.other,
+      isRequiredReps: false,
+      isRequiredWeight: false,
+      isRequiredTime: true,
+      isRequiredDistance: true,
+    );
 
 // ── Seed list ─────────────────────────────────────────────────────────────────
 // Exercises that target multiple muscle groups appear more than once.
@@ -408,6 +420,10 @@ final kMovementSeeds = <MovementSeedEntry>[
 
   // ── V ──────────────────────────────────────────────────────────────────────
   _db('V-Up (Weighted)', MuscleGroup.abs),
+
+  // ── Cardio ─────────────────────────────────────────────────────────────────
+  _cardio('Rowing'),
+  _cardio('Running/Jogging'),
 
   // ── W ──────────────────────────────────────────────────────────────────────
   _bb('Walking Lunges (Glute-Focused, Barbell)', MuscleGroup.glutes),

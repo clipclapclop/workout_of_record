@@ -20,5 +20,6 @@ class Movements extends Table {
   BoolColumn get isRequiredReps => boolean()();
   BoolColumn get isRequiredWeight => boolean()();
   BoolColumn get isRequiredTime => boolean()();
+  BoolColumn get isRequiredDistance => boolean().withDefault(const Constant(false))();
   TextColumn get category => textEnum<MovementCategory>()();
 }

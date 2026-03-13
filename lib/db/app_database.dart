@@ -45,7 +45,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.withExecutor(super.e);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -991,10 +991,11 @@ class AppDatabase extends _$AppDatabase {
         await into(movements).insert(MovementsCompanion.insert(
           name: s.name,
           muscleGroup: s.muscleGroup,
-          category: MovementCategory.resistance,
+          category: s.isRequiredDistance ? MovementCategory.cardio : MovementCategory.resistance,
           isRequiredReps: s.isRequiredReps,
           isRequiredWeight: s.isRequiredWeight,
           isRequiredTime: s.isRequiredTime,
+          isRequiredDistance: Value(s.isRequiredDistance),
           minWeight: Value(s.minWeight),
           weightDelta: Value(s.weightDelta),
         ));

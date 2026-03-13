@@ -11,6 +11,7 @@ enum MuscleGroup {
   forearms,
   glutes,
   calves,
+  other,
 }
 
 enum Soreness { none, aLittle, some, lots }
