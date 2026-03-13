@@ -144,6 +144,15 @@ class $MovementsTable extends Movements
     ),
   );
   @override
+  late final GeneratedColumnWithTypeConverter<MovementCategory, String>
+  category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  ).withConverter<MovementCategory>($MovementsTable.$convertercategory);
+  @override
   List<GeneratedColumn> get $columns => [
     id,
     name,
@@ -157,6 +166,7 @@ class $MovementsTable extends Movements
     isRequiredReps,
     isRequiredWeight,
     isRequiredTime,
+    category,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -315,6 +325,12 @@ class $MovementsTable extends Movements
         DriftSqlType.bool,
         data['${effectivePrefix}is_required_time'],
       )!,
+      category: $MovementsTable.$convertercategory.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}category'],
+        )!,
+      ),
     );
   }
 
@@ -325,6 +341,10 @@ class $MovementsTable extends Movements
 
   static JsonTypeConverter2<MuscleGroup, String, String> $convertermuscleGroup =
       const EnumNameConverter<MuscleGroup>(MuscleGroup.values);
+  static JsonTypeConverter2<MovementCategory, String, String>
+  $convertercategory = const EnumNameConverter<MovementCategory>(
+    MovementCategory.values,
+  );
 }
 
 class Movement extends DataClass implements Insertable<Movement> {
@@ -340,6 +360,7 @@ class Movement extends DataClass implements Insertable<Movement> {
   final bool isRequiredReps;
   final bool isRequiredWeight;
   final bool isRequiredTime;
+  final MovementCategory category;
   const Movement({
     required this.id,
     required this.name,
@@ -353,6 +374,7 @@ class Movement extends DataClass implements Insertable<Movement> {
     required this.isRequiredReps,
     required this.isRequiredWeight,
     required this.isRequiredTime,
+    required this.category,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -385,6 +407,11 @@ class Movement extends DataClass implements Insertable<Movement> {
     map['is_required_reps'] = Variable<bool>(isRequiredReps);
     map['is_required_weight'] = Variable<bool>(isRequiredWeight);
     map['is_required_time'] = Variable<bool>(isRequiredTime);
+    {
+      map['category'] = Variable<String>(
+        $MovementsTable.$convertercategory.toSql(category),
+      );
+    }
     return map;
   }
 
@@ -412,6 +439,7 @@ class Movement extends DataClass implements Insertable<Movement> {
       isRequiredReps: Value(isRequiredReps),
       isRequiredWeight: Value(isRequiredWeight),
       isRequiredTime: Value(isRequiredTime),
+      category: Value(category),
     );
   }
 
@@ -435,6 +463,9 @@ class Movement extends DataClass implements Insertable<Movement> {
       isRequiredReps: serializer.fromJson<bool>(json['isRequiredReps']),
       isRequiredWeight: serializer.fromJson<bool>(json['isRequiredWeight']),
       isRequiredTime: serializer.fromJson<bool>(json['isRequiredTime']),
+      category: $MovementsTable.$convertercategory.fromJson(
+        serializer.fromJson<String>(json['category']),
+      ),
     );
   }
   @override
@@ -455,6 +486,9 @@ class Movement extends DataClass implements Insertable<Movement> {
       'isRequiredReps': serializer.toJson<bool>(isRequiredReps),
       'isRequiredWeight': serializer.toJson<bool>(isRequiredWeight),
       'isRequiredTime': serializer.toJson<bool>(isRequiredTime),
+      'category': serializer.toJson<String>(
+        $MovementsTable.$convertercategory.toJson(category),
+      ),
     };
   }
 
@@ -471,6 +505,7 @@ class Movement extends DataClass implements Insertable<Movement> {
     bool? isRequiredReps,
     bool? isRequiredWeight,
     bool? isRequiredTime,
+    MovementCategory? category,
   }) => Movement(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -486,6 +521,7 @@ class Movement extends DataClass implements Insertable<Movement> {
     isRequiredReps: isRequiredReps ?? this.isRequiredReps,
     isRequiredWeight: isRequiredWeight ?? this.isRequiredWeight,
     isRequiredTime: isRequiredTime ?? this.isRequiredTime,
+    category: category ?? this.category,
   );
   Movement copyWithCompanion(MovementsCompanion data) {
     return Movement(
@@ -513,6 +549,7 @@ class Movement extends DataClass implements Insertable<Movement> {
       isRequiredTime: data.isRequiredTime.present
           ? data.isRequiredTime.value
           : this.isRequiredTime,
+      category: data.category.present ? data.category.value : this.category,
     );
   }
 
@@ -530,7 +567,8 @@ class Movement extends DataClass implements Insertable<Movement> {
           ..write('subMuscleGroup: $subMuscleGroup, ')
           ..write('isRequiredReps: $isRequiredReps, ')
           ..write('isRequiredWeight: $isRequiredWeight, ')
-          ..write('isRequiredTime: $isRequiredTime')
+          ..write('isRequiredTime: $isRequiredTime, ')
+          ..write('category: $category')
           ..write(')'))
         .toString();
   }
@@ -549,6 +587,7 @@ class Movement extends DataClass implements Insertable<Movement> {
     isRequiredReps,
     isRequiredWeight,
     isRequiredTime,
+    category,
   );
   @override
   bool operator ==(Object other) =>
@@ -565,7 +604,8 @@ class Movement extends DataClass implements Insertable<Movement> {
           other.subMuscleGroup == this.subMuscleGroup &&
           other.isRequiredReps == this.isRequiredReps &&
           other.isRequiredWeight == this.isRequiredWeight &&
-          other.isRequiredTime == this.isRequiredTime);
+          other.isRequiredTime == this.isRequiredTime &&
+          other.category == this.category);
 }
 
 class MovementsCompanion extends UpdateCompanion<Movement> {
@@ -581,6 +621,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
   final Value<bool> isRequiredReps;
   final Value<bool> isRequiredWeight;
   final Value<bool> isRequiredTime;
+  final Value<MovementCategory> category;
   const MovementsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
@@ -594,6 +635,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
     this.isRequiredReps = const Value.absent(),
     this.isRequiredWeight = const Value.absent(),
     this.isRequiredTime = const Value.absent(),
+    this.category = const Value.absent(),
   });
   MovementsCompanion.insert({
     this.id = const Value.absent(),
@@ -608,11 +650,13 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
     required bool isRequiredReps,
     required bool isRequiredWeight,
     required bool isRequiredTime,
+    required MovementCategory category,
   }) : name = Value(name),
        muscleGroup = Value(muscleGroup),
        isRequiredReps = Value(isRequiredReps),
        isRequiredWeight = Value(isRequiredWeight),
-       isRequiredTime = Value(isRequiredTime);
+       isRequiredTime = Value(isRequiredTime),
+       category = Value(category);
   static Insertable<Movement> custom({
     Expression<int>? id,
     Expression<String>? name,
@@ -626,6 +670,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
     Expression<bool>? isRequiredReps,
     Expression<bool>? isRequiredWeight,
     Expression<bool>? isRequiredTime,
+    Expression<String>? category,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -640,6 +685,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
       if (isRequiredReps != null) 'is_required_reps': isRequiredReps,
       if (isRequiredWeight != null) 'is_required_weight': isRequiredWeight,
       if (isRequiredTime != null) 'is_required_time': isRequiredTime,
+      if (category != null) 'category': category,
     });
   }
 
@@ -656,6 +702,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
     Value<bool>? isRequiredReps,
     Value<bool>? isRequiredWeight,
     Value<bool>? isRequiredTime,
+    Value<MovementCategory>? category,
   }) {
     return MovementsCompanion(
       id: id ?? this.id,
@@ -670,6 +717,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
       isRequiredReps: isRequiredReps ?? this.isRequiredReps,
       isRequiredWeight: isRequiredWeight ?? this.isRequiredWeight,
       isRequiredTime: isRequiredTime ?? this.isRequiredTime,
+      category: category ?? this.category,
     );
   }
 
@@ -714,6 +762,11 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
     if (isRequiredTime.present) {
       map['is_required_time'] = Variable<bool>(isRequiredTime.value);
     }
+    if (category.present) {
+      map['category'] = Variable<String>(
+        $MovementsTable.$convertercategory.toSql(category.value),
+      );
+    }
     return map;
   }
 
@@ -731,7 +784,8 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
           ..write('subMuscleGroup: $subMuscleGroup, ')
           ..write('isRequiredReps: $isRequiredReps, ')
           ..write('isRequiredWeight: $isRequiredWeight, ')
-          ..write('isRequiredTime: $isRequiredTime')
+          ..write('isRequiredTime: $isRequiredTime, ')
+          ..write('category: $category')
           ..write(')'))
         .toString();
   }
@@ -7050,6 +7104,7 @@ typedef $$MovementsTableCreateCompanionBuilder =
       required bool isRequiredReps,
       required bool isRequiredWeight,
       required bool isRequiredTime,
+      required MovementCategory category,
     });
 typedef $$MovementsTableUpdateCompanionBuilder =
     MovementsCompanion Function({
@@ -7065,6 +7120,7 @@ typedef $$MovementsTableUpdateCompanionBuilder =
       Value<bool> isRequiredReps,
       Value<bool> isRequiredWeight,
       Value<bool> isRequiredTime,
+      Value<MovementCategory> category,
     });
 
 final class $$MovementsTableReferences
@@ -7213,6 +7269,12 @@ class $$MovementsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnWithTypeConverterFilters<MovementCategory, MovementCategory, String>
+  get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
   Expression<bool> exerciseTemplatesRefs(
     Expression<bool> Function($$ExerciseTemplatesTableFilterComposer f) f,
   ) {
@@ -7357,6 +7419,11 @@ class $$MovementsTableOrderingComposer
     column: $table.isRequiredTime,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$MovementsTableAnnotationComposer
@@ -7416,6 +7483,9 @@ class $$MovementsTableAnnotationComposer
     column: $table.isRequiredTime,
     builder: (column) => column,
   );
+
+  GeneratedColumnWithTypeConverter<MovementCategory, String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
 
   Expression<T> exerciseTemplatesRefs<T extends Object>(
     Expression<T> Function($$ExerciseTemplatesTableAnnotationComposer a) f,
@@ -7539,6 +7609,7 @@ class $$MovementsTableTableManager
                 Value<bool> isRequiredReps = const Value.absent(),
                 Value<bool> isRequiredWeight = const Value.absent(),
                 Value<bool> isRequiredTime = const Value.absent(),
+                Value<MovementCategory> category = const Value.absent(),
               }) => MovementsCompanion(
                 id: id,
                 name: name,
@@ -7552,6 +7623,7 @@ class $$MovementsTableTableManager
                 isRequiredReps: isRequiredReps,
                 isRequiredWeight: isRequiredWeight,
                 isRequiredTime: isRequiredTime,
+                category: category,
               ),
           createCompanionCallback:
               ({
@@ -7567,6 +7639,7 @@ class $$MovementsTableTableManager
                 required bool isRequiredReps,
                 required bool isRequiredWeight,
                 required bool isRequiredTime,
+                required MovementCategory category,
               }) => MovementsCompanion.insert(
                 id: id,
                 name: name,
@@ -7580,6 +7653,7 @@ class $$MovementsTableTableManager
                 isRequiredReps: isRequiredReps,
                 isRequiredWeight: isRequiredWeight,
                 isRequiredTime: isRequiredTime,
+                category: category,
               ),
           withReferenceMapper: (p0) => p0
               .map(

@@ -35,6 +35,7 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
   late final TextEditingController _weightDeltaCtrl;
 
   late MuscleGroup _muscleGroup;
+  late MovementCategory _category;
   late bool _isRequiredReps;
   late bool _isRequiredWeight;
   late bool _isRequiredTime;
@@ -53,6 +54,7 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
     _weightDeltaCtrl = TextEditingController(
         text: m?.weightDelta != null ? _fmt(m!.weightDelta!) : '');
     _muscleGroup = m?.muscleGroup ?? MuscleGroup.values.first;
+    _category = m?.category ?? MovementCategory.resistance;
     _isRequiredReps = m?.isRequiredReps ?? true;
     _isRequiredWeight = m?.isRequiredWeight ?? true;
     _isRequiredTime = m?.isRequiredTime ?? false;
@@ -81,6 +83,7 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
     final companion = MovementsCompanion(
       name: Value(_nameCtrl.text.trim()),
       muscleGroup: Value(_muscleGroup),
+      category: Value(_category),
       subMuscleGroup: Value(
           _subMuscleCtrl.text.trim().isEmpty ? null : _subMuscleCtrl.text.trim()),
       note1: Value(_note1Ctrl.text.trim().isEmpty ? null : _note1Ctrl.text.trim()),
@@ -129,6 +132,17 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
               decoration: const InputDecoration(labelText: 'Name'),
               validator: _required,
               textCapitalization: TextCapitalization.words,
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<MovementCategory>(
+              key: ValueKey(_category),
+              initialValue: _category,
+              decoration: const InputDecoration(labelText: 'Category'),
+              items: MovementCategory.values.map((c) {
+                final label = c.name[0].toUpperCase() + c.name.substring(1);
+                return DropdownMenuItem(value: c, child: Text(label));
+              }).toList(),
+              onChanged: (v) => setState(() => _category = v!),
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<MuscleGroup>(

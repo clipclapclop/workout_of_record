@@ -44,7 +44,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.withExecutor(super.e);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -989,6 +989,7 @@ class AppDatabase extends _$AppDatabase {
       await into(movements).insert(MovementsCompanion.insert(
         name: 'Cable Fly',
         muscleGroup: MuscleGroup.chest,
+        category: MovementCategory.resistance,
         isRequiredReps: true,
         isRequiredWeight: true,
         isRequiredTime: false,
@@ -999,6 +1000,7 @@ class AppDatabase extends _$AppDatabase {
           await into(movements).insert(MovementsCompanion.insert(
         name: 'Dumbbell Press (Incline)',
         muscleGroup: MuscleGroup.chest,
+        category: MovementCategory.resistance,
         isRequiredReps: true,
         isRequiredWeight: true,
         isRequiredTime: false,
@@ -1009,6 +1011,7 @@ class AppDatabase extends _$AppDatabase {
           await into(movements).insert(MovementsCompanion.insert(
         name: 'Barbell Bent Over Row',
         muscleGroup: MuscleGroup.back,
+        category: MovementCategory.resistance,
         isRequiredReps: true,
         isRequiredWeight: true,
         isRequiredTime: false,
@@ -1018,6 +1021,7 @@ class AppDatabase extends _$AppDatabase {
       await into(movements).insert(MovementsCompanion.insert(
         name: 'Dumbbell Pullover',
         muscleGroup: MuscleGroup.back,
+        category: MovementCategory.resistance,
         isRequiredReps: true,
         isRequiredWeight: true,
         isRequiredTime: false,
@@ -1027,6 +1031,7 @@ class AppDatabase extends _$AppDatabase {
       await into(movements).insert(MovementsCompanion.insert(
         name: 'Lying Dumbbell Curl',
         muscleGroup: MuscleGroup.biceps,
+        category: MovementCategory.resistance,
         isRequiredReps: true,
         isRequiredWeight: true,
         isRequiredTime: false,
@@ -1037,6 +1042,7 @@ class AppDatabase extends _$AppDatabase {
           await into(movements).insert(MovementsCompanion.insert(
         name: 'Cable Overhead Tricep Extension',
         muscleGroup: MuscleGroup.triceps,
+        category: MovementCategory.resistance,
         isRequiredReps: true,
         isRequiredWeight: true,
         isRequiredTime: false,

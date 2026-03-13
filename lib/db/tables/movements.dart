@@ -15,4 +15,5 @@ class Movements extends Table {
   BoolColumn get isRequiredReps => boolean()();
   BoolColumn get isRequiredWeight => boolean()();
   BoolColumn get isRequiredTime => boolean()();
+  TextColumn get category => textEnum<MovementCategory>()();
 }

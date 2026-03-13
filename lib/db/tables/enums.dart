@@ -40,3 +40,5 @@ enum WeekGoal { hard, deload }
 enum TrainingGoal { strength, hypertrophy, endurance, general }
 
 enum CalorieState { surplus, maintenance, deficit }
+
+enum MovementCategory { resistance, cardio }
