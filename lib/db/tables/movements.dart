@@ -4,7 +4,12 @@ import 'enums.dart';
 
 class Movements extends Table {
   IntColumn get id => integer().autoIncrement()();
-  TextColumn get name => text().unique()();
+  TextColumn get name => text()();
+
+  @override
+  List<Set<Column>> get uniqueKeys => [
+        {name, muscleGroup},
+      ];
   RealColumn get minWeight => real().nullable()();
   RealColumn get weightDelta => real().nullable()();
   TextColumn get link => text().nullable()();

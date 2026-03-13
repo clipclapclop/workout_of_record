@@ -30,7 +30,6 @@ class $MovementsTable extends Movements
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
   );
   static const VerificationMeta _minWeightMeta = const VerificationMeta(
     'minWeight',
@@ -271,6 +270,10 @@ class $MovementsTable extends Movements
 
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {name, muscleGroup},
+  ];
   @override
   Movement map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';

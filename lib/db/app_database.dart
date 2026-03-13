@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'history_data.dart';
+import 'seed/movement_seed_data.dart';
 import 'planning.dart';
 import 'template_data.dart';
 import 'workout_data.dart';
@@ -44,7 +45,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.withExecutor(super.e);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -986,69 +987,27 @@ class AppDatabase extends _$AppDatabase {
   Future<void> _seedData() async {
     await transaction(() async {
       // ── Movements ──────────────────────────────────────────────────────────
-      await into(movements).insert(MovementsCompanion.insert(
-        name: 'Cable Fly',
-        muscleGroup: MuscleGroup.chest,
-        category: MovementCategory.resistance,
-        isRequiredReps: true,
-        isRequiredWeight: true,
-        isRequiredTime: false,
-        minWeight: const Value<double?>(3.5),
-        weightDelta: const Value<double?>(3.5),
-      ));
-      final dumbbellPressId =
-          await into(movements).insert(MovementsCompanion.insert(
-        name: 'Dumbbell Press (Incline)',
-        muscleGroup: MuscleGroup.chest,
-        category: MovementCategory.resistance,
-        isRequiredReps: true,
-        isRequiredWeight: true,
-        isRequiredTime: false,
-        minWeight: const Value<double?>(5.0),
-        weightDelta: const Value<double?>(5.0),
-      ));
-      final barbellRowId =
-          await into(movements).insert(MovementsCompanion.insert(
-        name: 'Barbell Bent Over Row',
-        muscleGroup: MuscleGroup.back,
-        category: MovementCategory.resistance,
-        isRequiredReps: true,
-        isRequiredWeight: true,
-        isRequiredTime: false,
-        minWeight: const Value<double?>(45.0),
-        weightDelta: const Value<double?>(5.0),
-      ));
-      await into(movements).insert(MovementsCompanion.insert(
-        name: 'Dumbbell Pullover',
-        muscleGroup: MuscleGroup.back,
-        category: MovementCategory.resistance,
-        isRequiredReps: true,
-        isRequiredWeight: true,
-        isRequiredTime: false,
-        minWeight: const Value<double?>(5.0),
-        weightDelta: const Value<double?>(5.0),
-      ));
-      await into(movements).insert(MovementsCompanion.insert(
-        name: 'Lying Dumbbell Curl',
-        muscleGroup: MuscleGroup.biceps,
-        category: MovementCategory.resistance,
-        isRequiredReps: true,
-        isRequiredWeight: true,
-        isRequiredTime: false,
-        minWeight: const Value<double?>(5.0),
-        weightDelta: const Value<double?>(5.0),
-      ));
-      final cableTriId =
-          await into(movements).insert(MovementsCompanion.insert(
-        name: 'Cable Overhead Tricep Extension',
-        muscleGroup: MuscleGroup.triceps,
-        category: MovementCategory.resistance,
-        isRequiredReps: true,
-        isRequiredWeight: true,
-        isRequiredTime: false,
-        minWeight: const Value<double?>(3.5),
-        weightDelta: const Value<double?>(3.5),
-      ));
+      for (final s in kMovementSeeds) {
+        await into(movements).insert(MovementsCompanion.insert(
+          name: s.name,
+          muscleGroup: s.muscleGroup,
+          category: MovementCategory.resistance,
+          isRequiredReps: s.isRequiredReps,
+          isRequiredWeight: s.isRequiredWeight,
+          isRequiredTime: s.isRequiredTime,
+          minWeight: Value(s.minWeight),
+          weightDelta: Value(s.weightDelta),
+        ));
+      }
+
+      // Look up IDs needed for the default template.
+      final allMovements = await select(movements).get();
+      int idOf(String name, MuscleGroup mg) =>
+          allMovements.firstWhere((m) => m.name == name && m.muscleGroup == mg).id;
+
+      final dumbbellPressId = idOf('Dumbbell Press (High Incline)', MuscleGroup.chest);
+      final cableTriId = idOf('Cable Overhead Tricep Extension', MuscleGroup.triceps);
+      final barbellRowId = idOf('Barbell Bent Over Row', MuscleGroup.back);
 
       // ── Meso template ──────────────────────────────────────────────────────
       final mesoTemplateId = await into(mesoTemplates).insert(
