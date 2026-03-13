@@ -208,7 +208,7 @@ final kMovementSeeds = <MovementSeedEntry>[
   _db('Dumbbell Curl (2-Arm)', MuscleGroup.biceps),
   _db('Dumbbell Curl (Alternating)', MuscleGroup.biceps),
   _db('Dumbbell Curl (Incline, 45 deg)', MuscleGroup.biceps),
-  _db('Dumbbell Curl (Incline, flat)', MuscleGroup.biceps),
+  _db('Dumbbell Curl (Lying)', MuscleGroup.biceps),
   _db('Dumbbell Facepull', MuscleGroup.shoulders),
   _db('Dumbbell Facepull', MuscleGroup.traps),
   _db('Dumbbell Facepull (Incline)', MuscleGroup.shoulders),

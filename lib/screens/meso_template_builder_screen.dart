@@ -65,7 +65,7 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
                   exercises: List<Movement>.from(d.movements),
                 ))
             .toList()
-        : [_DayDraft(name: '', isRestDay: false)];
+        : [];
 
     _tabCtrl = TabController(length: _days.length + 1, vsync: this);
     _loadMovements();
@@ -166,6 +166,12 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a template name.')),
+      );
+      return;
+    }
+    if (_days.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add at least one day.')),
       );
       return;
     }
