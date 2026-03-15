@@ -994,6 +994,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
               state.weightCtrl,
               AppPreferences.getUnitsMetric() ? 'kg' : 'lbs',
               enabled: !state.isChecked,
+              onChanged: (v) => _propagateWeight(exercise, setData, v),
             ),
           ],
           if (movement.isRequiredTime) ...[
@@ -1039,11 +1040,23 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     );
   }
 
+  void _propagateWeight(ExerciseData exercise, SetData setData, String value) {
+    final setIndex = exercise.sets.indexWhere((s) => s.completed.id == setData.completed.id);
+    for (var i = setIndex + 1; i < exercise.sets.length; i++) {
+      final id = exercise.sets[i].completed.id;
+      final s = _setStates[id];
+      if (s != null && !s.isChecked && !s.isSkipped) {
+        s.weightCtrl.text = value;
+      }
+    }
+  }
+
   Widget _inputField(
     TextEditingController ctrl,
     String label, {
     bool isInt = false,
     required bool enabled,
+    void Function(String)? onChanged,
   }) {
     return SizedBox(
       width: 72,
@@ -1059,7 +1072,10 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           isDense: true,
           border: const OutlineInputBorder(),
         ),
-        onChanged: (_) => setState(() {}),
+        onChanged: (v) {
+          setState(() {});
+          onChanged?.call(v);
+        },
       ),
     );
   }
