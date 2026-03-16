@@ -874,6 +874,31 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     }
   }
 
+  /// True when the exercise at [index] is unblocked — i.e. the previous
+  /// exercise is either skipped or fully done (all sets + post-ex check-in +
+  /// MG check-in if prev is the last exercise for its muscle group).
+  bool _isPrevExDone(int index) {
+    if (index == 0) return true;
+    final exercises = _data!.exercises;
+    final prev = exercises[index - 1];
+    if (_exerciseSkipReasons[prev.completed.id] != null) return true;
+    final allSetsDone =
+        prev.sets.every((s) => _setStates[s.completed.id]?.isChecked ?? false);
+    if (!allSetsDone || _postExDone[prev.completed.id] != true) return false;
+    // If prev is the last exercise for its MG and not all MG exercises are
+    // skipped, the MG check-in must also be done.
+    final mg = prev.movement.muscleGroup;
+    final lastMgIndex =
+        exercises.lastIndexWhere((e) => e.movement.muscleGroup == mg);
+    if (lastMgIndex == index - 1) {
+      final allMgSkipped = exercises
+          .where((e) => e.movement.muscleGroup == mg)
+          .every((e) => _exerciseSkipReasons[e.completed.id] != null);
+      if (!allMgSkipped && _postMgDone[mg] != true) return false;
+    }
+    return true;
+  }
+
   String _mgLabel(MuscleGroup mg) {
     final name = mg.name;
     return name[0].toUpperCase() + name.substring(1);
@@ -946,6 +971,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       ExerciseData exercise, int index, Map<MuscleGroup, int> lastExIndexForMg) {
     final isActive = exercise.completed.id == _activeExerciseId;
     final isExSkipped = _exerciseSkipReasons[exercise.completed.id] != null;
+    final isExLocked = !_isPrevExDone(index);
     final allSetsDone = exercise.sets
         .every((s) => _setStates[s.completed.id]?.isChecked ?? false);
     final postExDone = _postExDone[exercise.completed.id] == true;
@@ -1014,7 +1040,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
             itemBuilder: (_) => [
               PopupMenuItem(
                 value: _ExMenuAction.skipExercise,
-                enabled: !anySetChecked,
+                enabled: !anySetChecked && !isExLocked,
                 child: const Text('Skip Exercise'),
               ),
               PopupMenuItem(
@@ -1066,7 +1092,12 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     final setRows = [
       for (var i = 0; i < exercise.sets.length; i++)
         _buildSetRow(i + 1, exercise.sets[i], exercise.movement, exercise,
-            isExSkipped: isExSkipped),
+            isExSkipped: isExSkipped,
+            isLocked: isExLocked ||
+                (i > 0 &&
+                    !(_setStates[exercise.sets[i - 1].completed.id]
+                            ?.isChecked ??
+                        false))),
     ];
 
     final showTimer = isActive &&
@@ -1136,7 +1167,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   }
 
   Widget _buildSetRow(int setNum, SetData setData, Movement movement,
-      ExerciseData exercise, {bool isExSkipped = false}) {
+      ExerciseData exercise, {bool isExSkipped = false, bool isLocked = false}) {
     final state = _setStates[setData.completed.id]!;
     final canCheck = state.canCheck(movement);
 
@@ -1168,14 +1199,14 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           if (movement.isRequiredReps) ...[
             const SizedBox(width: 8),
             _inputField(state.repsCtrl, 'Reps',
-                isInt: true, enabled: !state.isChecked, onTap: _triggerTimer),
+                isInt: true, enabled: !state.isChecked && !isLocked, onTap: _triggerTimer),
           ],
           if (movement.isRequiredWeight) ...[
             const SizedBox(width: 8),
             _inputField(
               state.weightCtrl,
               AppPreferences.getUnitsMetric() ? 'kg' : 'lbs',
-              enabled: !state.isChecked,
+              enabled: !state.isChecked && !isLocked,
               onChanged: (v) => _propagateWeight(exercise, setData, v),
               onTap: _triggerTimer,
             ),
@@ -1185,7 +1216,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
             _inputField(
               state.distanceCtrl,
               AppPreferences.getUnitsMetric() ? 'km' : 'mi',
-              enabled: !state.isChecked,
+              enabled: !state.isChecked && !isLocked,
               onChanged: (v) => _propagateDistance(exercise, setData, v),
               onTap: _triggerTimer,
             ),
@@ -1193,12 +1224,12 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           if (movement.isRequiredTime) ...[
             const SizedBox(width: 8),
             _inputField(state.timeCtrl, 'Time',
-                enabled: !state.isChecked, onTap: _triggerTimer),
+                enabled: !state.isChecked && !isLocked, onTap: _triggerTimer),
           ],
           const SizedBox(width: 8),
           Checkbox(
             value: state.isChecked,
-            onChanged: isExSkipped
+            onChanged: isExSkipped || isLocked
                 ? null
                 : (canCheck || state.isChecked)
                     ? (v) =>
@@ -1218,7 +1249,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
             itemBuilder: (_) => [
               PopupMenuItem(
                 value: _SetMenuAction.skip,
-                enabled: !state.isChecked && !isExSkipped,
+                enabled: !state.isChecked && !isExSkipped && !isLocked,
                 child: const Text('Skip'),
               ),
               if (setData.planned == null)
