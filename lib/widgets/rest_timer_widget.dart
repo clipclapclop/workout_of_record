@@ -21,14 +21,10 @@ class RestTimerWidget extends StatefulWidget {
     super.key,
     required this.controller,
     required this.cueText,
-    required this.workoutTimerOn,
-    required this.onToggleWorkoutTimer,
   });
 
   final RestTimerController controller;
   final String? cueText;
-  final bool workoutTimerOn;
-  final VoidCallback onToggleWorkoutTimer;
 
   @override
   State<RestTimerWidget> createState() => _RestTimerWidgetState();
@@ -90,16 +86,7 @@ class _RestTimerWidgetState extends State<RestTimerWidget> {
     final atZero = remaining <= 0 && !isRunning;
 
     final colorScheme = Theme.of(context).colorScheme;
-    final Color displayColor;
-    if (atZero && ctrl.cued) {
-      displayColor = colorScheme.primary;
-    } else if (remaining < 10000) {
-      displayColor = colorScheme.error;
-    } else if (remaining < 30000) {
-      displayColor = Colors.orange;
-    } else {
-      displayColor = colorScheme.onSurface;
-    }
+    final Color displayColor = colorScheme.onSurface;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -141,22 +128,6 @@ class _RestTimerWidgetState extends State<RestTimerWidget> {
             constraints: const BoxConstraints(),
             tooltip: 'Reset',
             onPressed: ctrl.reset,
-          ),
-          const Spacer(),
-          // Per-workout on/off toggle
-          IconButton(
-            icon: Icon(
-              widget.workoutTimerOn ? Icons.timer_outlined : Icons.timer_off_outlined,
-              size: 20,
-              color: widget.workoutTimerOn
-                  ? colorScheme.onSurfaceVariant
-                  : colorScheme.outline,
-            ),
-            visualDensity: VisualDensity.compact,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            tooltip: widget.workoutTimerOn ? 'Turn off timer' : 'Turn on timer',
-            onPressed: widget.onToggleWorkoutTimer,
           ),
         ],
       ),

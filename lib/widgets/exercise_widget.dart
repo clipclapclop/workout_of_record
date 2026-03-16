@@ -318,8 +318,6 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
             key: ValueKey('timer_${exercise.completed.id}'),
             controller: _timerController,
             cueText: widget.cueText,
-            workoutTimerOn: widget.workoutTimerOn,
-            onToggleWorkoutTimer: widget.onToggleWorkoutTimer,
           ),
         if (movement.note1 != null)
           Padding(
