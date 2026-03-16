@@ -469,12 +469,14 @@ class AppDatabase extends _$AppDatabase {
       int id, {
       int? reps,
       double? weight,
+      double? distance,
       double? time,
   }) =>
       (update(completedSets)..where((s) => s.id.equals(id))).write(
         CompletedSetsCompanion(
           reps: Value(reps),
           weight: Value(weight),
+          distance: Value(distance),
           time: Value(time),
         ),
       );
@@ -485,6 +487,7 @@ class AppDatabase extends _$AppDatabase {
           skipReason: Value(reason),
           reps: const Value(null),
           weight: const Value(null),
+          distance: const Value(null),
           time: const Value(null),
         ),
       );
@@ -494,6 +497,7 @@ class AppDatabase extends _$AppDatabase {
         const CompletedSetsCompanion(
           reps: Value(null),
           weight: Value(null),
+          distance: Value(null),
           time: Value(null),
           skipReason: Value(null),
         ),

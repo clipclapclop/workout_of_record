@@ -60,6 +60,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         newSetStates[cs.id] = _SetUiState(
           reps: cs.reps?.toString() ?? ps?.reps?.toString() ?? '',
           weight: _fmt(cs.weight ?? ps?.weight),
+          distance: _fmt(cs.distance ?? ps?.distance),
           time: _fmt(cs.time ?? ps?.time),
           isChecked: WorkoutData.setIsDone(s, ex.movement),
           isSkipped: cs.skipReason != null,
@@ -138,6 +139,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         weight: movement.isRequiredWeight
             ? double.parse(state.weightCtrl.text.trim())
             : null,
+        distance: movement.isRequiredDistance
+            ? double.parse(state.distanceCtrl.text.trim())
+            : null,
         time: movement.isRequiredTime
             ? double.parse(state.timeCtrl.text.trim())
             : null,
@@ -171,6 +175,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
             final ps = setData.planned;
             state.repsCtrl.text = ps?.reps?.toString() ?? '';
             state.weightCtrl.text = _fmt(ps?.weight);
+            state.distanceCtrl.text = _fmt(ps?.distance);
             state.timeCtrl.text = _fmt(ps?.time);
           }
         }
@@ -433,6 +438,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         state.isChecked = true;
         state.repsCtrl.clear();
         state.weightCtrl.clear();
+        state.distanceCtrl.clear();
         state.timeCtrl.clear();
       }
     });
@@ -496,6 +502,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         state.isChecked = true;
         state.repsCtrl.clear();
         state.weightCtrl.clear();
+        state.distanceCtrl.clear();
         state.timeCtrl.clear();
       }
     });
@@ -548,6 +555,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         final ps = s.planned;
         state.repsCtrl.text = ps?.reps?.toString() ?? '';
         state.weightCtrl.text = _fmt(ps?.weight);
+        state.distanceCtrl.text = _fmt(ps?.distance);
         state.timeCtrl.text = _fmt(ps?.time);
       }
     });
@@ -997,6 +1005,15 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
               onChanged: (v) => _propagateWeight(exercise, setData, v),
             ),
           ],
+          if (movement.isRequiredDistance) ...[
+            const SizedBox(width: 8),
+            _inputField(
+              state.distanceCtrl,
+              AppPreferences.getUnitsMetric() ? 'km' : 'mi',
+              enabled: !state.isChecked,
+              onChanged: (v) => _propagateDistance(exercise, setData, v),
+            ),
+          ],
           if (movement.isRequiredTime) ...[
             const SizedBox(width: 8),
             _inputField(state.timeCtrl, 'Time', enabled: !state.isChecked),
@@ -1051,6 +1068,17 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     }
   }
 
+  void _propagateDistance(ExerciseData exercise, SetData setData, String value) {
+    final setIndex = exercise.sets.indexWhere((s) => s.completed.id == setData.completed.id);
+    for (var i = setIndex + 1; i < exercise.sets.length; i++) {
+      final id = exercise.sets[i].completed.id;
+      final s = _setStates[id];
+      if (s != null && !s.isChecked && !s.isSkipped) {
+        s.distanceCtrl.text = value;
+      }
+    }
+  }
+
   Widget _inputField(
     TextEditingController ctrl,
     String label, {
@@ -1091,13 +1119,16 @@ class _SetUiState {
     required this.isSkipped,
     String reps = '',
     String weight = '',
+    String distance = '',
     String time = '',
   })  : repsCtrl = TextEditingController(text: reps),
         weightCtrl = TextEditingController(text: weight),
+        distanceCtrl = TextEditingController(text: distance),
         timeCtrl = TextEditingController(text: time);
 
   final TextEditingController repsCtrl;
   final TextEditingController weightCtrl;
+  final TextEditingController distanceCtrl;
   final TextEditingController timeCtrl;
   bool isChecked;
   bool isSkipped;
@@ -1111,6 +1142,10 @@ class _SetUiState {
       final v = double.tryParse(weightCtrl.text.trim());
       if (v == null || v <= 0) return false;
     }
+    if (m.isRequiredDistance) {
+      final v = double.tryParse(distanceCtrl.text.trim());
+      if (v == null || v <= 0) return false;
+    }
     if (m.isRequiredTime) {
       final v = double.tryParse(timeCtrl.text.trim());
       if (v == null || v <= 0) return false;
@@ -1121,6 +1156,7 @@ class _SetUiState {
   void dispose() {
     repsCtrl.dispose();
     weightCtrl.dispose();
+    distanceCtrl.dispose();
     timeCtrl.dispose();
   }
 }

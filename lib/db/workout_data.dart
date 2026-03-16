@@ -35,7 +35,8 @@ class WorkoutData {
     final cs = s.completed;
     final repsOk = !m.isRequiredReps || cs.reps != null;
     final weightOk = !m.isRequiredWeight || cs.weight != null;
+    final distanceOk = !m.isRequiredDistance || cs.distance != null;
     final timeOk = !m.isRequiredTime || cs.time != null;
-    return (repsOk && weightOk && timeOk) || cs.skipReason != null;
+    return (repsOk && weightOk && distanceOk && timeOk) || cs.skipReason != null;
   }
 }
