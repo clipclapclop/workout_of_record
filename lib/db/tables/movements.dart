@@ -22,4 +22,6 @@ class Movements extends Table {
   BoolColumn get isRequiredTime => boolean()();
   BoolColumn get isRequiredDistance => boolean().withDefault(const Constant(false))();
   TextColumn get category => textEnum<MovementCategory>()();
+  /// Null = use global default (60 s). 0 = timer disabled for this movement.
+  IntColumn get restSeconds => integer().nullable()();
 }

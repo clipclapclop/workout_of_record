@@ -165,6 +165,17 @@ class $MovementsTable extends Movements
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   ).withConverter<MovementCategory>($MovementsTable.$convertercategory);
+  static const VerificationMeta _restSecondsMeta = const VerificationMeta(
+    'restSeconds',
+  );
+  @override
+  late final GeneratedColumn<int> restSeconds = GeneratedColumn<int>(
+    'rest_seconds',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -181,6 +192,7 @@ class $MovementsTable extends Movements
     isRequiredTime,
     isRequiredDistance,
     category,
+    restSeconds,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -289,6 +301,15 @@ class $MovementsTable extends Movements
         ),
       );
     }
+    if (data.containsKey('rest_seconds')) {
+      context.handle(
+        _restSecondsMeta,
+        restSeconds.isAcceptableOrUnknown(
+          data['rest_seconds']!,
+          _restSecondsMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -362,6 +383,10 @@ class $MovementsTable extends Movements
           data['${effectivePrefix}category'],
         )!,
       ),
+      restSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rest_seconds'],
+      ),
     );
   }
 
@@ -393,6 +418,9 @@ class Movement extends DataClass implements Insertable<Movement> {
   final bool isRequiredTime;
   final bool isRequiredDistance;
   final MovementCategory category;
+
+  /// Null = use global default (60 s). 0 = timer disabled for this movement.
+  final int? restSeconds;
   const Movement({
     required this.id,
     required this.name,
@@ -408,6 +436,7 @@ class Movement extends DataClass implements Insertable<Movement> {
     required this.isRequiredTime,
     required this.isRequiredDistance,
     required this.category,
+    this.restSeconds,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -446,6 +475,9 @@ class Movement extends DataClass implements Insertable<Movement> {
         $MovementsTable.$convertercategory.toSql(category),
       );
     }
+    if (!nullToAbsent || restSeconds != null) {
+      map['rest_seconds'] = Variable<int>(restSeconds);
+    }
     return map;
   }
 
@@ -475,6 +507,9 @@ class Movement extends DataClass implements Insertable<Movement> {
       isRequiredTime: Value(isRequiredTime),
       isRequiredDistance: Value(isRequiredDistance),
       category: Value(category),
+      restSeconds: restSeconds == null && nullToAbsent
+          ? const Value.absent()
+          : Value(restSeconds),
     );
   }
 
@@ -502,6 +537,7 @@ class Movement extends DataClass implements Insertable<Movement> {
       category: $MovementsTable.$convertercategory.fromJson(
         serializer.fromJson<String>(json['category']),
       ),
+      restSeconds: serializer.fromJson<int?>(json['restSeconds']),
     );
   }
   @override
@@ -526,6 +562,7 @@ class Movement extends DataClass implements Insertable<Movement> {
       'category': serializer.toJson<String>(
         $MovementsTable.$convertercategory.toJson(category),
       ),
+      'restSeconds': serializer.toJson<int?>(restSeconds),
     };
   }
 
@@ -544,6 +581,7 @@ class Movement extends DataClass implements Insertable<Movement> {
     bool? isRequiredTime,
     bool? isRequiredDistance,
     MovementCategory? category,
+    Value<int?> restSeconds = const Value.absent(),
   }) => Movement(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -561,6 +599,7 @@ class Movement extends DataClass implements Insertable<Movement> {
     isRequiredTime: isRequiredTime ?? this.isRequiredTime,
     isRequiredDistance: isRequiredDistance ?? this.isRequiredDistance,
     category: category ?? this.category,
+    restSeconds: restSeconds.present ? restSeconds.value : this.restSeconds,
   );
   Movement copyWithCompanion(MovementsCompanion data) {
     return Movement(
@@ -592,6 +631,9 @@ class Movement extends DataClass implements Insertable<Movement> {
           ? data.isRequiredDistance.value
           : this.isRequiredDistance,
       category: data.category.present ? data.category.value : this.category,
+      restSeconds: data.restSeconds.present
+          ? data.restSeconds.value
+          : this.restSeconds,
     );
   }
 
@@ -611,7 +653,8 @@ class Movement extends DataClass implements Insertable<Movement> {
           ..write('isRequiredWeight: $isRequiredWeight, ')
           ..write('isRequiredTime: $isRequiredTime, ')
           ..write('isRequiredDistance: $isRequiredDistance, ')
-          ..write('category: $category')
+          ..write('category: $category, ')
+          ..write('restSeconds: $restSeconds')
           ..write(')'))
         .toString();
   }
@@ -632,6 +675,7 @@ class Movement extends DataClass implements Insertable<Movement> {
     isRequiredTime,
     isRequiredDistance,
     category,
+    restSeconds,
   );
   @override
   bool operator ==(Object other) =>
@@ -650,7 +694,8 @@ class Movement extends DataClass implements Insertable<Movement> {
           other.isRequiredWeight == this.isRequiredWeight &&
           other.isRequiredTime == this.isRequiredTime &&
           other.isRequiredDistance == this.isRequiredDistance &&
-          other.category == this.category);
+          other.category == this.category &&
+          other.restSeconds == this.restSeconds);
 }
 
 class MovementsCompanion extends UpdateCompanion<Movement> {
@@ -668,6 +713,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
   final Value<bool> isRequiredTime;
   final Value<bool> isRequiredDistance;
   final Value<MovementCategory> category;
+  final Value<int?> restSeconds;
   const MovementsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
@@ -683,6 +729,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
     this.isRequiredTime = const Value.absent(),
     this.isRequiredDistance = const Value.absent(),
     this.category = const Value.absent(),
+    this.restSeconds = const Value.absent(),
   });
   MovementsCompanion.insert({
     this.id = const Value.absent(),
@@ -699,6 +746,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
     required bool isRequiredTime,
     this.isRequiredDistance = const Value.absent(),
     required MovementCategory category,
+    this.restSeconds = const Value.absent(),
   }) : name = Value(name),
        muscleGroup = Value(muscleGroup),
        isRequiredReps = Value(isRequiredReps),
@@ -720,6 +768,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
     Expression<bool>? isRequiredTime,
     Expression<bool>? isRequiredDistance,
     Expression<String>? category,
+    Expression<int>? restSeconds,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -737,6 +786,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
       if (isRequiredDistance != null)
         'is_required_distance': isRequiredDistance,
       if (category != null) 'category': category,
+      if (restSeconds != null) 'rest_seconds': restSeconds,
     });
   }
 
@@ -755,6 +805,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
     Value<bool>? isRequiredTime,
     Value<bool>? isRequiredDistance,
     Value<MovementCategory>? category,
+    Value<int?>? restSeconds,
   }) {
     return MovementsCompanion(
       id: id ?? this.id,
@@ -771,6 +822,7 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
       isRequiredTime: isRequiredTime ?? this.isRequiredTime,
       isRequiredDistance: isRequiredDistance ?? this.isRequiredDistance,
       category: category ?? this.category,
+      restSeconds: restSeconds ?? this.restSeconds,
     );
   }
 
@@ -823,6 +875,9 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
         $MovementsTable.$convertercategory.toSql(category.value),
       );
     }
+    if (restSeconds.present) {
+      map['rest_seconds'] = Variable<int>(restSeconds.value);
+    }
     return map;
   }
 
@@ -842,7 +897,8 @@ class MovementsCompanion extends UpdateCompanion<Movement> {
           ..write('isRequiredWeight: $isRequiredWeight, ')
           ..write('isRequiredTime: $isRequiredTime, ')
           ..write('isRequiredDistance: $isRequiredDistance, ')
-          ..write('category: $category')
+          ..write('category: $category, ')
+          ..write('restSeconds: $restSeconds')
           ..write(')'))
         .toString();
   }
@@ -7267,6 +7323,7 @@ typedef $$MovementsTableCreateCompanionBuilder =
       required bool isRequiredTime,
       Value<bool> isRequiredDistance,
       required MovementCategory category,
+      Value<int?> restSeconds,
     });
 typedef $$MovementsTableUpdateCompanionBuilder =
     MovementsCompanion Function({
@@ -7284,6 +7341,7 @@ typedef $$MovementsTableUpdateCompanionBuilder =
       Value<bool> isRequiredTime,
       Value<bool> isRequiredDistance,
       Value<MovementCategory> category,
+      Value<int?> restSeconds,
     });
 
 final class $$MovementsTableReferences
@@ -7443,6 +7501,11 @@ class $$MovementsTableFilterComposer
     builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
+  ColumnFilters<int> get restSeconds => $composableBuilder(
+    column: $table.restSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> exerciseTemplatesRefs(
     Expression<bool> Function($$ExerciseTemplatesTableFilterComposer f) f,
   ) {
@@ -7597,6 +7660,11 @@ class $$MovementsTableOrderingComposer
     column: $table.category,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get restSeconds => $composableBuilder(
+    column: $table.restSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$MovementsTableAnnotationComposer
@@ -7664,6 +7732,11 @@ class $$MovementsTableAnnotationComposer
 
   GeneratedColumnWithTypeConverter<MovementCategory, String> get category =>
       $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<int> get restSeconds => $composableBuilder(
+    column: $table.restSeconds,
+    builder: (column) => column,
+  );
 
   Expression<T> exerciseTemplatesRefs<T extends Object>(
     Expression<T> Function($$ExerciseTemplatesTableAnnotationComposer a) f,
@@ -7789,6 +7862,7 @@ class $$MovementsTableTableManager
                 Value<bool> isRequiredTime = const Value.absent(),
                 Value<bool> isRequiredDistance = const Value.absent(),
                 Value<MovementCategory> category = const Value.absent(),
+                Value<int?> restSeconds = const Value.absent(),
               }) => MovementsCompanion(
                 id: id,
                 name: name,
@@ -7804,6 +7878,7 @@ class $$MovementsTableTableManager
                 isRequiredTime: isRequiredTime,
                 isRequiredDistance: isRequiredDistance,
                 category: category,
+                restSeconds: restSeconds,
               ),
           createCompanionCallback:
               ({
@@ -7821,6 +7896,7 @@ class $$MovementsTableTableManager
                 required bool isRequiredTime,
                 Value<bool> isRequiredDistance = const Value.absent(),
                 required MovementCategory category,
+                Value<int?> restSeconds = const Value.absent(),
               }) => MovementsCompanion.insert(
                 id: id,
                 name: name,
@@ -7836,6 +7912,7 @@ class $$MovementsTableTableManager
                 isRequiredTime: isRequiredTime,
                 isRequiredDistance: isRequiredDistance,
                 category: category,
+                restSeconds: restSeconds,
               ),
           withReferenceMapper: (p0) => p0
               .map(

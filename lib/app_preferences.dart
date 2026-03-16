@@ -75,6 +75,27 @@ class AppPreferences {
       ? _secure.delete(key: _kSettingsApiKey)
       : _secure.write(key: _kSettingsApiKey, value: v);
 
+  // ── Timer ──────────────────────────────────────────────────────────────────
+
+  static bool getTimerEnabled() => _prefs.getBool(_kTimerEnabled) ?? true;
+  static Future<void> setTimerEnabled(bool v) => _prefs.setBool(_kTimerEnabled, v);
+
+  /// Default rest duration in seconds when a movement has no override. Default 60.
+  static int getTimerDefaultSeconds() => _prefs.getInt(_kTimerDefaultSeconds) ?? 60;
+  static Future<void> setTimerDefaultSeconds(int v) => _prefs.setInt(_kTimerDefaultSeconds, v);
+
+  static TimerSound getTimerSound() {
+    final s = _prefs.getString(_kTimerSound);
+    return s == null ? TimerSound.tts : TimerSound.values.byName(s);
+  }
+  static Future<void> setTimerSound(TimerSound v) => _prefs.setString(_kTimerSound, v.name);
+
+  static bool getTimerHaptic() => _prefs.getBool(_kTimerHaptic) ?? true;
+  static Future<void> setTimerHaptic(bool v) => _prefs.setBool(_kTimerHaptic, v);
+
+  static bool getTimerKeepAwake() => _prefs.getBool(_kTimerKeepAwake) ?? false;
+  static Future<void> setTimerKeepAwake(bool v) => _prefs.setBool(_kTimerKeepAwake, v);
+
   // ── Backup ─────────────────────────────────────────────────────────────────
 
   static bool getBackupEnabled() => _prefs.getBool(_kBackupEnabled) ?? false;
@@ -116,6 +137,11 @@ class AppPreferences {
   static const _kSettingsAiEnabled = 'settings_ai_enabled';
   static const _kSettingsUnitsMetric = 'settings_units_metric';
   static const _kSettingsApiKey = 'settings_api_key';
+  static const _kTimerEnabled = 'timer_enabled';
+  static const _kTimerDefaultSeconds = 'timer_default_seconds';
+  static const _kTimerSound = 'timer_sound';
+  static const _kTimerHaptic = 'timer_haptic';
+  static const _kTimerKeepAwake = 'timer_keep_awake';
   static const _kBackupEnabled = 'backup_enabled';
   static const _kAutoBackupEnabled = 'auto_backup_enabled';
   static const _kBackupHour = 'backup_hour';

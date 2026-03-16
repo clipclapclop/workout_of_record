@@ -33,12 +33,14 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
   late final TextEditingController _linkCtrl;
   late final TextEditingController _minWeightCtrl;
   late final TextEditingController _weightDeltaCtrl;
+  late final TextEditingController _restSecondsCtrl;
 
   late MuscleGroup _muscleGroup;
   late MovementCategory _category;
   late bool _isRequiredReps;
   late bool _isRequiredWeight;
   late bool _isRequiredTime;
+  late bool _isRequiredDistance;
 
   @override
   void initState() {
@@ -53,11 +55,14 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
         text: m?.minWeight != null ? _fmt(m!.minWeight!) : '');
     _weightDeltaCtrl = TextEditingController(
         text: m?.weightDelta != null ? _fmt(m!.weightDelta!) : '');
+    _restSecondsCtrl = TextEditingController(
+        text: m?.restSeconds != null ? m!.restSeconds.toString() : '');
     _muscleGroup = m?.muscleGroup ?? MuscleGroup.values.first;
     _category = m?.category ?? MovementCategory.resistance;
     _isRequiredReps = m?.isRequiredReps ?? true;
     _isRequiredWeight = m?.isRequiredWeight ?? true;
     _isRequiredTime = m?.isRequiredTime ?? false;
+    _isRequiredDistance = m?.isRequiredDistance ?? false;
   }
 
   @override
@@ -69,6 +74,7 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
     _linkCtrl.dispose();
     _minWeightCtrl.dispose();
     _weightDeltaCtrl.dispose();
+    _restSecondsCtrl.dispose();
     super.dispose();
   }
 
@@ -77,6 +83,13 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
 
   String? _required(String? v) =>
       (v == null || v.trim().isEmpty) ? 'Required' : null;
+
+  /// 0 = timer disabled for this movement, null = use global default.
+  int? _parseRestSeconds() {
+    final raw = _restSecondsCtrl.text.trim();
+    if (raw.isEmpty) return null;
+    return int.tryParse(raw);
+  }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
@@ -94,6 +107,8 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
       isRequiredReps: Value(_isRequiredReps),
       isRequiredWeight: Value(_isRequiredWeight),
       isRequiredTime: Value(_isRequiredTime),
+      isRequiredDistance: Value(_isRequiredDistance),
+      restSeconds: Value(_parseRestSeconds()),
     );
     if (widget.movement != null) {
       await db.updateMovement(companion.copyWith(id: Value(widget.movement!.id)));
@@ -183,6 +198,26 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
               value: _isRequiredTime,
               onChanged: (v) => setState(() => _isRequiredTime = v),
               contentPadding: EdgeInsets.zero,
+            ),
+            SwitchListTile(
+              title: const Text('Distance'),
+              value: _isRequiredDistance,
+              onChanged: (v) => setState(() => _isRequiredDistance = v),
+              contentPadding: EdgeInsets.zero,
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _restSecondsCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Rest timer (seconds, 0 = off, blank = default)',
+              ),
+              keyboardType: TextInputType.number,
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return null;
+                final n = int.tryParse(v.trim());
+                if (n == null || n < 0) return 'Enter a whole number ≥ 0';
+                return null;
+              },
             ),
             const SizedBox(height: 8),
             Row(

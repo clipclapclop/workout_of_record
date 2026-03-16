@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../app_preferences.dart';
 import '../db/app_database.dart';
@@ -8,6 +9,8 @@ import '../db/history_data.dart';
 import '../db/tables/enums.dart';
 import '../db/workout_data.dart';
 import '../widgets/app_nav_menu.dart';
+import '../widgets/rest_timer_controller.dart';
+import '../widgets/rest_timer_widget.dart';
 import 'home_screen.dart';
 
 class WorkoutScreen extends StatefulWidget {
@@ -35,6 +38,14 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   final Map<MuscleGroup, bool> _postMgDone = {};
   bool _loading = true;
 
+  // ── Rest timer ─────────────────────────────────────────────────────────────
+  RestTimerController? _timerController;
+  // Per-workout kill-switch: toggled via the timer widget's icon button.
+  bool _timerWorkoutOn = true;
+  // Track which exercise the controller was last configured for so we can
+  // detect transitions and update the duration.
+  int? _timerExerciseId;
+
   @override
   void initState() {
     super.initState();
@@ -46,7 +57,131 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     for (final s in _setStates.values) {
       s.dispose();
     }
+    _timerController?.dispose();
+    WakelockPlus.disable();
     super.dispose();
+  }
+
+  // ── Timer helpers ──────────────────────────────────────────────────────────
+
+  /// The first exercise that still has work to do (unchecked sets, or sets done
+  /// but post-exercise check-in not yet answered). Returns null when the whole
+  /// workout is done.
+  int? get _activeExerciseId {
+    if (_data == null) return null;
+    for (final ex in _data!.exercises) {
+      if (_exerciseSkipReasons[ex.completed.id] != null) continue;
+      final allSetsDone =
+          ex.sets.every((s) => _setStates[s.completed.id]?.isChecked ?? false);
+      if (!allSetsDone) return ex.completed.id;
+      if (_postExDone[ex.completed.id] != true) return ex.completed.id;
+    }
+    return null;
+  }
+
+  /// Effective rest duration for [movement]: per-movement override → global
+  /// default. Returns 0 if the timer is disabled for this movement.
+  int _effectiveDuration(Movement movement) {
+    final perMovement = movement.restSeconds;
+    if (perMovement != null) return perMovement; // 0 means disabled
+    return AppPreferences.getTimerDefaultSeconds();
+  }
+
+  /// Cue text spoken by TTS when the timer reaches zero.
+  /// Priority: distance → time → weight from the next uncompleted set's
+  /// planned values. Returns null when nothing meaningful is available.
+  String? _cueText(ExerciseData exercise) {
+    SetData? next;
+    for (final s in exercise.sets) {
+      if (!(_setStates[s.completed.id]?.isChecked ?? false)) {
+        next = s;
+        break;
+      }
+    }
+    if (next?.planned == null) return null;
+    final ps = next!.planned!;
+    final m = exercise.movement;
+    final metric = AppPreferences.getUnitsMetric();
+    if (m.isRequiredDistance && ps.distance != null) {
+      final unit = metric ? 'kilometers' : 'miles';
+      return '${_fmt(ps.distance!)} $unit';
+    }
+    if (m.isRequiredTime && ps.time != null) {
+      return '${_fmt(ps.time!)} seconds';
+    }
+    if (m.isRequiredWeight && ps.weight != null) {
+      final unit = metric ? 'kilograms' : 'pounds';
+      return '${_fmt(ps.weight!)} $unit';
+    }
+    return null;
+  }
+
+  /// Call after any action that may change the active exercise or should
+  /// start the countdown (set checked, input tapped).
+  /// Called when an input field is tapped. Always starts/restarts the timer.
+  void _triggerTimer() {
+    if (!AppPreferences.getTimerEnabled() || !_timerWorkoutOn) return;
+
+    final activeId = _activeExerciseId;
+    if (activeId == null) return;
+
+    final activeEx =
+        _data!.exercises.firstWhere((e) => e.completed.id == activeId);
+    final dur = _effectiveDuration(activeEx.movement);
+    if (dur == 0) return;
+
+    if (_timerController == null) {
+      _timerController = RestTimerController(durationSeconds: dur);
+      _timerExerciseId = activeId;
+    } else if (_timerExerciseId != activeId) {
+      _timerController!.setDuration(dur);
+      _timerExerciseId = activeId;
+    }
+
+    _timerController!.start();
+  }
+
+  /// Called after a set is checked or skipped. Only starts the timer when
+  /// the active exercise has advanced — i.e. we just crossed into a new
+  /// exercise. Within the same exercise the input-tap already started the
+  /// countdown and we don't want the checkbox to reset it.
+  void _triggerTimerOnExerciseAdvance() {
+    if (!AppPreferences.getTimerEnabled() || !_timerWorkoutOn) return;
+
+    final activeId = _activeExerciseId;
+    if (activeId == null || activeId == _timerExerciseId) return;
+
+    final activeEx =
+        _data!.exercises.firstWhere((e) => e.completed.id == activeId);
+    final dur = _effectiveDuration(activeEx.movement);
+    if (dur == 0) return;
+
+    if (_timerController == null) {
+      setState(() {
+        _timerController = RestTimerController(durationSeconds: dur);
+        _timerExerciseId = activeId;
+      });
+    } else {
+      _timerController!.setDuration(dur);
+      _timerExerciseId = activeId;
+    }
+
+    _timerController!.start();
+  }
+
+  void _toggleWorkoutTimer() {
+    setState(() => _timerWorkoutOn = !_timerWorkoutOn);
+    if (!_timerWorkoutOn) {
+      _timerController?.stop();
+    }
+  }
+
+  void _applyWakeLock() {
+    if (AppPreferences.getTimerKeepAwake()) {
+      WakelockPlus.enable();
+    } else {
+      WakelockPlus.disable();
+    }
   }
 
   Future<void> _load() async {
@@ -86,7 +221,23 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         }
         _loading = false;
       });
+      _applyWakeLock();
+      _initTimerIfNeeded();
     }
+  }
+
+  void _initTimerIfNeeded() {
+    if (_timerController != null) return;
+    final activeId = _activeExerciseId;
+    if (activeId == null) return;
+    final activeEx = _data!.exercises.firstWhere((e) => e.completed.id == activeId);
+    final dur = _effectiveDuration(activeEx.movement);
+    if (dur == 0) return;
+    if (!AppPreferences.getTimerEnabled() || !_timerWorkoutOn) return;
+    setState(() {
+      _timerController = RestTimerController(durationSeconds: dur);
+      _timerExerciseId = activeId;
+    });
   }
 
   String _fmt(double? v) {
@@ -202,6 +353,10 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         await _showPostExerciseSheet(exercise);
       }
     }
+
+    // Advance the timer to the next exercise if we just crossed into one.
+    // Input taps handle same-exercise restarts; the checkbox must not reset.
+    if (checked && mounted) _triggerTimerOnExerciseAdvance();
   }
 
   Future<void> _showPostExerciseSheet(ExerciseData exercise) async {
@@ -450,6 +605,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         await _showPostExerciseSheet(exercise);
       }
     }
+    if (mounted) _triggerTimerOnExerciseAdvance();
   }
 
   Future<void> _showExerciseSkipSheet(ExerciseData exercise) async {
@@ -494,6 +650,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
   Future<void> _skipExercise(ExerciseData exercise, SkipReason reason) async {
     await db.skipExercise(exercise.completed.id, reason);
+    _timerController?.reset();
     setState(() {
       _exerciseSkipReasons[exercise.completed.id] = reason;
       for (final s in exercise.sets) {
@@ -540,6 +697,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
   Future<void> _unskipExercise(ExerciseData exercise) async {
     await db.unskipExercise(exercise.completed.id);
+    _timerController?.reset();
     final mg = exercise.movement.muscleGroup;
     if (_postMgDone[mg] == true) {
       await db.clearPostMuscleGroupCheckin(widget.completedWorkoutId, mg);
@@ -786,6 +944,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
   Widget _buildExercise(
       ExerciseData exercise, int index, Map<MuscleGroup, int> lastExIndexForMg) {
+    final isActive = exercise.completed.id == _activeExerciseId;
     final isExSkipped = _exerciseSkipReasons[exercise.completed.id] != null;
     final allSetsDone = exercise.sets
         .every((s) => _setStates[s.completed.id]?.isChecked ?? false);
@@ -910,10 +1069,25 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
             isExSkipped: isExSkipped),
     ];
 
+    final showTimer = isActive &&
+        !isExSkipped &&
+        AppPreferences.getTimerEnabled() &&
+        _timerWorkoutOn &&
+        _timerController != null &&
+        _effectiveDuration(exercise.movement) > 0;
+
     final column = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         header,
+        if (showTimer)
+          RestTimerWidget(
+            key: ValueKey('timer_${exercise.completed.id}'),
+            controller: _timerController!,
+            cueText: _cueText(exercise),
+            workoutTimerOn: _timerWorkoutOn,
+            onToggleWorkoutTimer: _toggleWorkoutTimer,
+          ),
         if (exercise.movement.note1 != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -994,7 +1168,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           if (movement.isRequiredReps) ...[
             const SizedBox(width: 8),
             _inputField(state.repsCtrl, 'Reps',
-                isInt: true, enabled: !state.isChecked),
+                isInt: true, enabled: !state.isChecked, onTap: _triggerTimer),
           ],
           if (movement.isRequiredWeight) ...[
             const SizedBox(width: 8),
@@ -1003,6 +1177,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
               AppPreferences.getUnitsMetric() ? 'kg' : 'lbs',
               enabled: !state.isChecked,
               onChanged: (v) => _propagateWeight(exercise, setData, v),
+              onTap: _triggerTimer,
             ),
           ],
           if (movement.isRequiredDistance) ...[
@@ -1012,11 +1187,13 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
               AppPreferences.getUnitsMetric() ? 'km' : 'mi',
               enabled: !state.isChecked,
               onChanged: (v) => _propagateDistance(exercise, setData, v),
+              onTap: _triggerTimer,
             ),
           ],
           if (movement.isRequiredTime) ...[
             const SizedBox(width: 8),
-            _inputField(state.timeCtrl, 'Time', enabled: !state.isChecked),
+            _inputField(state.timeCtrl, 'Time',
+                enabled: !state.isChecked, onTap: _triggerTimer),
           ],
           const SizedBox(width: 8),
           Checkbox(
@@ -1085,6 +1262,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     bool isInt = false,
     required bool enabled,
     void Function(String)? onChanged,
+    VoidCallback? onTap,
   }) {
     return SizedBox(
       width: 72,
@@ -1100,6 +1278,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           isDense: true,
           border: const OutlineInputBorder(),
         ),
+        onTap: onTap,
         onChanged: (v) {
           setState(() {});
           onChanged?.call(v);

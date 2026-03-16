@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../app_preferences.dart';
+import '../db/tables/enums.dart';
 import '../services/backup_scheduler.dart';
 import '../services/backup_service.dart';
 import '../widgets/app_nav_menu.dart';
@@ -23,6 +24,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _apiKeyLoading = true;
   bool _obscureApiKey = true;
 
+  late bool _timerEnabled;
+  late TimerSound _timerSound;
+  late bool _timerHaptic;
+  late bool _timerKeepAwake;
+  late int _timerDefaultSeconds;
+  late final TextEditingController _timerSecondsCtrl;
+
   bool _backupEnabled = false;
   bool _autoBackupEnabled = false;
   int _backupHour = 2;
@@ -36,6 +44,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _aiEnabled = AppPreferences.getAiEnabled();
     _unitsMetric = AppPreferences.getUnitsMetric();
+    _timerEnabled = AppPreferences.getTimerEnabled();
+    _timerSound = AppPreferences.getTimerSound();
+    _timerHaptic = AppPreferences.getTimerHaptic();
+    _timerKeepAwake = AppPreferences.getTimerKeepAwake();
+    _timerDefaultSeconds = AppPreferences.getTimerDefaultSeconds();
+    _timerSecondsCtrl =
+        TextEditingController(text: _timerDefaultSeconds.toString());
     _backupEnabled = AppPreferences.getBackupEnabled();
     _autoBackupEnabled = AppPreferences.getAutoBackupEnabled();
     _backupHour = AppPreferences.getBackupHour();
@@ -48,6 +63,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void dispose() {
     _apiKeyController.dispose();
+    _timerSecondsCtrl.dispose();
     super.dispose();
   }
 
@@ -184,6 +200,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         automaticallyImplyLeading: false,
         actions: [AppNavMenu(current: AppScreen.settings)],
       ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+          child: FilledButton(
+            onPressed: _apiKeyLoading ? null : _save,
+            child: const Text('Save'),
+          ),
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
@@ -237,13 +262,85 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _apiKeyLoading ? null : _save,
-              child: const Text('Save'),
-            ),
+
+          // ── Rest Timer ────────────────────────────────────────────────────
+          SwitchListTile(
+            title: const Text('Rest Timer'),
+            subtitle: const Text('Show a countdown timer between sets.'),
+            value: _timerEnabled,
+            contentPadding: EdgeInsets.zero,
+            onChanged: (v) async {
+              setState(() => _timerEnabled = v);
+              await AppPreferences.setTimerEnabled(v);
+            },
           ),
+          if (_timerEnabled) ...[
+            const SizedBox(height: 4),
+            TextField(
+              controller: _timerSecondsCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Default rest (seconds)',
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+              onChanged: (v) async {
+                final seconds = int.tryParse(v.trim());
+                if (seconds != null && seconds > 0) {
+                  _timerDefaultSeconds = seconds;
+                  await AppPreferences.setTimerDefaultSeconds(seconds);
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+            const Text('Sound'),
+            RadioGroup<TimerSound>(
+              groupValue: _timerSound,
+              onChanged: (v) async {
+                setState(() => _timerSound = v!);
+                await AppPreferences.setTimerSound(v!);
+              },
+              child: Column(
+                children: const [
+                  RadioListTile<TimerSound>(
+                    title: Text('Read target value aloud'),
+                    value: TimerSound.tts,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  RadioListTile<TimerSound>(
+                    title: Text('Chime ("ready")'),
+                    value: TimerSound.chime,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  RadioListTile<TimerSound>(
+                    title: Text('Silent'),
+                    value: TimerSound.silent,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+            ),
+            SwitchListTile(
+              title: const Text('Haptic feedback'),
+              subtitle: const Text('Vibrate when the timer reaches zero.'),
+              value: _timerHaptic,
+              contentPadding: EdgeInsets.zero,
+              onChanged: (v) async {
+                setState(() => _timerHaptic = v);
+                await AppPreferences.setTimerHaptic(v);
+              },
+            ),
+            SwitchListTile(
+              title: const Text('Keep screen awake'),
+              subtitle: const Text('Prevent the screen from sleeping during a workout.'),
+              value: _timerKeepAwake,
+              contentPadding: EdgeInsets.zero,
+              onChanged: (v) async {
+                setState(() => _timerKeepAwake = v);
+                await AppPreferences.setTimerKeepAwake(v);
+              },
+            ),
+          ],
           const SizedBox(height: 32),
 
           // ── Backup ────────────────────────────────────────────────────────
