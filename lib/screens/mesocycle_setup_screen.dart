@@ -109,7 +109,7 @@ class _MesocycleSetupScreenState extends State<MesocycleSetupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Set Up Mesocycle'),
+        title: const Text('Mesocycle Setup'),
         automaticallyImplyLeading: false,
         actions: [AppNavMenu(current: AppScreen.workout)],
       ),

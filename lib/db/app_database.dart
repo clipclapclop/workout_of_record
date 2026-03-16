@@ -1011,7 +1011,7 @@ class AppDatabase extends _$AppDatabase {
           allMovements.firstWhere((m) => m.name == name && m.muscleGroup == mg).id;
 
       final dumbbellPressId = idOf('Dumbbell Press (High Incline)', MuscleGroup.chest);
-      final cableTriId = idOf('Cable Overhead Tricep Extension', MuscleGroup.triceps);
+      final cableTriId = idOf('Cable Overhead Triceps Extension', MuscleGroup.triceps);
       final barbellRowId = idOf('Barbell Bent Over Row', MuscleGroup.back);
 
       // ── Meso template ──────────────────────────────────────────────────────
