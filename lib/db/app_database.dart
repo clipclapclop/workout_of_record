@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'history_data.dart';
+import 'seed/meso_template_seed_data.dart';
 import 'seed/movement_seed_data.dart';
 import 'planning.dart';
 import 'template_data.dart';
@@ -1005,80 +1006,45 @@ class AppDatabase extends _$AppDatabase {
         ));
       }
 
-      // Look up IDs needed for the default template.
+      // ── Meso templates ─────────────────────────────────────────────────────
       final allMovements = await select(movements).get();
       int idOf(String name, MuscleGroup mg) =>
           allMovements.firstWhere((m) => m.name == name && m.muscleGroup == mg).id;
 
-      final dumbbellPressId = idOf('Dumbbell Press (High Incline)', MuscleGroup.chest);
-      final cableTriId = idOf('Cable Overhead Triceps Extension', MuscleGroup.triceps);
-      final barbellRowId = idOf('Barbell Bent Over Row', MuscleGroup.back);
-
-      // ── Meso template ──────────────────────────────────────────────────────
-      final mesoTemplateId = await into(mesoTemplates).insert(
-        MesoTemplatesCompanion.insert(
-          name: 'Default Template',
-          createdAt: Value(DateTime.now()),
-        ),
-      );
-      final weekTemplateId = await into(weekTemplates).insert(
-        WeekTemplatesCompanion.insert(
-          mesoTemplateId: mesoTemplateId,
-          name: 'Standard Week',
-          workoutCount: 2,
-        ),
-      );
-
-      final wtDay1Id = await into(workoutTemplates).insert(
-        WorkoutTemplatesCompanion.insert(
-          weekTemplateId: weekTemplateId,
-          name: 'Day 1',
-          isRestDay: false,
-          dayIndex: 0,
-        ),
-      );
-      await into(workoutTemplates).insert(WorkoutTemplatesCompanion.insert(
-        weekTemplateId: weekTemplateId,
-        name: 'Day 2',
-        isRestDay: true,
-        dayIndex: 1,
-      ));
-      final wtDay3Id = await into(workoutTemplates).insert(
-        WorkoutTemplatesCompanion.insert(
-          weekTemplateId: weekTemplateId,
-          name: 'Day 3',
-          isRestDay: false,
-          dayIndex: 2,
-        ),
-      );
-      await into(workoutTemplates).insert(WorkoutTemplatesCompanion.insert(
-        weekTemplateId: weekTemplateId,
-        name: 'Day 4',
-        isRestDay: true,
-        dayIndex: 3,
-      ));
-      await into(workoutTemplates).insert(WorkoutTemplatesCompanion.insert(
-        weekTemplateId: weekTemplateId,
-        name: 'Day 5',
-        isRestDay: true,
-        dayIndex: 4,
-      ));
-
-      await into(exerciseTemplates).insert(ExerciseTemplatesCompanion.insert(
-        workoutTemplateId: wtDay1Id,
-        movementId: dumbbellPressId,
-        exerciseIndex: 0,
-      ));
-      await into(exerciseTemplates).insert(ExerciseTemplatesCompanion.insert(
-        workoutTemplateId: wtDay1Id,
-        movementId: cableTriId,
-        exerciseIndex: 1,
-      ));
-      await into(exerciseTemplates).insert(ExerciseTemplatesCompanion.insert(
-        workoutTemplateId: wtDay3Id,
-        movementId: barbellRowId,
-        exerciseIndex: 0,
-      ));
+      for (final tmpl in kMesoTemplateSeeds) {
+        final mesoTemplateId = await into(mesoTemplates).insert(
+          MesoTemplatesCompanion.insert(
+            name: tmpl.name,
+            createdAt: Value(DateTime.now()),
+          ),
+        );
+        final weekTemplateId = await into(weekTemplates).insert(
+          WeekTemplatesCompanion.insert(
+            mesoTemplateId: mesoTemplateId,
+            name: tmpl.weekName,
+            workoutCount: tmpl.days.where((d) => !d.isRestDay).length,
+          ),
+        );
+        for (var i = 0; i < tmpl.days.length; i++) {
+          final day = tmpl.days[i];
+          final wtId = await into(workoutTemplates).insert(
+            WorkoutTemplatesCompanion.insert(
+              weekTemplateId: weekTemplateId,
+              name: day.name,
+              isRestDay: day.isRestDay,
+              dayIndex: i,
+            ),
+          );
+          for (var j = 0; j < day.movements.length; j++) {
+            final ref = day.movements[j];
+            await into(exerciseTemplates).insert(ExerciseTemplatesCompanion.insert(
+              workoutTemplateId: wtId,
+              movementId: idOf(ref.name, ref.muscleGroup),
+              exerciseIndex: j,
+            ));
+          }
+        }
+      }
 
     });
   }
