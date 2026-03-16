@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../app_preferences.dart';
@@ -9,8 +8,8 @@ import '../db/history_data.dart';
 import '../db/tables/enums.dart';
 import '../db/workout_data.dart';
 import '../widgets/app_nav_menu.dart';
-import '../widgets/rest_timer_controller.dart';
-import '../widgets/rest_timer_widget.dart';
+import '../widgets/exercise_widget.dart';
+import '../widgets/set_ui_state.dart';
 import 'home_screen.dart';
 
 class WorkoutScreen extends StatefulWidget {
@@ -29,7 +28,7 @@ class WorkoutScreen extends StatefulWidget {
 
 class _WorkoutScreenState extends State<WorkoutScreen> {
   WorkoutData? _data;
-  final Map<int, _SetUiState> _setStates = {};
+  final Map<int, SetUiState> _setStates = {};
   // keyed by completedExercise.id
   final Map<int, bool> _postExDone = {};
   final Map<int, SkipReason?> _exerciseSkipReasons = {};
@@ -38,16 +37,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   final Map<MuscleGroup, bool> _postMgDone = {};
   bool _loading = true;
 
-  // ── Rest timer ─────────────────────────────────────────────────────────────
-  RestTimerController? _timerController;
-  // Per-workout kill-switch: toggled via the timer widget's icon button.
+  // Per-workout timer kill-switch — toggled via the timer widget's icon button.
   bool _timerWorkoutOn = true;
-  // Track which exercise the controller was last configured for so we can
-  // detect transitions and update the duration.
-  int? _timerExerciseId;
-  // Track which set last triggered the timer so tapping multiple fields
-  // within the same set doesn't keep restarting the countdown.
-  int? _timerSetId;
 
   @override
   void initState() {
@@ -60,12 +51,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     for (final s in _setStates.values) {
       s.dispose();
     }
-    _timerController?.dispose();
     WakelockPlus.disable();
     super.dispose();
   }
 
-  // ── Timer helpers ──────────────────────────────────────────────────────────
+  // ── Active exercise ────────────────────────────────────────────────────────
 
   /// The first exercise that still has work to do (unchecked sets, or sets done
   /// but post-exercise check-in not yet answered). Returns null when the whole
@@ -91,8 +81,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   }
 
   /// Cue text spoken by TTS when the timer reaches zero.
-  /// Priority: distance → time → weight from the next uncompleted set's
-  /// planned values. Returns null when nothing meaningful is available.
   String? _cueText(ExerciseData exercise) {
     SetData? next;
     for (final s in exercise.sets) {
@@ -119,69 +107,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     return null;
   }
 
-  /// Call after any action that may change the active exercise or should
-  /// start the countdown (set checked, input tapped).
-  /// Called when an input field is tapped. Always starts/restarts the timer.
-  void _triggerTimer(int setId) {
-    if (!AppPreferences.getTimerEnabled() || !_timerWorkoutOn) return;
-
-    final activeId = _activeExerciseId;
-    if (activeId == null) return;
-
-    final activeEx =
-        _data!.exercises.firstWhere((e) => e.completed.id == activeId);
-    final dur = _effectiveDuration(activeEx.movement);
-    if (dur == 0) return;
-
-    if (_timerController == null) {
-      _timerController = RestTimerController(durationSeconds: dur);
-      _timerExerciseId = activeId;
-    } else if (_timerExerciseId != activeId) {
-      _timerController!.setDuration(dur);
-      _timerExerciseId = activeId;
-    } else if (_timerSetId == setId) {
-      // Same set tapped again — don't restart the countdown.
-      return;
-    }
-
-    _timerSetId = setId;
-    _timerController!.start();
-  }
-
-  /// Called after a set is checked or skipped. Only starts the timer when
-  /// the active exercise has advanced — i.e. we just crossed into a new
-  /// exercise. Within the same exercise the input-tap already started the
-  /// countdown and we don't want the checkbox to reset it.
-  void _triggerTimerOnExerciseAdvance() {
-    if (!AppPreferences.getTimerEnabled() || !_timerWorkoutOn) return;
-
-    final activeId = _activeExerciseId;
-    if (activeId == null || activeId == _timerExerciseId) return;
-
-    final activeEx =
-        _data!.exercises.firstWhere((e) => e.completed.id == activeId);
-    final dur = _effectiveDuration(activeEx.movement);
-    if (dur == 0) return;
-
-    if (_timerController == null) {
-      setState(() {
-        _timerController = RestTimerController(durationSeconds: dur);
-        _timerExerciseId = activeId;
-      });
-    } else {
-      _timerController!.setDuration(dur);
-      _timerExerciseId = activeId;
-    }
-
-    _timerSetId = null;
-    _timerController!.start();
-  }
-
   void _toggleWorkoutTimer() {
     setState(() => _timerWorkoutOn = !_timerWorkoutOn);
-    if (!_timerWorkoutOn) {
-      _timerController?.stop();
-    }
+    // ExerciseWidget's didUpdateWidget handles stopping its own controller.
   }
 
   void _applyWakeLock() {
@@ -195,12 +123,12 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   Future<void> _load() async {
     final data = await db.getWorkoutData(widget.completedWorkoutId);
 
-    final newSetStates = <int, _SetUiState>{};
+    final newSetStates = <int, SetUiState>{};
     for (final ex in data.exercises) {
       for (final s in ex.sets) {
         final cs = s.completed;
         final ps = s.planned;
-        newSetStates[cs.id] = _SetUiState(
+        newSetStates[cs.id] = SetUiState(
           reps: cs.reps?.toString() ?? ps?.reps?.toString() ?? '',
           weight: _fmt(cs.weight ?? ps?.weight),
           distance: _fmt(cs.distance ?? ps?.distance),
@@ -230,22 +158,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         _loading = false;
       });
       _applyWakeLock();
-      _initTimerIfNeeded();
     }
-  }
-
-  void _initTimerIfNeeded() {
-    if (_timerController != null) return;
-    final activeId = _activeExerciseId;
-    if (activeId == null) return;
-    final activeEx = _data!.exercises.firstWhere((e) => e.completed.id == activeId);
-    final dur = _effectiveDuration(activeEx.movement);
-    if (dur == 0) return;
-    if (!AppPreferences.getTimerEnabled() || !_timerWorkoutOn) return;
-    setState(() {
-      _timerController = RestTimerController(durationSeconds: dur);
-      _timerExerciseId = activeId;
-    });
   }
 
   String _fmt(double? v) {
@@ -287,7 +200,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   }
 
   Future<void> _onToggle(
-      int setId, Movement movement, bool checked, ExerciseData exercise) async {
+      SetData setData, bool checked, ExerciseData exercise) async {
+    final setId = setData.completed.id;
+    final movement = exercise.movement;
     if (checked) {
       final state = _setStates[setId]!;
       await db.saveCompletedSet(
@@ -329,9 +244,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           state.isChecked = false;
           state.isSkipped = false;
           if (wasSkipped) {
-            final setData =
-                exercise.sets.firstWhere((s) => s.completed.id == id);
-            final ps = setData.planned;
+            final sd = exercise.sets.firstWhere((s) => s.completed.id == id);
+            final ps = sd.planned;
             state.repsCtrl.text = ps?.reps?.toString() ?? '';
             state.weightCtrl.text = _fmt(ps?.weight);
             state.distanceCtrl.text = _fmt(ps?.distance);
@@ -361,10 +275,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         await _showPostExerciseSheet(exercise);
       }
     }
-
-    // Advance the timer to the next exercise if we just crossed into one.
-    // Input taps handle same-exercise restarts; the checkbox must not reset.
-    if (checked && mounted) _triggerTimerOnExerciseAdvance();
   }
 
   Future<void> _showPostExerciseSheet(ExerciseData exercise) async {
@@ -422,8 +332,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
     setState(() => _postExDone[exercise.completed.id] = true);
 
-    // If all exercises for this muscle group now have check-ins (or are
-    // skipped), and the MG itself isn't all-skipped, show MG sheet.
     final mg = exercise.movement.muscleGroup;
     final mgExercises =
         _data!.exercises.where((e) => e.movement.muscleGroup == mg).toList();
@@ -613,7 +521,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         await _showPostExerciseSheet(exercise);
       }
     }
-    if (mounted) _triggerTimerOnExerciseAdvance();
   }
 
   Future<void> _showExerciseSkipSheet(ExerciseData exercise) async {
@@ -658,7 +565,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
   Future<void> _skipExercise(ExerciseData exercise, SkipReason reason) async {
     await db.skipExercise(exercise.completed.id, reason);
-    _timerController?.reset();
     setState(() {
       _exerciseSkipReasons[exercise.completed.id] = reason;
       for (final s in exercise.sets) {
@@ -705,7 +611,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
   Future<void> _unskipExercise(ExerciseData exercise) async {
     await db.unskipExercise(exercise.completed.id);
-    _timerController?.reset();
     final mg = exercise.movement.muscleGroup;
     if (_postMgDone[mg] == true) {
       await db.clearPostMuscleGroupCheckin(widget.completedWorkoutId, mg);
@@ -738,7 +643,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
     if (!mounted) return;
 
-    // Group by meso, preserving newest-first encounter order.
     final mesoOrder = <int>[];
     final byMeso = <int, List<MovementHistoryEntry>>{};
     for (final entry in entries) {
@@ -882,9 +786,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     }
   }
 
-  /// True when the exercise at [index] is unblocked — i.e. the previous
-  /// exercise is either skipped or fully done (all sets + post-ex check-in +
-  /// MG check-in if prev is the last exercise for its muscle group).
+  /// True when the exercise at [index] is unblocked.
   bool _isPrevExDone(int index) {
     if (index == 0) return true;
     final exercises = _data!.exercises;
@@ -893,8 +795,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     final allSetsDone =
         prev.sets.every((s) => _setStates[s.completed.id]?.isChecked ?? false);
     if (!allSetsDone || _postExDone[prev.completed.id] != true) return false;
-    // If prev is the last exercise for its MG and not all MG exercises are
-    // skipped, the MG check-in must also be done.
     final mg = prev.movement.muscleGroup;
     final lastMgIndex =
         exercises.lastIndexWhere((e) => e.movement.muscleGroup == mg);
@@ -910,6 +810,30 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   String _mgLabel(MuscleGroup mg) {
     final name = mg.name;
     return name[0].toUpperCase() + name.substring(1);
+  }
+
+  void _propagateWeight(ExerciseData exercise, SetData setData, String value) {
+    final setIndex = exercise.sets
+        .indexWhere((s) => s.completed.id == setData.completed.id);
+    for (var i = setIndex + 1; i < exercise.sets.length; i++) {
+      final id = exercise.sets[i].completed.id;
+      final s = _setStates[id];
+      if (s != null && !s.isChecked && !s.isSkipped) {
+        s.weightCtrl.text = value;
+      }
+    }
+  }
+
+  void _propagateDistance(ExerciseData exercise, SetData setData, String value) {
+    final setIndex = exercise.sets
+        .indexWhere((s) => s.completed.id == setData.completed.id);
+    for (var i = setIndex + 1; i < exercise.sets.length; i++) {
+      final id = exercise.sets[i].completed.id;
+      final s = _setStates[id];
+      if (s != null && !s.isChecked && !s.isSkipped) {
+        s.distanceCtrl.text = value;
+      }
+    }
   }
 
   @override
@@ -933,6 +857,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
     final data = _data!;
     final lastExIndexForMg = _lastExIndexForMg();
+    final activeExId = _activeExerciseId;
 
     return Scaffold(
       appBar: AppBar(
@@ -953,7 +878,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               children: [
                 for (var i = 0; i < data.exercises.length; i++)
-                  _buildExercise(data.exercises[i], i, lastExIndexForMg),
+                  _buildExerciseWidget(
+                      data.exercises[i], i, lastExIndexForMg, activeExId),
               ],
             ),
           ),
@@ -975,9 +901,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     );
   }
 
-  Widget _buildExercise(
-      ExerciseData exercise, int index, Map<MuscleGroup, int> lastExIndexForMg) {
-    final isActive = exercise.completed.id == _activeExerciseId;
+  Widget _buildExerciseWidget(ExerciseData exercise, int index,
+      Map<MuscleGroup, int> lastExIndexForMg, int? activeExId) {
+    final isActive = exercise.completed.id == activeExId;
     final isExSkipped = _exerciseSkipReasons[exercise.completed.id] != null;
     final isExLocked = !_isPrevExDone(index);
     final allSetsDone = exercise.sets
@@ -1000,381 +926,38 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     final showPostMgReopen =
         isLastForMg && allMgExDone && _postMgDone[mg] != true;
 
-    final persistent = _isPersistent[exercise.completed.id] ?? true;
-
-    Widget headerTrailing;
-    if (isExSkipped) {
-      headerTrailing = Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextButton(
-            onPressed: () => _unskipExercise(exercise),
-            child: const Text('Unskip'),
-          ),
-          PopupMenuButton<_ExMenuAction>(
-            iconSize: 18,
-            padding: EdgeInsets.zero,
-            onSelected: (_) => _togglePersistence(exercise),
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: _ExMenuAction.togglePersistent,
-                child: Text(persistent ? "Don't carry forward" : 'Carry forward'),
-              ),
-            ],
-          ),
-        ],
-      );
-    } else {
-      headerTrailing = Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (showPostExReopen)
-            TextButton(
-              onPressed: () => _showPostExerciseSheet(exercise),
-              child: const Text('Rate joint pain'),
-            ),
-          PopupMenuButton<_ExMenuAction>(
-            iconSize: 18,
-            padding: EdgeInsets.zero,
-            onSelected: (action) {
-              if (action == _ExMenuAction.skipExercise) {
-                _showExerciseSkipSheet(exercise);
-              } else if (action == _ExMenuAction.addSet) {
-                _addSet(exercise);
-              } else {
-                _togglePersistence(exercise);
-              }
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: _ExMenuAction.skipExercise,
-                enabled: !anySetChecked && !isExLocked,
-                child: const Text('Skip Exercise'),
-              ),
-              PopupMenuItem(
-                value: _ExMenuAction.addSet,
-                child: const Text('Add Set'),
-              ),
-              const PopupMenuDivider(),
-              PopupMenuItem(
-                value: _ExMenuAction.togglePersistent,
-                child: Text(persistent ? "Don't carry forward" : 'Carry forward'),
-              ),
-            ],
-          ),
-        ],
-      );
-    }
-
-    final header = Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              exercise.movement.name,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-          ),
-          if (exercise.movement.link != null)
-            IconButton(
-              icon: const Icon(Icons.play_circle_outline, size: 20),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              onPressed: () => launchUrl(
-                Uri.parse(exercise.movement.link!),
-                mode: LaunchMode.externalApplication,
-              ),
-            ),
-          IconButton(
-            icon: const Icon(Icons.history, size: 20),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            onPressed: () => _showMovementHistorySheet(exercise),
-          ),
-          headerTrailing,
-        ],
-      ),
+    return ExerciseWidget(
+      key: ValueKey(exercise.completed.id),
+      exercise: exercise,
+      isActive: isActive,
+      isExSkipped: isExSkipped,
+      isExLocked: isExLocked,
+      allSetsDone: allSetsDone,
+      showPostExReopen: showPostExReopen,
+      anySetChecked: anySetChecked,
+      showPostMgReopen: showPostMgReopen,
+      mgLabel: _mgLabel(mg),
+      persistent: _isPersistent[exercise.completed.id] ?? true,
+      timerEnabled: AppPreferences.getTimerEnabled(),
+      workoutTimerOn: _timerWorkoutOn,
+      timerDurationSeconds: _effectiveDuration(exercise.movement),
+      cueText: _cueText(exercise),
+      setStates: _setStates,
+      onToggleWorkoutTimer: _toggleWorkoutTimer,
+      onShowPostExerciseSheet: () => _showPostExerciseSheet(exercise),
+      onShowPostMuscleGroupSheet: () => _showPostMuscleGroupSheet(mg),
+      onShowExerciseSkipSheet: () => _showExerciseSkipSheet(exercise),
+      onUnskipExercise: () => _unskipExercise(exercise),
+      onAddSet: () => _addSet(exercise),
+      onToggleSet: (setData, checked) => _onToggle(setData, checked, exercise),
+      onShowSetSkipSheet: (setData) => _showSkipReasonSheet(setData, exercise),
+      onDeleteSet: (setData) => _deleteSet(setData, exercise),
+      onTogglePersistence: () => _togglePersistence(exercise),
+      onShowMovementHistorySheet: () => _showMovementHistorySheet(exercise),
+      onWeightChanged: (setData, value) =>
+          _propagateWeight(exercise, setData, value),
+      onDistanceChanged: (setData, value) =>
+          _propagateDistance(exercise, setData, value),
     );
-
-    final setRows = [
-      for (var i = 0; i < exercise.sets.length; i++)
-        _buildSetRow(i + 1, exercise.sets[i], exercise.movement, exercise,
-            isExSkipped: isExSkipped,
-            isLocked: isExLocked ||
-                (i > 0 &&
-                    !(_setStates[exercise.sets[i - 1].completed.id]
-                            ?.isChecked ??
-                        false))),
-    ];
-
-    final showTimer = isActive &&
-        !isExSkipped &&
-        AppPreferences.getTimerEnabled() &&
-        _timerWorkoutOn &&
-        _timerController != null &&
-        _effectiveDuration(exercise.movement) > 0;
-
-    final column = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        header,
-        if (showTimer)
-          RestTimerWidget(
-            key: ValueKey('timer_${exercise.completed.id}'),
-            controller: _timerController!,
-            cueText: _cueText(exercise),
-            workoutTimerOn: _timerWorkoutOn,
-            onToggleWorkoutTimer: _toggleWorkoutTimer,
-          ),
-        if (exercise.movement.note1 != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              exercise.movement.note1!,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          ),
-        ...setRows,
-        if (showPostMgReopen)
-          Padding(
-            padding: const EdgeInsets.only(top: 4, bottom: 4),
-            child: TextButton.icon(
-              onPressed: () => _showPostMuscleGroupSheet(mg),
-              icon: const Icon(Icons.rate_review_outlined, size: 18),
-              label: Text('Rate ${_mgLabel(mg)}'),
-            ),
-          ),
-      ],
-    );
-
-    if (isExSkipped) {
-      return Card(
-        margin: const EdgeInsets.only(top: 8),
-        color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3),
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 8, 12),
-          child: column,
-        ),
-      );
-    }
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 8, 12),
-        child: column,
-      ),
-    );
-  }
-
-  Widget _buildSetRow(int setNum, SetData setData, Movement movement,
-      ExerciseData exercise, {bool isExSkipped = false, bool isLocked = false}) {
-    final state = _setStates[setData.completed.id]!;
-    final canCheck = state.canCheck(movement);
-
-    Color? rowColor;
-    if (state.isSkipped) {
-      rowColor = Theme.of(context).colorScheme.error.withValues(alpha: 0.12);
-    } else if (state.isChecked) {
-      rowColor =
-          Theme.of(context).colorScheme.primary.withValues(alpha: 0.08);
-    }
-
-    return Container(
-      decoration: rowColor != null
-          ? BoxDecoration(
-              color: rowColor,
-              borderRadius: BorderRadius.circular(8),
-            )
-          : null,
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 44,
-            child: Text(
-              'Set $setNum',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-          if (movement.isRequiredReps) ...[
-            const SizedBox(width: 8),
-            _inputField(state.repsCtrl, 'Reps',
-                isInt: true, enabled: !state.isChecked && !isLocked, onTap: () => _triggerTimer(setData.completed.id)),
-          ],
-          if (movement.isRequiredWeight) ...[
-            const SizedBox(width: 8),
-            _inputField(
-              state.weightCtrl,
-              AppPreferences.getUnitsMetric() ? 'kg' : 'lbs',
-              enabled: !state.isChecked && !isLocked,
-              onChanged: (v) => _propagateWeight(exercise, setData, v),
-              onTap: () => _triggerTimer(setData.completed.id),
-            ),
-          ],
-          if (movement.isRequiredDistance) ...[
-            const SizedBox(width: 8),
-            _inputField(
-              state.distanceCtrl,
-              AppPreferences.getUnitsMetric() ? 'km' : 'mi',
-              enabled: !state.isChecked && !isLocked,
-              onChanged: (v) => _propagateDistance(exercise, setData, v),
-              onTap: () => _triggerTimer(setData.completed.id),
-            ),
-          ],
-          if (movement.isRequiredTime) ...[
-            const SizedBox(width: 8),
-            _inputField(state.timeCtrl, 'Time',
-                enabled: !state.isChecked && !isLocked, onTap: () => _triggerTimer(setData.completed.id)),
-          ],
-          const SizedBox(width: 8),
-          Checkbox(
-            value: state.isChecked,
-            onChanged: isExSkipped || isLocked
-                ? null
-                : (canCheck || state.isChecked)
-                    ? (v) =>
-                        _onToggle(setData.completed.id, movement, v!, exercise)
-                    : null,
-          ),
-          PopupMenuButton<_SetMenuAction>(
-            iconSize: 18,
-            padding: EdgeInsets.zero,
-            onSelected: (action) {
-              if (action == _SetMenuAction.skip) {
-                _showSkipReasonSheet(setData, exercise);
-              } else if (action == _SetMenuAction.delete) {
-                _deleteSet(setData, exercise);
-              }
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: _SetMenuAction.skip,
-                enabled: !state.isChecked && !isExSkipped && !isLocked,
-                child: const Text('Skip'),
-              ),
-              if (setData.planned == null)
-                PopupMenuItem(
-                  value: _SetMenuAction.delete,
-                  enabled: !state.isChecked,
-                  child: const Text('Delete'),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _propagateWeight(ExerciseData exercise, SetData setData, String value) {
-    final setIndex = exercise.sets.indexWhere((s) => s.completed.id == setData.completed.id);
-    for (var i = setIndex + 1; i < exercise.sets.length; i++) {
-      final id = exercise.sets[i].completed.id;
-      final s = _setStates[id];
-      if (s != null && !s.isChecked && !s.isSkipped) {
-        s.weightCtrl.text = value;
-      }
-    }
-  }
-
-  void _propagateDistance(ExerciseData exercise, SetData setData, String value) {
-    final setIndex = exercise.sets.indexWhere((s) => s.completed.id == setData.completed.id);
-    for (var i = setIndex + 1; i < exercise.sets.length; i++) {
-      final id = exercise.sets[i].completed.id;
-      final s = _setStates[id];
-      if (s != null && !s.isChecked && !s.isSkipped) {
-        s.distanceCtrl.text = value;
-      }
-    }
-  }
-
-  Widget _inputField(
-    TextEditingController ctrl,
-    String label, {
-    bool isInt = false,
-    required bool enabled,
-    void Function(String)? onChanged,
-    VoidCallback? onTap,
-  }) {
-    return SizedBox(
-      width: 72,
-      child: TextField(
-        controller: ctrl,
-        enabled: enabled,
-        keyboardType: isInt
-            ? TextInputType.number
-            : const TextInputType.numberWithOptions(decimal: true),
-        textAlign: TextAlign.center,
-        decoration: InputDecoration(
-          labelText: label,
-          isDense: true,
-          border: const OutlineInputBorder(),
-        ),
-        onTap: onTap,
-        onChanged: (v) {
-          setState(() {});
-          onChanged?.call(v);
-        },
-      ),
-    );
-  }
-}
-
-enum _SetMenuAction { skip, delete }
-
-enum _ExMenuAction { skipExercise, addSet, togglePersistent }
-
-class _SetUiState {
-  _SetUiState({
-    required this.isChecked,
-    required this.isSkipped,
-    String reps = '',
-    String weight = '',
-    String distance = '',
-    String time = '',
-  })  : repsCtrl = TextEditingController(text: reps),
-        weightCtrl = TextEditingController(text: weight),
-        distanceCtrl = TextEditingController(text: distance),
-        timeCtrl = TextEditingController(text: time);
-
-  final TextEditingController repsCtrl;
-  final TextEditingController weightCtrl;
-  final TextEditingController distanceCtrl;
-  final TextEditingController timeCtrl;
-  bool isChecked;
-  bool isSkipped;
-
-  bool canCheck(Movement m) {
-    if (m.isRequiredReps) {
-      final v = int.tryParse(repsCtrl.text.trim());
-      if (v == null || v < 1) return false;
-    }
-    if (m.isRequiredWeight) {
-      final v = double.tryParse(weightCtrl.text.trim());
-      if (v == null || v <= 0) return false;
-    }
-    if (m.isRequiredDistance) {
-      final v = double.tryParse(distanceCtrl.text.trim());
-      if (v == null || v <= 0) return false;
-    }
-    if (m.isRequiredTime) {
-      final v = double.tryParse(timeCtrl.text.trim());
-      if (v == null || v <= 0) return false;
-    }
-    return true;
-  }
-
-  void dispose() {
-    repsCtrl.dispose();
-    weightCtrl.dispose();
-    distanceCtrl.dispose();
-    timeCtrl.dispose();
   }
 }
