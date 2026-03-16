@@ -22,7 +22,8 @@ Future<void> _completeWorkoutFull(AppDatabase db, int workoutId) async {
 
 void main() {
   // Each test creates its own in-memory DB seeded by _seedData() via onCreate.
-  // Seed data: movements + default template (Day1/rest/Day3/rest/rest), no mesocycle.
+  // Seed data: movements + default template (Monday/Tuesday/Wednesday/Thursday/Friday,
+  // all training days, no rest days), no mesocycle.
 
   test('1. Fresh meso: getOrCreateNextWorkout creates week 1 and returns Day 1',
       () async {
@@ -33,7 +34,7 @@ void main() {
     final next = await db.getOrCreateNextWorkout(mesoId);
 
     expect(next, isNotNull);
-    expect(next!.name, 'Day 1');
+    expect(next!.name, 'Monday');
     expect(next.isRestDay, false);
 
     // Week 1 should now exist.
@@ -75,10 +76,10 @@ void main() {
     expect(pwRows.length, 1);
 
     final peRows = await db.select(db.plannedExercises).get();
-    expect(peRows.length, 2); // Dumbbell Press + Cable Tri
+    expect(peRows.length, 5); // 5 exercises from Monday slot
 
     final psRows = await db.select(db.plannedSets).get();
-    expect(psRows.length, 4); // 2 sets × 2 exercises
+    expect(psRows.length, 10); // 2 sets × 5 exercises
 
     // Cold start: all reps/weight null.
     expect(psRows.every((s) => s.reps == null && s.weight == null), true);
@@ -96,7 +97,7 @@ void main() {
 
     final pwRows = await db.select(db.plannedWorkouts).get();
     expect(pwRows.length, 1); // still only one
-    expect((await db.select(db.plannedSets).get()).length, 4);
+    expect((await db.select(db.plannedSets).get()).length, 10);
   });
 
   test('5. initializeWorkout creates active completed_workout with correct exercises/sets',
@@ -119,10 +120,10 @@ void main() {
     final ceRows = await (db.select(db.completedExercises)
           ..where((e) => e.completedWorkoutId.equals(cwId)))
         .get();
-    expect(ceRows.length, 2); // Dumbbell Press + Cable Tri
+    expect(ceRows.length, 5); // 5 exercises from Monday slot
 
     final allSets = await db.select(db.completedSets).get();
-    expect(allSets.length, 4); // 2 sets × 2 exercises
+    expect(allSets.length, 10); // 2 sets × 5 exercises
     expect(allSets.every((s) => s.reps == null && s.weight == null), true);
 
     // app_state removed; currentCompletedWorkoutId now lives in AppPreferences.
@@ -150,29 +151,24 @@ void main() {
     expect(rows.first.sleepQuality, CurrentState.good);
   });
 
-  test('7. After completing Day 1, getOrCreateNextWorkout creates rest day and returns Day 3',
+  test('7. After completing Monday, getOrCreateNextWorkout returns Tuesday',
       () async {
     final db = _openDb();
     addTearDown(db.close);
 
     final mesoId = await _createMeso(db);
-    final day1 = await db.getOrCreateNextWorkout(mesoId);
-    await _completeWorkoutFull(db, day1!.id);
+    final monday = await db.getOrCreateNextWorkout(mesoId);
+    await _completeWorkoutFull(db, monday!.id);
 
     final next = await db.getOrCreateNextWorkout(mesoId);
     expect(next, isNotNull);
-    expect(next!.name, 'Day 3');
+    expect(next!.name, 'Tuesday');
     expect(next.isRestDay, false);
 
-    // Day 2 rest day row should now exist and be completed.
+    // Only 2 workout rows: Monday (completed) + Tuesday (ready).
     final workoutRows = await db.select(db.workouts).get();
-    final restDay = workoutRows.firstWhere((w) => w.isRestDay);
-    expect(restDay.name, 'Day 2');
-
-    final completedRows = await (db.select(db.completedWorkouts)
-          ..where((cw) => cw.workoutId.equals(restDay.id)))
-        .get();
-    expect(completedRows.length, 1);
+    expect(workoutRows.length, 2);
+    expect(workoutRows.every((w) => !w.isRestDay), true);
   });
 
   test('8. After completing all week 1 training, getOrCreateNextWorkout creates week 2',
@@ -182,19 +178,16 @@ void main() {
 
     final mesoId = await _createMeso(db);
 
-    // Complete Day 1.
-    final day1 = await db.getOrCreateNextWorkout(mesoId);
-    await _completeWorkoutFull(db, day1!.id);
+    // Complete all 5 training days in week 1 (Monday–Friday, no rest days).
+    for (var i = 0; i < 5; i++) {
+      final w = await db.getOrCreateNextWorkout(mesoId);
+      await _completeWorkoutFull(db, w!.id);
+    }
 
-    // Complete Day 3.
-    final day3 = await db.getOrCreateNextWorkout(mesoId);
-    expect(day3!.name, 'Day 3');
-    await _completeWorkoutFull(db, day3.id);
-
-    // Next call should create week 2.
+    // Next call should create week 2 starting from Monday.
     final week2day1 = await db.getOrCreateNextWorkout(mesoId);
     expect(week2day1, isNotNull);
-    expect(week2day1!.name, 'Day 1'); // same slot name from prior week template
+    expect(week2day1!.name, 'Monday');
 
     final weekRows = await (db.select(db.weeks)
           ..orderBy([(w) => OrderingTerm.asc(w.weekNumber)]))
@@ -211,17 +204,11 @@ void main() {
 
     final mesoId = await _createMeso(db, totalWeeks: 2);
 
-    // Complete week 1.
-    final w1d1 = await db.getOrCreateNextWorkout(mesoId);
-    await _completeWorkoutFull(db, w1d1!.id);
-    final w1d3 = await db.getOrCreateNextWorkout(mesoId);
-    await _completeWorkoutFull(db, w1d3!.id);
-
-    // Complete week 2.
-    final w2d1 = await db.getOrCreateNextWorkout(mesoId);
-    await _completeWorkoutFull(db, w2d1!.id);
-    final w2d3 = await db.getOrCreateNextWorkout(mesoId);
-    await _completeWorkoutFull(db, w2d3!.id);
+    // Complete all 5 days in week 1, then all 5 in week 2.
+    for (var i = 0; i < 10; i++) {
+      final w = await db.getOrCreateNextWorkout(mesoId);
+      await _completeWorkoutFull(db, w!.id);
+    }
 
     final done = await db.getOrCreateNextWorkout(mesoId);
     expect(done, isNull);
@@ -237,7 +224,7 @@ void main() {
     // Verify no mesocycle rows existed before.
     final workout = await db.getOrCreateNextWorkout(mesoId);
     expect(workout, isNotNull);
-    expect(workout!.name, 'Day 1');
+    expect(workout!.name, 'Monday');
 
     // Save check-in.
     await db.savePreWorkoutCheckin(PreWorkoutCheckinsCompanion.insert(
@@ -261,10 +248,10 @@ void main() {
     final exercises = await (db.select(db.completedExercises)
           ..where((e) => e.completedWorkoutId.equals(cwId)))
         .get();
-    expect(exercises.length, 2);
+    expect(exercises.length, 5); // 5 exercises from Monday slot
 
     final allSets = await db.select(db.completedSets).get();
-    expect(allSets.length, 4);
+    expect(allSets.length, 10); // 2 sets × 5 exercises
     expect(allSets.every((s) => s.reps == null && s.weight == null), true);
   });
 }

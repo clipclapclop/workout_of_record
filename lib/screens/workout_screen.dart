@@ -45,6 +45,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   // Track which exercise the controller was last configured for so we can
   // detect transitions and update the duration.
   int? _timerExerciseId;
+  // Track which set last triggered the timer so tapping multiple fields
+  // within the same set doesn't keep restarting the countdown.
+  int? _timerSetId;
 
   @override
   void initState() {
@@ -119,7 +122,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   /// Call after any action that may change the active exercise or should
   /// start the countdown (set checked, input tapped).
   /// Called when an input field is tapped. Always starts/restarts the timer.
-  void _triggerTimer() {
+  void _triggerTimer(int setId) {
     if (!AppPreferences.getTimerEnabled() || !_timerWorkoutOn) return;
 
     final activeId = _activeExerciseId;
@@ -136,8 +139,12 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     } else if (_timerExerciseId != activeId) {
       _timerController!.setDuration(dur);
       _timerExerciseId = activeId;
+    } else if (_timerSetId == setId) {
+      // Same set tapped again — don't restart the countdown.
+      return;
     }
 
+    _timerSetId = setId;
     _timerController!.start();
   }
 
@@ -166,6 +173,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       _timerExerciseId = activeId;
     }
 
+    _timerSetId = null;
     _timerController!.start();
   }
 
@@ -1199,7 +1207,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           if (movement.isRequiredReps) ...[
             const SizedBox(width: 8),
             _inputField(state.repsCtrl, 'Reps',
-                isInt: true, enabled: !state.isChecked && !isLocked, onTap: _triggerTimer),
+                isInt: true, enabled: !state.isChecked && !isLocked, onTap: () => _triggerTimer(setData.completed.id)),
           ],
           if (movement.isRequiredWeight) ...[
             const SizedBox(width: 8),
@@ -1208,7 +1216,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
               AppPreferences.getUnitsMetric() ? 'kg' : 'lbs',
               enabled: !state.isChecked && !isLocked,
               onChanged: (v) => _propagateWeight(exercise, setData, v),
-              onTap: _triggerTimer,
+              onTap: () => _triggerTimer(setData.completed.id),
             ),
           ],
           if (movement.isRequiredDistance) ...[
@@ -1218,13 +1226,13 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
               AppPreferences.getUnitsMetric() ? 'km' : 'mi',
               enabled: !state.isChecked && !isLocked,
               onChanged: (v) => _propagateDistance(exercise, setData, v),
-              onTap: _triggerTimer,
+              onTap: () => _triggerTimer(setData.completed.id),
             ),
           ],
           if (movement.isRequiredTime) ...[
             const SizedBox(width: 8),
             _inputField(state.timeCtrl, 'Time',
-                enabled: !state.isChecked && !isLocked, onTap: _triggerTimer),
+                enabled: !state.isChecked && !isLocked, onTap: () => _triggerTimer(setData.completed.id)),
           ],
           const SizedBox(width: 8),
           Checkbox(
