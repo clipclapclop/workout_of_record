@@ -77,6 +77,20 @@ class AppPreferences {
 
   // ── Backup ─────────────────────────────────────────────────────────────────
 
+  static bool getBackupEnabled() => _prefs.getBool(_kBackupEnabled) ?? false;
+  static Future<void> setBackupEnabled(bool v) => _prefs.setBool(_kBackupEnabled, v);
+
+  static bool getAutoBackupEnabled() => _prefs.getBool(_kAutoBackupEnabled) ?? false;
+  static Future<void> setAutoBackupEnabled(bool v) => _prefs.setBool(_kAutoBackupEnabled, v);
+
+  /// Hour (0–23) for scheduled backups. Defaults to 2 (2 AM).
+  static int getBackupHour() => _prefs.getInt(_kBackupHour) ?? 2;
+  static Future<void> setBackupHour(int v) => _prefs.setInt(_kBackupHour, v);
+
+  /// Minute (0–59) for scheduled backups. Defaults to 0.
+  static int getBackupMinute() => _prefs.getInt(_kBackupMinute) ?? 0;
+  static Future<void> setBackupMinute(int v) => _prefs.setInt(_kBackupMinute, v);
+
   static String? getBackupDirectoryPath() => _prefs.getString(_kBackupDirectoryPath);
   static Future<void> setBackupDirectoryPath(String? v) => v == null
       ? _prefs.remove(_kBackupDirectoryPath)
@@ -102,6 +116,10 @@ class AppPreferences {
   static const _kSettingsAiEnabled = 'settings_ai_enabled';
   static const _kSettingsUnitsMetric = 'settings_units_metric';
   static const _kSettingsApiKey = 'settings_api_key';
+  static const _kBackupEnabled = 'backup_enabled';
+  static const _kAutoBackupEnabled = 'auto_backup_enabled';
+  static const _kBackupHour = 'backup_hour';
+  static const _kBackupMinute = 'backup_minute';
   static const _kBackupDirectoryPath = 'backup_directory_path';
   static const _kLastBackupTimestamp = 'backup_last_timestamp';
 }

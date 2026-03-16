@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../app_preferences.dart';
+import '../services/backup_scheduler.dart';
 import '../services/backup_service.dart';
 import '../widgets/app_nav_menu.dart';
 import 'home_screen.dart';
@@ -22,6 +23,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _apiKeyLoading = true;
   bool _obscureApiKey = true;
 
+  bool _backupEnabled = false;
+  bool _autoBackupEnabled = false;
+  int _backupHour = 2;
+  int _backupMinute = 0;
   String? _backupDirPath;
   DateTime? _lastBackupTimestamp;
   bool _isBusy = false;
@@ -31,6 +36,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _aiEnabled = AppPreferences.getAiEnabled();
     _unitsMetric = AppPreferences.getUnitsMetric();
+    _backupEnabled = AppPreferences.getBackupEnabled();
+    _autoBackupEnabled = AppPreferences.getAutoBackupEnabled();
+    _backupHour = AppPreferences.getBackupHour();
+    _backupMinute = AppPreferences.getBackupMinute();
     _backupDirPath = AppPreferences.getBackupDirectoryPath();
     _lastBackupTimestamp = AppPreferences.getLastBackupTimestamp();
     _loadApiKey();
@@ -238,54 +247,120 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 32),
 
           // ── Backup ────────────────────────────────────────────────────────
-          Text('Backup', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _backupDirPath ?? 'No backup location set',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                  overflow: TextOverflow.ellipsis,
+          SwitchListTile(
+            title: const Text('Enable Backups'),
+            value: _backupEnabled,
+            contentPadding: EdgeInsets.zero,
+            onChanged: _isBusy
+                ? null
+                : (v) async {
+                    setState(() => _backupEnabled = v);
+                    await AppPreferences.setBackupEnabled(v);
+                    // Cancel auto-backup when backups are fully disabled
+                    if (!v && _autoBackupEnabled) {
+                      await BackupScheduler.cancel();
+                    }
+                  },
+          ),
+          if (_backupEnabled) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _backupDirPath ?? 'No backup location set',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-              TextButton(
-                onPressed: _isBusy ? null : _pickBackupLocation,
-                child: const Text('Change'),
+                TextButton(
+                  onPressed: _isBusy ? null : _pickBackupLocation,
+                  child: const Text('Export Folder'),
+                ),
+              ],
+            ),
+            if (_lastBackupTimestamp != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                'Last backup: ${_formatTimestamp(_lastBackupTimestamp!)}',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
-          ),
-          if (_lastBackupTimestamp != null) ...[
-            const SizedBox(height: 2),
-            Text(
-              'Last backup: ${_formatTimestamp(_lastBackupTimestamp!)}',
-              style: Theme.of(context).textTheme.bodySmall,
+            const SizedBox(height: 4),
+            SwitchListTile(
+              title: const Text('Automatic Backups'),
+              subtitle: const Text('Run a backup daily at the scheduled time.'),
+              value: _autoBackupEnabled,
+              contentPadding: EdgeInsets.zero,
+              onChanged: _isBusy
+                  ? null
+                  : (v) async {
+                      setState(() => _autoBackupEnabled = v);
+                      await AppPreferences.setAutoBackupEnabled(v);
+                      if (v) {
+                        await BackupScheduler.schedule(_backupHour, _backupMinute);
+                      } else {
+                        await BackupScheduler.cancel();
+                      }
+                    },
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Backup time: ${_backupHour.toString().padLeft(2, '0')}:${_backupMinute.toString().padLeft(2, '0')}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+                TextButton(
+                  onPressed: _isBusy
+                      ? null
+                      : () async {
+                          final picked = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay(
+                                hour: _backupHour, minute: _backupMinute),
+                          );
+                          if (picked == null || !mounted) return;
+                          setState(() {
+                            _backupHour = picked.hour;
+                            _backupMinute = picked.minute;
+                          });
+                          await AppPreferences.setBackupHour(picked.hour);
+                          await AppPreferences.setBackupMinute(picked.minute);
+                          if (_autoBackupEnabled) {
+                            await BackupScheduler.schedule(picked.hour, picked.minute);
+                          }
+                        },
+                  child: const Text('Change time'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: (_backupDirPath == null || _isBusy) ? null : _backupNow,
+                    child: _isBusy
+                        ? const SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Back Up Now'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _isBusy ? null : _restoreFromBackup,
+                    child: const Text('Restore'),
+                  ),
+                ),
+              ],
             ),
           ],
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: (_backupDirPath == null || _isBusy) ? null : _backupNow,
-                  child: _isBusy
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Back Up Now'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _isBusy ? null : _restoreFromBackup,
-                  child: const Text('Restore'),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );

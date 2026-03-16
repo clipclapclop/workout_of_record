@@ -3,6 +3,7 @@ import 'package:workmanager/workmanager.dart';
 
 import 'app_preferences.dart';
 import 'screens/home_screen.dart';
+import 'services/backup_scheduler.dart';
 import 'services/backup_service.dart';
 import 'theme.dart';
 
@@ -24,12 +25,12 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppPreferences.init();
   await Workmanager().initialize(callbackDispatcher);
-  await Workmanager().registerPeriodicTask(
-    'nightly-backup',
-    'backupTask',
-    frequency: const Duration(hours: 24),
-    existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
-  );
+  if (AppPreferences.getBackupEnabled() && AppPreferences.getAutoBackupEnabled()) {
+    await BackupScheduler.schedule(
+      AppPreferences.getBackupHour(),
+      AppPreferences.getBackupMinute(),
+    );
+  }
   runApp(const MyApp());
 }
 
