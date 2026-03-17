@@ -48,3 +48,4 @@ enum MovementCategory { resistance, cardio }
 
 enum TimerSound { tts, chime, silent }
 
+enum Persistence { persistent, replaced, singleUse }

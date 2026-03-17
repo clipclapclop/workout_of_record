@@ -46,7 +46,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.withExecutor(super.e);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -63,6 +63,41 @@ class AppDatabase extends _$AppDatabase {
                   "ALTER TABLE post_muscle_group_checkins "
                   "ADD COLUMN pump_level TEXT NOT NULL DEFAULT 'none'",
                 );
+              case 9:
+                // 9 → 10: Replace isPersistent bool with Persistence intEnum;
+                // remove unique constraint on (completedWorkoutId, orderIndex).
+                // SQLite requires full table recreation to drop a constraint
+                // and rename a column. FK checks are disabled for the swap so
+                // that child tables (completed_sets, post_exercise_checkins,
+                // etc.) don't block the DROP.
+                await customStatement('PRAGMA foreign_keys = OFF');
+                await customStatement('''
+                  CREATE TABLE completed_exercises_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    completed_workout_id INTEGER NOT NULL
+                      REFERENCES completed_workouts(id),
+                    movement_id INTEGER NOT NULL
+                      REFERENCES movements(id),
+                    order_index INTEGER NOT NULL,
+                    persistence INTEGER NOT NULL DEFAULT 0,
+                    skip_reason TEXT
+                  )
+                ''');
+                await customStatement('''
+                  INSERT INTO completed_exercises_new
+                    (id, completed_workout_id, movement_id, order_index,
+                     persistence, skip_reason)
+                  SELECT id, completed_workout_id, movement_id, order_index,
+                    CASE WHEN is_persistent = 1 THEN 0 ELSE 2 END,
+                    skip_reason
+                  FROM completed_exercises
+                ''');
+                await customStatement('DROP TABLE completed_exercises');
+                await customStatement(
+                  'ALTER TABLE completed_exercises_new '
+                  'RENAME TO completed_exercises',
+                );
+                await customStatement('PRAGMA foreign_keys = ON');
             }
           }
         },
@@ -275,7 +310,7 @@ class AppDatabase extends _$AppDatabase {
     final priorExercises = await (select(completedExercises)
           ..where((ce) =>
               ce.completedWorkoutId.equals(priorCompleted.id) &
-              ce.isPersistent.equals(true))
+              ce.persistence.equals(Persistence.persistent.index))
           ..orderBy([(ce) => OrderingTerm.asc(ce.orderIndex)]))
         .get();
 
@@ -416,7 +451,9 @@ class AppDatabase extends _$AppDatabase {
         .getSingleOrNull();
 
     final completedExs = await (select(completedExercises)
-          ..where((e) => e.completedWorkoutId.equals(completedWorkoutId))
+          ..where((e) =>
+              e.completedWorkoutId.equals(completedWorkoutId) &
+              e.persistence.equals(Persistence.replaced.index).not())
           ..orderBy([(e) => OrderingTerm.asc(e.orderIndex)]))
         .get();
 
@@ -767,11 +804,34 @@ class AppDatabase extends _$AppDatabase {
     ));
   }
 
-  Future<void> setExercisePersistence(
-          int completedExerciseId, bool isPersistent) =>
+  Future<void> setPersistence(
+          int completedExerciseId, Persistence persistence) =>
       (update(completedExercises)
             ..where((e) => e.id.equals(completedExerciseId)))
-          .write(CompletedExercisesCompanion(isPersistent: Value(isPersistent)));
+          .write(CompletedExercisesCompanion(persistence: Value(persistence)));
+
+  Future<void> replaceExercise(
+    int oldExId,
+    int movementId,
+    int orderIndex,
+    int completedWorkoutId,
+  ) =>
+      transaction(() async {
+        await (update(completedExercises)
+              ..where((e) => e.id.equals(oldExId)))
+            .write(CompletedExercisesCompanion(
+                persistence: const Value(Persistence.replaced)));
+        final newExId = await into(completedExercises).insert(
+          CompletedExercisesCompanion.insert(
+            completedWorkoutId: completedWorkoutId,
+            movementId: movementId,
+            orderIndex: orderIndex,
+          ),
+        );
+        await into(completedSets).insert(
+          CompletedSetsCompanion.insert(completedExerciseId: newExId),
+        );
+      });
 
   /// Returns all non-rest-day completed workouts (excludes active/in-progress), newest first.
   Future<List<CompletedWorkoutSummary>> getCompletedWorkoutSummaries() async {

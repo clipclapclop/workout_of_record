@@ -4251,21 +4251,18 @@ class $CompletedExercisesTable extends CompletedExercises
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _isPersistentMeta = const VerificationMeta(
-    'isPersistent',
-  );
   @override
-  late final GeneratedColumn<bool> isPersistent = GeneratedColumn<bool>(
-    'is_persistent',
-    aliasedName,
-    false,
-    type: DriftSqlType.bool,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("is_persistent" IN (0, 1))',
-    ),
-    defaultValue: const Constant(true),
-  );
+  late final GeneratedColumnWithTypeConverter<Persistence, int> persistence =
+      GeneratedColumn<int>(
+        'persistence',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(0),
+      ).withConverter<Persistence>(
+        $CompletedExercisesTable.$converterpersistence,
+      );
   @override
   late final GeneratedColumnWithTypeConverter<SkipReason?, String> skipReason =
       GeneratedColumn<String>(
@@ -4283,7 +4280,7 @@ class $CompletedExercisesTable extends CompletedExercises
     completedWorkoutId,
     movementId,
     orderIndex,
-    isPersistent,
+    persistence,
     skipReason,
   ];
   @override
@@ -4328,24 +4325,11 @@ class $CompletedExercisesTable extends CompletedExercises
     } else if (isInserting) {
       context.missing(_orderIndexMeta);
     }
-    if (data.containsKey('is_persistent')) {
-      context.handle(
-        _isPersistentMeta,
-        isPersistent.isAcceptableOrUnknown(
-          data['is_persistent']!,
-          _isPersistentMeta,
-        ),
-      );
-    }
     return context;
   }
 
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  List<Set<GeneratedColumn>> get uniqueKeys => [
-    {completedWorkoutId, orderIndex},
-  ];
   @override
   CompletedExercise map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
@@ -4366,10 +4350,12 @@ class $CompletedExercisesTable extends CompletedExercises
         DriftSqlType.int,
         data['${effectivePrefix}order_index'],
       )!,
-      isPersistent: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}is_persistent'],
-      )!,
+      persistence: $CompletedExercisesTable.$converterpersistence.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}persistence'],
+        )!,
+      ),
       skipReason: $CompletedExercisesTable.$converterskipReasonn.fromSql(
         attachedDatabase.typeMapping.read(
           DriftSqlType.string,
@@ -4384,6 +4370,8 @@ class $CompletedExercisesTable extends CompletedExercises
     return $CompletedExercisesTable(attachedDatabase, alias);
   }
 
+  static JsonTypeConverter2<Persistence, int, int> $converterpersistence =
+      const EnumIndexConverter<Persistence>(Persistence.values);
   static JsonTypeConverter2<SkipReason, String, String> $converterskipReason =
       const EnumNameConverter<SkipReason>(SkipReason.values);
   static JsonTypeConverter2<SkipReason?, String?, String?>
@@ -4396,14 +4384,14 @@ class CompletedExercise extends DataClass
   final int completedWorkoutId;
   final int movementId;
   final int orderIndex;
-  final bool isPersistent;
+  final Persistence persistence;
   final SkipReason? skipReason;
   const CompletedExercise({
     required this.id,
     required this.completedWorkoutId,
     required this.movementId,
     required this.orderIndex,
-    required this.isPersistent,
+    required this.persistence,
     this.skipReason,
   });
   @override
@@ -4413,7 +4401,11 @@ class CompletedExercise extends DataClass
     map['completed_workout_id'] = Variable<int>(completedWorkoutId);
     map['movement_id'] = Variable<int>(movementId);
     map['order_index'] = Variable<int>(orderIndex);
-    map['is_persistent'] = Variable<bool>(isPersistent);
+    {
+      map['persistence'] = Variable<int>(
+        $CompletedExercisesTable.$converterpersistence.toSql(persistence),
+      );
+    }
     if (!nullToAbsent || skipReason != null) {
       map['skip_reason'] = Variable<String>(
         $CompletedExercisesTable.$converterskipReasonn.toSql(skipReason),
@@ -4428,7 +4420,7 @@ class CompletedExercise extends DataClass
       completedWorkoutId: Value(completedWorkoutId),
       movementId: Value(movementId),
       orderIndex: Value(orderIndex),
-      isPersistent: Value(isPersistent),
+      persistence: Value(persistence),
       skipReason: skipReason == null && nullToAbsent
           ? const Value.absent()
           : Value(skipReason),
@@ -4445,7 +4437,9 @@ class CompletedExercise extends DataClass
       completedWorkoutId: serializer.fromJson<int>(json['completedWorkoutId']),
       movementId: serializer.fromJson<int>(json['movementId']),
       orderIndex: serializer.fromJson<int>(json['orderIndex']),
-      isPersistent: serializer.fromJson<bool>(json['isPersistent']),
+      persistence: $CompletedExercisesTable.$converterpersistence.fromJson(
+        serializer.fromJson<int>(json['persistence']),
+      ),
       skipReason: $CompletedExercisesTable.$converterskipReasonn.fromJson(
         serializer.fromJson<String?>(json['skipReason']),
       ),
@@ -4459,7 +4453,9 @@ class CompletedExercise extends DataClass
       'completedWorkoutId': serializer.toJson<int>(completedWorkoutId),
       'movementId': serializer.toJson<int>(movementId),
       'orderIndex': serializer.toJson<int>(orderIndex),
-      'isPersistent': serializer.toJson<bool>(isPersistent),
+      'persistence': serializer.toJson<int>(
+        $CompletedExercisesTable.$converterpersistence.toJson(persistence),
+      ),
       'skipReason': serializer.toJson<String?>(
         $CompletedExercisesTable.$converterskipReasonn.toJson(skipReason),
       ),
@@ -4471,14 +4467,14 @@ class CompletedExercise extends DataClass
     int? completedWorkoutId,
     int? movementId,
     int? orderIndex,
-    bool? isPersistent,
+    Persistence? persistence,
     Value<SkipReason?> skipReason = const Value.absent(),
   }) => CompletedExercise(
     id: id ?? this.id,
     completedWorkoutId: completedWorkoutId ?? this.completedWorkoutId,
     movementId: movementId ?? this.movementId,
     orderIndex: orderIndex ?? this.orderIndex,
-    isPersistent: isPersistent ?? this.isPersistent,
+    persistence: persistence ?? this.persistence,
     skipReason: skipReason.present ? skipReason.value : this.skipReason,
   );
   CompletedExercise copyWithCompanion(CompletedExercisesCompanion data) {
@@ -4493,9 +4489,9 @@ class CompletedExercise extends DataClass
       orderIndex: data.orderIndex.present
           ? data.orderIndex.value
           : this.orderIndex,
-      isPersistent: data.isPersistent.present
-          ? data.isPersistent.value
-          : this.isPersistent,
+      persistence: data.persistence.present
+          ? data.persistence.value
+          : this.persistence,
       skipReason: data.skipReason.present
           ? data.skipReason.value
           : this.skipReason,
@@ -4509,7 +4505,7 @@ class CompletedExercise extends DataClass
           ..write('completedWorkoutId: $completedWorkoutId, ')
           ..write('movementId: $movementId, ')
           ..write('orderIndex: $orderIndex, ')
-          ..write('isPersistent: $isPersistent, ')
+          ..write('persistence: $persistence, ')
           ..write('skipReason: $skipReason')
           ..write(')'))
         .toString();
@@ -4521,7 +4517,7 @@ class CompletedExercise extends DataClass
     completedWorkoutId,
     movementId,
     orderIndex,
-    isPersistent,
+    persistence,
     skipReason,
   );
   @override
@@ -4532,7 +4528,7 @@ class CompletedExercise extends DataClass
           other.completedWorkoutId == this.completedWorkoutId &&
           other.movementId == this.movementId &&
           other.orderIndex == this.orderIndex &&
-          other.isPersistent == this.isPersistent &&
+          other.persistence == this.persistence &&
           other.skipReason == this.skipReason);
 }
 
@@ -4541,14 +4537,14 @@ class CompletedExercisesCompanion extends UpdateCompanion<CompletedExercise> {
   final Value<int> completedWorkoutId;
   final Value<int> movementId;
   final Value<int> orderIndex;
-  final Value<bool> isPersistent;
+  final Value<Persistence> persistence;
   final Value<SkipReason?> skipReason;
   const CompletedExercisesCompanion({
     this.id = const Value.absent(),
     this.completedWorkoutId = const Value.absent(),
     this.movementId = const Value.absent(),
     this.orderIndex = const Value.absent(),
-    this.isPersistent = const Value.absent(),
+    this.persistence = const Value.absent(),
     this.skipReason = const Value.absent(),
   });
   CompletedExercisesCompanion.insert({
@@ -4556,7 +4552,7 @@ class CompletedExercisesCompanion extends UpdateCompanion<CompletedExercise> {
     required int completedWorkoutId,
     required int movementId,
     required int orderIndex,
-    this.isPersistent = const Value.absent(),
+    this.persistence = const Value.absent(),
     this.skipReason = const Value.absent(),
   }) : completedWorkoutId = Value(completedWorkoutId),
        movementId = Value(movementId),
@@ -4566,7 +4562,7 @@ class CompletedExercisesCompanion extends UpdateCompanion<CompletedExercise> {
     Expression<int>? completedWorkoutId,
     Expression<int>? movementId,
     Expression<int>? orderIndex,
-    Expression<bool>? isPersistent,
+    Expression<int>? persistence,
     Expression<String>? skipReason,
   }) {
     return RawValuesInsertable({
@@ -4575,7 +4571,7 @@ class CompletedExercisesCompanion extends UpdateCompanion<CompletedExercise> {
         'completed_workout_id': completedWorkoutId,
       if (movementId != null) 'movement_id': movementId,
       if (orderIndex != null) 'order_index': orderIndex,
-      if (isPersistent != null) 'is_persistent': isPersistent,
+      if (persistence != null) 'persistence': persistence,
       if (skipReason != null) 'skip_reason': skipReason,
     });
   }
@@ -4585,7 +4581,7 @@ class CompletedExercisesCompanion extends UpdateCompanion<CompletedExercise> {
     Value<int>? completedWorkoutId,
     Value<int>? movementId,
     Value<int>? orderIndex,
-    Value<bool>? isPersistent,
+    Value<Persistence>? persistence,
     Value<SkipReason?>? skipReason,
   }) {
     return CompletedExercisesCompanion(
@@ -4593,7 +4589,7 @@ class CompletedExercisesCompanion extends UpdateCompanion<CompletedExercise> {
       completedWorkoutId: completedWorkoutId ?? this.completedWorkoutId,
       movementId: movementId ?? this.movementId,
       orderIndex: orderIndex ?? this.orderIndex,
-      isPersistent: isPersistent ?? this.isPersistent,
+      persistence: persistence ?? this.persistence,
       skipReason: skipReason ?? this.skipReason,
     );
   }
@@ -4613,8 +4609,10 @@ class CompletedExercisesCompanion extends UpdateCompanion<CompletedExercise> {
     if (orderIndex.present) {
       map['order_index'] = Variable<int>(orderIndex.value);
     }
-    if (isPersistent.present) {
-      map['is_persistent'] = Variable<bool>(isPersistent.value);
+    if (persistence.present) {
+      map['persistence'] = Variable<int>(
+        $CompletedExercisesTable.$converterpersistence.toSql(persistence.value),
+      );
     }
     if (skipReason.present) {
       map['skip_reason'] = Variable<String>(
@@ -4631,7 +4629,7 @@ class CompletedExercisesCompanion extends UpdateCompanion<CompletedExercise> {
           ..write('completedWorkoutId: $completedWorkoutId, ')
           ..write('movementId: $movementId, ')
           ..write('orderIndex: $orderIndex, ')
-          ..write('isPersistent: $isPersistent, ')
+          ..write('persistence: $persistence, ')
           ..write('skipReason: $skipReason')
           ..write(')'))
         .toString();
@@ -12540,7 +12538,7 @@ typedef $$CompletedExercisesTableCreateCompanionBuilder =
       required int completedWorkoutId,
       required int movementId,
       required int orderIndex,
-      Value<bool> isPersistent,
+      Value<Persistence> persistence,
       Value<SkipReason?> skipReason,
     });
 typedef $$CompletedExercisesTableUpdateCompanionBuilder =
@@ -12549,7 +12547,7 @@ typedef $$CompletedExercisesTableUpdateCompanionBuilder =
       Value<int> completedWorkoutId,
       Value<int> movementId,
       Value<int> orderIndex,
-      Value<bool> isPersistent,
+      Value<Persistence> persistence,
       Value<SkipReason?> skipReason,
     });
 
@@ -12679,9 +12677,10 @@ class $$CompletedExercisesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<bool> get isPersistent => $composableBuilder(
-    column: $table.isPersistent,
-    builder: (column) => ColumnFilters(column),
+  ColumnWithTypeConverterFilters<Persistence, Persistence, int>
+  get persistence => $composableBuilder(
+    column: $table.persistence,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
   ColumnWithTypeConverterFilters<SkipReason?, SkipReason, String>
@@ -12806,8 +12805,8 @@ class $$CompletedExercisesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<bool> get isPersistent => $composableBuilder(
-    column: $table.isPersistent,
+  ColumnOrderings<int> get persistence => $composableBuilder(
+    column: $table.persistence,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -12880,10 +12879,11 @@ class $$CompletedExercisesTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<bool> get isPersistent => $composableBuilder(
-    column: $table.isPersistent,
-    builder: (column) => column,
-  );
+  GeneratedColumnWithTypeConverter<Persistence, int> get persistence =>
+      $composableBuilder(
+        column: $table.persistence,
+        builder: (column) => column,
+      );
 
   GeneratedColumnWithTypeConverter<SkipReason?, String> get skipReason =>
       $composableBuilder(
@@ -13032,14 +13032,14 @@ class $$CompletedExercisesTableTableManager
                 Value<int> completedWorkoutId = const Value.absent(),
                 Value<int> movementId = const Value.absent(),
                 Value<int> orderIndex = const Value.absent(),
-                Value<bool> isPersistent = const Value.absent(),
+                Value<Persistence> persistence = const Value.absent(),
                 Value<SkipReason?> skipReason = const Value.absent(),
               }) => CompletedExercisesCompanion(
                 id: id,
                 completedWorkoutId: completedWorkoutId,
                 movementId: movementId,
                 orderIndex: orderIndex,
-                isPersistent: isPersistent,
+                persistence: persistence,
                 skipReason: skipReason,
               ),
           createCompanionCallback:
@@ -13048,14 +13048,14 @@ class $$CompletedExercisesTableTableManager
                 required int completedWorkoutId,
                 required int movementId,
                 required int orderIndex,
-                Value<bool> isPersistent = const Value.absent(),
+                Value<Persistence> persistence = const Value.absent(),
                 Value<SkipReason?> skipReason = const Value.absent(),
               }) => CompletedExercisesCompanion.insert(
                 id: id,
                 completedWorkoutId: completedWorkoutId,
                 movementId: movementId,
                 orderIndex: orderIndex,
-                isPersistent: isPersistent,
+                persistence: persistence,
                 skipReason: skipReason,
               ),
           withReferenceMapper: (p0) => p0

@@ -9,6 +9,7 @@ import '../db/tables/enums.dart';
 import '../db/workout_data.dart';
 import '../widgets/app_nav_menu.dart';
 import '../widgets/exercise_widget.dart';
+import '../widgets/movement_picker_sheet.dart';
 import '../widgets/set_ui_state.dart';
 import 'home_screen.dart';
 
@@ -32,7 +33,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   // keyed by completedExercise.id
   final Map<int, bool> _postExDone = {};
   final Map<int, SkipReason?> _exerciseSkipReasons = {};
-  final Map<int, bool> _isPersistent = {};
+  final Map<int, Persistence> _persistence = {};
   // keyed by MuscleGroup
   final Map<MuscleGroup, bool> _postMgDone = {};
   bool _loading = true;
@@ -141,8 +142,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           ex.completed.id, () => ex.postExerciseCheckin != null);
       _exerciseSkipReasons.putIfAbsent(
           ex.completed.id, () => ex.completed.skipReason);
-      _isPersistent.putIfAbsent(
-          ex.completed.id, () => ex.completed.isPersistent);
+      _persistence.putIfAbsent(
+          ex.completed.id, () => ex.completed.persistence);
       _postMgDone.putIfAbsent(ex.movement.muscleGroup, () => false);
     }
     for (final mgCheckin in data.postMuscleGroupCheckins) {
@@ -657,9 +658,38 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   }
 
   Future<void> _togglePersistence(ExerciseData exercise) async {
-    final next = !(_isPersistent[exercise.completed.id] ?? true);
-    await db.setExercisePersistence(exercise.completed.id, next);
-    setState(() => _isPersistent[exercise.completed.id] = next);
+    final current =
+        _persistence[exercise.completed.id] ?? Persistence.persistent;
+    final next = current == Persistence.persistent
+        ? Persistence.singleUse
+        : Persistence.persistent;
+    await db.setPersistence(exercise.completed.id, next);
+    setState(() => _persistence[exercise.completed.id] = next);
+  }
+
+  Future<void> _replaceExercise(ExerciseData exercise) async {
+    final movs = await db.getMovements();
+    if (!mounted) return;
+    await showMovementPickerSheet(
+      context: context,
+      allMovements: movs,
+      alreadyAdded: {
+        for (final ex in _data!.exercises)
+          if (ex.completed.id != exercise.completed.id) ex.completed.movementId,
+      },
+      onAdd: (m) {
+        db
+            .replaceExercise(
+          exercise.completed.id,
+          m.id,
+          exercise.completed.orderIndex,
+          widget.completedWorkoutId,
+        )
+            .then((_) {
+          if (mounted) _load();
+        });
+      },
+    );
   }
 
   Future<void> _showMovementHistorySheet(ExerciseData exercise) async {
@@ -961,7 +991,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       anySetChecked: anySetChecked,
       showPostMgReopen: showPostMgReopen,
       mgLabel: _mgLabel(mg),
-      persistent: _isPersistent[exercise.completed.id] ?? true,
+      persistence: _persistence[exercise.completed.id] ?? Persistence.persistent,
       timerEnabled: AppPreferences.getTimerEnabled(),
       workoutTimerOn: _timerWorkoutOn,
       timerDurationSeconds: _effectiveDuration(exercise.movement),
@@ -977,6 +1007,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       onShowSetSkipSheet: (setData) => _showSkipReasonSheet(setData, exercise),
       onDeleteSet: (setData) => _deleteSet(setData, exercise),
       onTogglePersistence: () => _togglePersistence(exercise),
+      onReplace: () => _replaceExercise(exercise),
       onShowMovementHistorySheet: () => _showMovementHistorySheet(exercise),
       onWeightChanged: (setData, value) =>
           _propagateWeight(exercise, setData, value),

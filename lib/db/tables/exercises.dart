@@ -17,12 +17,7 @@ class CompletedExercises extends Table {
       integer().references(CompletedWorkouts, #id)();
   IntColumn get movementId => integer().references(Movements, #id)();
   IntColumn get orderIndex => integer()();
-  BoolColumn get isPersistent =>
-      boolean().withDefault(const Constant(true))();
+  IntColumn get persistence =>
+      intEnum<Persistence>().withDefault(const Constant(0))();
   TextColumn get skipReason => textEnum<SkipReason>().nullable()();
-
-  @override
-  List<Set<Column>> get uniqueKeys => [
-        {completedWorkoutId, orderIndex},
-      ];
 }

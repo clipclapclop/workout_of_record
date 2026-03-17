@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../db/tables/enums.dart';
 import '../db/workout_data.dart';
 import 'rest_timer_controller.dart';
 import 'rest_timer_widget.dart';
 import 'set_ui_state.dart';
 import 'set_widget.dart';
 
-enum _ExMenuAction { skipExercise, addSet, togglePersistent }
+enum _ExMenuAction { skipExercise, addSet, replace, togglePersistent }
 
 /// A card for a single exercise within a workout.
 ///
@@ -29,7 +30,7 @@ class ExerciseWidget extends StatefulWidget {
     required this.anySetChecked,
     required this.showPostMgReopen,
     required this.mgLabel,
-    required this.persistent,
+    required this.persistence,
     required this.timerEnabled,
     required this.workoutTimerOn,
     required this.timerDurationSeconds,
@@ -45,6 +46,7 @@ class ExerciseWidget extends StatefulWidget {
     required this.onShowSetSkipSheet,
     required this.onDeleteSet,
     required this.onTogglePersistence,
+    required this.onReplace,
     required this.onShowMovementHistorySheet,
     required this.onWeightChanged,
     required this.onDistanceChanged,
@@ -59,7 +61,7 @@ class ExerciseWidget extends StatefulWidget {
   final bool anySetChecked;
   final bool showPostMgReopen;
   final String mgLabel;
-  final bool persistent;
+  final Persistence persistence;
   final bool timerEnabled;
   final bool workoutTimerOn;
   final int timerDurationSeconds;
@@ -76,6 +78,7 @@ class ExerciseWidget extends StatefulWidget {
   final Future<void> Function(SetData setData) onShowSetSkipSheet;
   final Future<void> Function(SetData setData) onDeleteSet;
   final VoidCallback onTogglePersistence;
+  final VoidCallback onReplace;
   final VoidCallback onShowMovementHistorySheet;
   final void Function(SetData setData, String value) onWeightChanged;
   final void Function(SetData setData, String value) onDistanceChanged;
@@ -184,11 +187,21 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
           PopupMenuButton<_ExMenuAction>(
             iconSize: 18,
             padding: EdgeInsets.zero,
-            onSelected: (_) => widget.onTogglePersistence(),
+            onSelected: (action) {
+              if (action == _ExMenuAction.replace) {
+                widget.onReplace();
+              } else {
+                widget.onTogglePersistence();
+              }
+            },
             itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: _ExMenuAction.replace,
+                child: Text('Replace'),
+              ),
               PopupMenuItem(
                 value: _ExMenuAction.togglePersistent,
-                child: Text(widget.persistent
+                child: Text(widget.persistence == Persistence.persistent
                     ? "Don't carry forward"
                     : 'Carry forward'),
               ),
@@ -213,6 +226,8 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                 widget.onShowExerciseSkipSheet();
               } else if (action == _ExMenuAction.addSet) {
                 widget.onAddSet();
+              } else if (action == _ExMenuAction.replace) {
+                widget.onReplace();
               } else {
                 widget.onTogglePersistence();
               }
@@ -227,10 +242,14 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                 value: _ExMenuAction.addSet,
                 child: Text('Add Set'),
               ),
+              const PopupMenuItem(
+                value: _ExMenuAction.replace,
+                child: Text('Replace'),
+              ),
               const PopupMenuDivider(),
               PopupMenuItem(
                 value: _ExMenuAction.togglePersistent,
-                child: Text(widget.persistent
+                child: Text(widget.persistence == Persistence.persistent
                     ? "Don't carry forward"
                     : 'Carry forward'),
               ),
