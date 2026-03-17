@@ -41,7 +41,7 @@ final kMesoTemplateSeeds = <MesoTemplateSeedEntry>[
         movements: [
           MovementRef('Barbell Bent Over Row', MuscleGroup.back),
           MovementRef('Barbell Pullover', MuscleGroup.back),
-          MovementRef('Lying Dumbbell Curl', MuscleGroup.biceps),
+          MovementRef('Dumbbell Curl (Lying)', MuscleGroup.biceps),
           MovementRef('Dumbbell Lateral Raise', MuscleGroup.shoulders),
           MovementRef('Hanging Straight Leg Raise', MuscleGroup.abs),
         ],

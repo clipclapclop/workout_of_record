@@ -145,6 +145,7 @@ final kMovementSeeds = <MovementSeedEntry>[
   _ca('Cable Curl', MuscleGroup.biceps),
   _ca('Cable Curl (EZ Bar)', MuscleGroup.biceps),
   _ca('Cable Curl (EZ Bar, Wide Grip)', MuscleGroup.biceps),
+  _ca('Cable Curl (Lying)', MuscleGroup.biceps),
   _ca('Cable Curl (Single-Arm)', MuscleGroup.biceps),
   _ca('Cable Flexion Row', MuscleGroup.back),
   _ca('Cable Flye', MuscleGroup.chest),
@@ -301,10 +302,7 @@ final kMovementSeeds = <MovementSeedEntry>[
   // ── L ──────────────────────────────────────────────────────────────────────
   _bb('Landmine Row', MuscleGroup.back),
   _mc('Leg Extension', MuscleGroup.quads),
-  _pm('Leg Press Calves', MuscleGroup.calves),
-  _db('Lying Biceps Dumbbell Curl', MuscleGroup.biceps),
-  _ca('Lying Cable Curl', MuscleGroup.biceps),
-  _db('Lying Dumbbell Curl', MuscleGroup.biceps),
+  _pm('Leg Press Calves', MuscleGroup.calves),,
   _mc('Lying Leg Curl', MuscleGroup.hamstrings),
 
   // ── M ──────────────────────────────────────────────────────────────────────
