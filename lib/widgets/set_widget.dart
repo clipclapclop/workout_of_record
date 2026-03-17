@@ -10,8 +10,8 @@ enum _SetMenuAction { skip, delete }
 /// A single set row within an exercise.
 ///
 /// Owns [_hasResetTimer] so that the first interaction on this set
-/// triggers a timer reset exactly once. The flag is cleared automatically
-/// when [isChecked] transitions back to false (i.e. the set is unchecked).
+/// triggers a timer reset exactly once. Re-checking a set after unchecking
+/// does not reset the timer again.
 class SetWidget extends StatefulWidget {
   const SetWidget({
     super.key,
@@ -36,8 +36,6 @@ class SetWidget extends StatefulWidget {
   final int setNum;
   final bool isExSkipped;
   final bool isLocked;
-  /// Passed explicitly (in addition to [state]) so [didUpdateWidget] can
-  /// detect the true→false transition and clear [_hasResetTimer].
   final bool isChecked;
   final bool isSkipped;
   final SetUiState state;
@@ -58,15 +56,6 @@ class SetWidget extends StatefulWidget {
 
 class _SetWidgetState extends State<SetWidget> {
   bool _hasResetTimer = false;
-
-  @override
-  void didUpdateWidget(SetWidget old) {
-    super.didUpdateWidget(old);
-    // When the set is unchecked, re-arm the one-shot timer reset.
-    if (old.isChecked && !widget.isChecked) {
-      _hasResetTimer = false;
-    }
-  }
 
   void _maybeResetTimer() {
     if (!_hasResetTimer) {
