@@ -140,15 +140,6 @@ class _SetWidgetState extends State<SetWidget> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
-          if (movement.isRequiredReps) ...[
-            const SizedBox(width: 8),
-            _inputField(
-              state.repsCtrl,
-              'Reps',
-              isInt: true,
-              enabled: !isChecked && !isLocked,
-            ),
-          ],
           if (movement.isRequiredWeight) ...[
             const SizedBox(width: 8),
             _inputField(
@@ -156,6 +147,15 @@ class _SetWidgetState extends State<SetWidget> {
               AppPreferences.getUnitsMetric() ? 'kg' : 'lbs',
               enabled: !isChecked && !isLocked,
               onChanged: widget.onWeightChanged,
+            ),
+          ],
+          if (movement.isRequiredReps) ...[
+            const SizedBox(width: 8),
+            _inputField(
+              state.repsCtrl,
+              'Reps',
+              isInt: true,
+              enabled: !isChecked && !isLocked,
             ),
           ],
           if (movement.isRequiredDistance) ...[
