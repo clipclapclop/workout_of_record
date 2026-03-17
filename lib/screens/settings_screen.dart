@@ -39,6 +39,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
   DateTime? _lastBackupTimestamp;
   bool _isBusy = false;
 
+  // Initial values for dirty-checking
+  late bool _initAiEnabled;
+  late bool _initUnitsMetric;
+  late bool _initTimerEnabled;
+  late TimerSound _initTimerSound;
+  late bool _initTimerHaptic;
+  late bool _initTimerKeepAwake;
+  late int _initTimerDefaultSeconds;
+  late bool _initBackupEnabled;
+  late bool _initAutoBackupEnabled;
+  late int _initBackupHour;
+  late int _initBackupMinute;
+  String? _initBackupDirPath;
+  String _initApiKey = '';
+
+  bool get _hasUnsavedChanges =>
+      _aiEnabled != _initAiEnabled ||
+      _unitsMetric != _initUnitsMetric ||
+      _timerEnabled != _initTimerEnabled ||
+      _timerDefaultSeconds != _initTimerDefaultSeconds ||
+      _timerSound != _initTimerSound ||
+      _timerHaptic != _initTimerHaptic ||
+      _timerKeepAwake != _initTimerKeepAwake ||
+      _backupEnabled != _initBackupEnabled ||
+      _autoBackupEnabled != _initAutoBackupEnabled ||
+      _backupHour != _initBackupHour ||
+      _backupMinute != _initBackupMinute ||
+      _backupDirPath != _initBackupDirPath ||
+      _apiKeyController.text.trim() != _initApiKey;
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +87,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _backupMinute = AppPreferences.getBackupMinute();
     _backupDirPath = AppPreferences.getBackupDirectoryPath();
     _lastBackupTimestamp = AppPreferences.getLastBackupTimestamp();
+
+    // Snapshot initial values for dirty-checking
+    _initAiEnabled = _aiEnabled;
+    _initUnitsMetric = _unitsMetric;
+    _initTimerEnabled = _timerEnabled;
+    _initTimerSound = _timerSound;
+    _initTimerHaptic = _timerHaptic;
+    _initTimerKeepAwake = _timerKeepAwake;
+    _initTimerDefaultSeconds = _timerDefaultSeconds;
+    _initBackupEnabled = _backupEnabled;
+    _initAutoBackupEnabled = _autoBackupEnabled;
+    _initBackupHour = _backupHour;
+    _initBackupMinute = _backupMinute;
+    _initBackupDirPath = _backupDirPath;
+
     _loadApiKey();
   }
 
@@ -72,6 +117,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) {
       setState(() {
         _apiKeyController.text = key ?? '';
+        _initApiKey = key ?? '';
         _apiKeyLoading = false;
       });
     }
@@ -93,7 +139,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     final dirPath = await FilePicker.platform.getDirectoryPath();
     if (dirPath == null) return;
-    await AppPreferences.setBackupDirectoryPath(dirPath);
     if (mounted) setState(() => _backupDirPath = dirPath);
   }
 
@@ -181,15 +226,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
       '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
 
   Future<void> _save() async {
-    final value = _apiKeyController.text.trim();
-    await AppPreferences.setApiKey(value.isEmpty ? null : value);
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-        (_) => false,
-      );
+    await AppPreferences.setAiEnabled(_aiEnabled);
+    await AppPreferences.setUnitsMetric(_unitsMetric);
+    await AppPreferences.setTimerEnabled(_timerEnabled);
+    await AppPreferences.setTimerDefaultSeconds(_timerDefaultSeconds);
+    await AppPreferences.setTimerSound(_timerSound);
+    await AppPreferences.setTimerHaptic(_timerHaptic);
+    await AppPreferences.setTimerKeepAwake(_timerKeepAwake);
+    await AppPreferences.setBackupEnabled(_backupEnabled);
+    if (_backupDirPath != null) {
+      await AppPreferences.setBackupDirectoryPath(_backupDirPath!);
     }
+    await AppPreferences.setAutoBackupEnabled(_autoBackupEnabled);
+    await AppPreferences.setBackupHour(_backupHour);
+    await AppPreferences.setBackupMinute(_backupMinute);
+    if (_backupEnabled && _autoBackupEnabled) {
+      await BackupScheduler.schedule(_backupHour, _backupMinute);
+    } else {
+      await BackupScheduler.cancel();
+    }
+    final apiKey = _apiKeyController.text.trim();
+    await AppPreferences.setApiKey(apiKey.isEmpty ? null : apiKey);
+  }
+
+  Future<bool> _onNavigateAway() async {
+    if (!_hasUnsavedChanges) return true;
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Unsaved changes'),
+        content: const Text('You have unsaved settings.'),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                  ),
+                  onPressed: () => Navigator.pop(ctx, 'cancel'),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                  ),
+                  onPressed: () => Navigator.pop(ctx, 'dismiss'),
+                  child: const Text('Dismiss'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                  ),
+                  onPressed: () => Navigator.pop(ctx, 'save'),
+                  child: const Text('Save'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    if (result == 'save') {
+      await _save();
+      return true;
+    }
+    if (result == 'dismiss') return true;
+    return false;
   }
 
   @override
@@ -198,13 +308,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(
         title: const Text('Settings'),
         automaticallyImplyLeading: false,
-        actions: [AppNavMenu(current: AppScreen.settings)],
+        actions: [AppNavMenu(current: AppScreen.settings, onNavigateAway: _onNavigateAway)],
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
           child: FilledButton(
-            onPressed: _apiKeyLoading ? null : _save,
+            onPressed: _apiKeyLoading
+                ? null
+                : () async {
+                    await _save();
+                    if (!context.mounted) return;
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (_) => const HomeScreen()),
+                      (_) => false,
+                    );
+                  },
             child: const Text('Save'),
           ),
         ),
@@ -218,10 +338,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: Text(_unitsMetric ? 'kg' : 'lbs'),
             value: _unitsMetric,
             contentPadding: EdgeInsets.zero,
-            onChanged: (v) async {
-              setState(() => _unitsMetric = v);
-              await AppPreferences.setUnitsMetric(v);
-            },
+            onChanged: (v) => setState(() => _unitsMetric = v),
           ),
           const SizedBox(height: 8),
 
@@ -232,10 +349,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 'Use AI to pre-fill set targets based on your history and profile.'),
             value: _aiEnabled,
             contentPadding: EdgeInsets.zero,
-            onChanged: (v) async {
-              setState(() => _aiEnabled = v);
-              await AppPreferences.setAiEnabled(v);
-            },
+            onChanged: (v) => setState(() => _aiEnabled = v),
           ),
           const SizedBox(height: 24),
 
@@ -269,10 +383,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: const Text('Show a countdown timer between sets.'),
             value: _timerEnabled,
             contentPadding: EdgeInsets.zero,
-            onChanged: (v) async {
-              setState(() => _timerEnabled = v);
-              await AppPreferences.setTimerEnabled(v);
-            },
+            onChanged: (v) => setState(() => _timerEnabled = v),
           ),
           if (_timerEnabled) ...[
             const SizedBox(height: 4),
@@ -284,11 +395,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 border: OutlineInputBorder(),
               ),
               keyboardType: TextInputType.number,
-              onChanged: (v) async {
+              onChanged: (v) {
                 final seconds = int.tryParse(v.trim());
                 if (seconds != null && seconds > 0) {
-                  _timerDefaultSeconds = seconds;
-                  await AppPreferences.setTimerDefaultSeconds(seconds);
+                  setState(() => _timerDefaultSeconds = seconds);
                 }
               },
             ),
@@ -296,10 +406,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const Text('Sound'),
             RadioGroup<TimerSound>(
               groupValue: _timerSound,
-              onChanged: (v) async {
-                setState(() => _timerSound = v!);
-                await AppPreferences.setTimerSound(v!);
-              },
+              onChanged: (v) => setState(() => _timerSound = v!),
               child: Column(
                 children: const [
                   RadioListTile<TimerSound>(
@@ -325,20 +432,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               subtitle: const Text('Vibrate when the timer reaches zero.'),
               value: _timerHaptic,
               contentPadding: EdgeInsets.zero,
-              onChanged: (v) async {
-                setState(() => _timerHaptic = v);
-                await AppPreferences.setTimerHaptic(v);
-              },
+              onChanged: (v) => setState(() => _timerHaptic = v),
             ),
             SwitchListTile(
               title: const Text('Keep screen awake'),
               subtitle: const Text('Prevent the screen from sleeping during a workout.'),
               value: _timerKeepAwake,
               contentPadding: EdgeInsets.zero,
-              onChanged: (v) async {
-                setState(() => _timerKeepAwake = v);
-                await AppPreferences.setTimerKeepAwake(v);
-              },
+              onChanged: (v) => setState(() => _timerKeepAwake = v),
             ),
           ],
           const SizedBox(height: 32),
@@ -350,14 +451,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             contentPadding: EdgeInsets.zero,
             onChanged: _isBusy
                 ? null
-                : (v) async {
-                    setState(() => _backupEnabled = v);
-                    await AppPreferences.setBackupEnabled(v);
-                    // Cancel auto-backup when backups are fully disabled
-                    if (!v && _autoBackupEnabled) {
-                      await BackupScheduler.cancel();
-                    }
-                  },
+                : (v) => setState(() => _backupEnabled = v),
           ),
           if (_backupEnabled) ...[
             const SizedBox(height: 4),
@@ -391,15 +485,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               contentPadding: EdgeInsets.zero,
               onChanged: _isBusy
                   ? null
-                  : (v) async {
-                      setState(() => _autoBackupEnabled = v);
-                      await AppPreferences.setAutoBackupEnabled(v);
-                      if (v) {
-                        await BackupScheduler.schedule(_backupHour, _backupMinute);
-                      } else {
-                        await BackupScheduler.cancel();
-                      }
-                    },
+                  : (v) => setState(() => _autoBackupEnabled = v),
             ),
             Row(
               children: [
@@ -423,11 +509,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             _backupHour = picked.hour;
                             _backupMinute = picked.minute;
                           });
-                          await AppPreferences.setBackupHour(picked.hour);
-                          await AppPreferences.setBackupMinute(picked.minute);
-                          if (_autoBackupEnabled) {
-                            await BackupScheduler.schedule(picked.hour, picked.minute);
-                          }
                         },
                   child: const Text('Change time'),
                 ),

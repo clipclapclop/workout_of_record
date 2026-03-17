@@ -16,11 +16,13 @@ class AppNavMenu extends StatelessWidget {
     required this.current,
     this.activeWorkoutId,
     this.activeWorkoutName,
+    this.onNavigateAway,
   });
 
   final AppScreen current;
   final int? activeWorkoutId;
   final String? activeWorkoutName;
+  final Future<bool> Function()? onNavigateAway;
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +63,12 @@ class AppNavMenu extends StatelessWidget {
     );
   }
 
-  void _navigate(BuildContext context, AppScreen screen) {
+  void _navigate(BuildContext context, AppScreen screen) async {
+    if (onNavigateAway != null) {
+      final ok = await onNavigateAway!();
+      if (!ok) return;
+    }
+    if (!context.mounted) return;
     final Widget dest = switch (screen) {
       AppScreen.workout => activeWorkoutId != null
           ? WorkoutScreen(
