@@ -54,6 +54,16 @@ class AppDatabase extends _$AppDatabase {
           await m.createAll();
           await _seedData();
         },
+        onUpgrade: (Migrator m, int from, int to) async {
+          // Dev only — no migrations; nuke and recreate.
+          await customStatement('PRAGMA foreign_keys = OFF');
+          for (final table in allTables) {
+            await m.deleteTable(table.actualTableName);
+          }
+          await customStatement('PRAGMA foreign_keys = ON');
+          await m.createAll();
+          await _seedData();
+        },
       );
 
   // ── Public API ─────────────────────────────────────────────────────────────
