@@ -453,7 +453,7 @@ class AppDatabase extends _$AppDatabase {
     final completedExs = await (select(completedExercises)
           ..where((e) =>
               e.completedWorkoutId.equals(completedWorkoutId) &
-              e.persistence.equals(Persistence.replaced.index).not())
+              e.persistence.equals(Persistence.dropped.index).not())
           ..orderBy([(e) => OrderingTerm.asc(e.orderIndex)]))
         .get();
 
@@ -810,6 +810,53 @@ class AppDatabase extends _$AppDatabase {
             ..where((e) => e.id.equals(completedExerciseId)))
           .write(CompletedExercisesCompanion(persistence: Value(persistence)));
 
+  Future<void> addExerciseAfter(
+    int completedWorkoutId,
+    int afterOrderIndex,
+    int movementId,
+  ) =>
+      transaction(() async {
+        await customUpdate(
+          'UPDATE completed_exercises '
+          'SET order_index = order_index + 1 '
+          'WHERE completed_workout_id = ? AND order_index > ?',
+          variables: [
+            Variable.withInt(completedWorkoutId),
+            Variable.withInt(afterOrderIndex),
+          ],
+          updates: {completedExercises},
+        );
+        final newExId = await into(completedExercises).insert(
+          CompletedExercisesCompanion.insert(
+            completedWorkoutId: completedWorkoutId,
+            movementId: movementId,
+            orderIndex: afterOrderIndex + 1,
+          ),
+        );
+        await into(completedSets).insert(
+          CompletedSetsCompanion.insert(completedExerciseId: newExId),
+        );
+      });
+
+  Future<void> swapExerciseOrder(
+    int idA,
+    int orderIndexA,
+    int idB,
+    int orderIndexB,
+  ) =>
+      transaction(() async {
+        await (update(completedExercises)..where((e) => e.id.equals(idA)))
+            .write(CompletedExercisesCompanion(orderIndex: Value(orderIndexB)));
+        await (update(completedExercises)..where((e) => e.id.equals(idB)))
+            .write(CompletedExercisesCompanion(orderIndex: Value(orderIndexA)));
+      });
+
+  Future<void> deleteExercise(int completedExerciseId) =>
+      (update(completedExercises)
+            ..where((e) => e.id.equals(completedExerciseId)))
+          .write(const CompletedExercisesCompanion(
+              persistence: Value(Persistence.dropped)));
+
   Future<void> replaceExercise(
     int oldExId,
     int movementId,
@@ -820,7 +867,7 @@ class AppDatabase extends _$AppDatabase {
         await (update(completedExercises)
               ..where((e) => e.id.equals(oldExId)))
             .write(CompletedExercisesCompanion(
-                persistence: const Value(Persistence.replaced)));
+                persistence: const Value(Persistence.dropped)));
         final newExId = await into(completedExercises).insert(
           CompletedExercisesCompanion.insert(
             completedWorkoutId: completedWorkoutId,

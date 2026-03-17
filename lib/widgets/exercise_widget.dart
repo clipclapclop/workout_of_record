@@ -8,7 +8,7 @@ import 'rest_timer_widget.dart';
 import 'set_ui_state.dart';
 import 'set_widget.dart';
 
-enum _ExMenuAction { skipExercise, addSet, replace, togglePersistent }
+enum _ExMenuAction { skipExercise, addSet, replace, togglePersistent, addExercise, moveUp, moveDown, deleteExercise }
 
 /// A card for a single exercise within a workout.
 ///
@@ -47,6 +47,10 @@ class ExerciseWidget extends StatefulWidget {
     required this.onDeleteSet,
     required this.onTogglePersistence,
     required this.onReplace,
+    this.onAddExercise,
+    this.onMoveUp,
+    this.onMoveDown,
+    this.onDeleteExercise,
     required this.onShowMovementHistorySheet,
     required this.onWeightChanged,
     required this.onDistanceChanged,
@@ -79,6 +83,10 @@ class ExerciseWidget extends StatefulWidget {
   final Future<void> Function(SetData setData) onDeleteSet;
   final VoidCallback onTogglePersistence;
   final VoidCallback onReplace;
+  final VoidCallback? onAddExercise;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
+  final VoidCallback? onDeleteExercise;
   final VoidCallback onShowMovementHistorySheet;
   final void Function(SetData setData, String value) onWeightChanged;
   final void Function(SetData setData, String value) onDistanceChanged;
@@ -190,6 +198,10 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
             onSelected: (action) {
               if (action == _ExMenuAction.replace) {
                 widget.onReplace();
+              } else if (action == _ExMenuAction.moveUp) {
+                widget.onMoveUp?.call();
+              } else if (action == _ExMenuAction.moveDown) {
+                widget.onMoveDown?.call();
               } else {
                 widget.onTogglePersistence();
               }
@@ -199,6 +211,16 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                 value: _ExMenuAction.replace,
                 child: Text('Replace'),
               ),
+              if (widget.onMoveUp != null)
+                const PopupMenuItem(
+                  value: _ExMenuAction.moveUp,
+                  child: Text('Move Up'),
+                ),
+              if (widget.onMoveDown != null)
+                const PopupMenuItem(
+                  value: _ExMenuAction.moveDown,
+                  child: Text('Move Down'),
+                ),
               PopupMenuItem(
                 value: _ExMenuAction.togglePersistent,
                 child: Text(widget.persistence == Persistence.persistent
@@ -228,32 +250,63 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                 widget.onAddSet();
               } else if (action == _ExMenuAction.replace) {
                 widget.onReplace();
+              } else if (action == _ExMenuAction.addExercise) {
+                widget.onAddExercise?.call();
+              } else if (action == _ExMenuAction.moveUp) {
+                widget.onMoveUp?.call();
+              } else if (action == _ExMenuAction.moveDown) {
+                widget.onMoveDown?.call();
+              } else if (action == _ExMenuAction.deleteExercise) {
+                widget.onDeleteExercise?.call();
               } else {
                 widget.onTogglePersistence();
               }
             },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: _ExMenuAction.skipExercise,
-                enabled: !widget.anySetChecked && !widget.isExLocked,
-                child: const Text('Skip Exercise'),
-              ),
-              const PopupMenuItem(
-                value: _ExMenuAction.addSet,
-                child: Text('Add Set'),
-              ),
-              const PopupMenuItem(
-                value: _ExMenuAction.replace,
-                child: Text('Replace'),
-              ),
-              const PopupMenuDivider(),
-              PopupMenuItem(
-                value: _ExMenuAction.togglePersistent,
-                child: Text(widget.persistence == Persistence.persistent
-                    ? "Don't carry forward"
-                    : 'Carry forward'),
-              ),
-            ],
+            itemBuilder: (_) {
+              final isExCompleted = widget.allSetsDone && !widget.showPostExReopen;
+              return [
+                PopupMenuItem(
+                  value: _ExMenuAction.skipExercise,
+                  enabled: !widget.anySetChecked && !widget.isExLocked,
+                  child: const Text('Skip Exercise'),
+                ),
+                const PopupMenuItem(
+                  value: _ExMenuAction.addSet,
+                  child: Text('Add Set'),
+                ),
+                const PopupMenuItem(
+                  value: _ExMenuAction.replace,
+                  child: Text('Replace'),
+                ),
+                if (!isExCompleted && widget.onAddExercise != null)
+                  const PopupMenuItem(
+                    value: _ExMenuAction.addExercise,
+                    child: Text('Add Exercise'),
+                  ),
+                if (widget.onMoveUp != null)
+                  const PopupMenuItem(
+                    value: _ExMenuAction.moveUp,
+                    child: Text('Move Up'),
+                  ),
+                if (widget.onMoveDown != null)
+                  const PopupMenuItem(
+                    value: _ExMenuAction.moveDown,
+                    child: Text('Move Down'),
+                  ),
+                if (widget.onDeleteExercise != null)
+                  const PopupMenuItem(
+                    value: _ExMenuAction.deleteExercise,
+                    child: Text('Delete Exercise'),
+                  ),
+                const PopupMenuDivider(),
+                PopupMenuItem(
+                  value: _ExMenuAction.togglePersistent,
+                  child: Text(widget.persistence == Persistence.persistent
+                      ? "Don't carry forward"
+                      : 'Carry forward'),
+                ),
+              ];
+            },
           ),
         ],
       );

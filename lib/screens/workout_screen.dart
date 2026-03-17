@@ -667,6 +667,63 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     setState(() => _persistence[exercise.completed.id] = next);
   }
 
+  Future<void> _addExerciseAfter(ExerciseData exercise) async {
+    final movs = await db.getMovements();
+    if (!mounted) return;
+    await showMovementPickerSheet(
+      context: context,
+      allMovements: movs,
+      alreadyAdded: {
+        for (final ex in _data!.exercises) ex.completed.movementId,
+      },
+      onAdd: (m) {
+        db
+            .addExerciseAfter(
+          widget.completedWorkoutId,
+          exercise.completed.orderIndex,
+          m.id,
+        )
+            .then((_) {
+          if (mounted) _load();
+        });
+      },
+    );
+  }
+
+  Future<void> _moveExerciseUp(int index) async {
+    final exA = _data!.exercises[index];
+    final exB = _data!.exercises[index - 1];
+    await db.swapExerciseOrder(
+      exA.completed.id,
+      exA.completed.orderIndex,
+      exB.completed.id,
+      exB.completed.orderIndex,
+    );
+    await _load();
+  }
+
+  Future<void> _moveExerciseDown(int index) async {
+    final exA = _data!.exercises[index];
+    final exB = _data!.exercises[index + 1];
+    await db.swapExerciseOrder(
+      exA.completed.id,
+      exA.completed.orderIndex,
+      exB.completed.id,
+      exB.completed.orderIndex,
+    );
+    await _load();
+  }
+
+  Future<void> _deleteExercise(ExerciseData exercise) async {
+    await db.deleteExercise(exercise.completed.id);
+    _setStates.removeWhere((key, _) =>
+        exercise.sets.any((s) => s.completed.id == key));
+    _postExDone.remove(exercise.completed.id);
+    _exerciseSkipReasons.remove(exercise.completed.id);
+    _persistence.remove(exercise.completed.id);
+    await _load();
+  }
+
   Future<void> _replaceExercise(ExerciseData exercise) async {
     final movs = await db.getMovements();
     if (!mounted) return;
@@ -955,6 +1012,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     );
   }
 
+  bool _isExNotStarted(ExerciseData ex) {
+    return _exerciseSkipReasons[ex.completed.id] == null &&
+        !ex.sets.any((s) => _setStates[s.completed.id]?.isChecked ?? false);
+  }
+
   Widget _buildExerciseWidget(ExerciseData exercise, int index,
       Map<MuscleGroup, int> lastExIndexForMg, int? activeExId) {
     final isActive = exercise.completed.id == activeExId;
@@ -966,6 +1028,16 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     final showPostExReopen = allSetsDone && !postExDone;
     final anySetChecked = exercise.sets
         .any((s) => _setStates[s.completed.id]?.isChecked ?? false);
+
+    final isExCompleted = isExSkipped || (allSetsDone && postExDone);
+    final isNotStarted = !isExSkipped && !anySetChecked;
+    final exercises = _data!.exercises;
+    final canMoveUp = isNotStarted &&
+        index > 0 &&
+        _isExNotStarted(exercises[index - 1]);
+    final canMoveDown = isNotStarted &&
+        index < exercises.length - 1 &&
+        _isExNotStarted(exercises[index + 1]);
 
     final mg = exercise.movement.muscleGroup;
     final isLastForMg = lastExIndexForMg[mg] == index;
@@ -1008,6 +1080,10 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       onDeleteSet: (setData) => _deleteSet(setData, exercise),
       onTogglePersistence: () => _togglePersistence(exercise),
       onReplace: () => _replaceExercise(exercise),
+      onAddExercise: isExCompleted ? null : () => _addExerciseAfter(exercise),
+      onMoveUp: canMoveUp ? () => _moveExerciseUp(index) : null,
+      onMoveDown: canMoveDown ? () => _moveExerciseDown(index) : null,
+      onDeleteExercise: isNotStarted ? () => _deleteExercise(exercise) : null,
       onShowMovementHistorySheet: () => _showMovementHistorySheet(exercise),
       onWeightChanged: (setData, value) =>
           _propagateWeight(exercise, setData, value),
