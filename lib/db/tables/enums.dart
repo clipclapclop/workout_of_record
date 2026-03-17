@@ -22,6 +22,8 @@ enum Effort { tooEasy, easy, hard, tooHard }
 
 enum Volume { tooLittle, good, aLot, wayTooMuch }
 
+enum Pump { none, aLittle, good, amazing }
+
 enum SkipReason {
   systemicFatigue,
   muscleFatigue,
@@ -45,3 +47,4 @@ enum CalorieState { surplus, maintenance, deficit }
 enum MovementCategory { resistance, cardio }
 
 enum TimerSound { tts, chime, silent }
+

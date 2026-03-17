@@ -348,11 +348,13 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
   Future<void> _showPostMuscleGroupSheet(MuscleGroup muscleGroup) async {
     Effort? effort;
+    Pump? pump;
     Volume? volume;
     var effortSet = false;
+    var pumpSet = false;
     var volumeSet = false;
 
-    final result = await showModalBottomSheet<(Effort, Volume)>(
+    final result = await showModalBottomSheet<(Effort, Pump, Volume)>(
       context: context,
       isDismissible: false,
       enableDrag: false,
@@ -387,7 +389,28 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                 onSelectionChanged: (v) {
                   setSheet(() => effort = v.first);
                   effortSet = true;
-                  if (volumeSet) Navigator.pop(ctx, (effort!, volume!));
+                  if (pumpSet && volumeSet) Navigator.pop(ctx, (effort!, pump!, volume!));
+                },
+                showSelectedIcon: false,
+              ),
+              const SizedBox(height: 16),
+              const Text('How was the pump?'),
+              const SizedBox(height: 8),
+              SegmentedButton<Pump>(
+                segments: const [
+                  ButtonSegment(
+                      value: Pump.none, label: Text('None')),
+                  ButtonSegment(value: Pump.aLittle, label: Text('A Little')),
+                  ButtonSegment(value: Pump.good, label: Text('Good')),
+                  ButtonSegment(
+                      value: Pump.amazing, label: Text('Amazing')),
+                ],
+                selected: pump != null ? {pump!} : const {},
+                emptySelectionAllowed: true,
+                onSelectionChanged: (v) {
+                  setSheet(() => pump = v.first);
+                  pumpSet = true;
+                  if (effortSet && volumeSet) Navigator.pop(ctx, (effort!, pump!, volume!));
                 },
                 showSelectedIcon: false,
               ),
@@ -408,7 +431,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                 onSelectionChanged: (v) {
                   setSheet(() => volume = v.first);
                   volumeSet = true;
-                  if (effortSet) Navigator.pop(ctx, (effort!, volume!));
+                  if (effortSet && pumpSet) Navigator.pop(ctx, (effort!, pump!, volume!));
                 },
                 showSelectedIcon: false,
               ),
@@ -430,7 +453,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         completedWorkoutId: widget.completedWorkoutId,
         muscleGroup: muscleGroup,
         effortLevel: result.$1,
-        volumeLevel: result.$2,
+        pumpLevel: result.$2,
+        volumeLevel: result.$3,
       ),
     );
 

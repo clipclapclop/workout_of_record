@@ -6911,12 +6911,22 @@ class $PostMuscleGroupCheckinsTable extends PostMuscleGroupCheckins
         $PostMuscleGroupCheckinsTable.$convertervolumeLevel,
       );
   @override
+  late final GeneratedColumnWithTypeConverter<Pump, String> pumpLevel =
+      GeneratedColumn<String>(
+        'pump_level',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<Pump>($PostMuscleGroupCheckinsTable.$converterpumpLevel);
+  @override
   List<GeneratedColumn> get $columns => [
     id,
     completedWorkoutId,
     muscleGroup,
     effortLevel,
     volumeLevel,
+    pumpLevel,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -6983,6 +6993,12 @@ class $PostMuscleGroupCheckinsTable extends PostMuscleGroupCheckins
           data['${effectivePrefix}volume_level'],
         )!,
       ),
+      pumpLevel: $PostMuscleGroupCheckinsTable.$converterpumpLevel.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}pump_level'],
+        )!,
+      ),
     );
   }
 
@@ -6997,6 +7013,8 @@ class $PostMuscleGroupCheckinsTable extends PostMuscleGroupCheckins
       const EnumNameConverter<Effort>(Effort.values);
   static JsonTypeConverter2<Volume, String, String> $convertervolumeLevel =
       const EnumNameConverter<Volume>(Volume.values);
+  static JsonTypeConverter2<Pump, String, String> $converterpumpLevel =
+      const EnumNameConverter<Pump>(Pump.values);
 }
 
 class PostMuscleGroupCheckin extends DataClass
@@ -7006,12 +7024,14 @@ class PostMuscleGroupCheckin extends DataClass
   final MuscleGroup muscleGroup;
   final Effort effortLevel;
   final Volume volumeLevel;
+  final Pump pumpLevel;
   const PostMuscleGroupCheckin({
     required this.id,
     required this.completedWorkoutId,
     required this.muscleGroup,
     required this.effortLevel,
     required this.volumeLevel,
+    required this.pumpLevel,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -7033,6 +7053,11 @@ class PostMuscleGroupCheckin extends DataClass
         $PostMuscleGroupCheckinsTable.$convertervolumeLevel.toSql(volumeLevel),
       );
     }
+    {
+      map['pump_level'] = Variable<String>(
+        $PostMuscleGroupCheckinsTable.$converterpumpLevel.toSql(pumpLevel),
+      );
+    }
     return map;
   }
 
@@ -7043,6 +7068,7 @@ class PostMuscleGroupCheckin extends DataClass
       muscleGroup: Value(muscleGroup),
       effortLevel: Value(effortLevel),
       volumeLevel: Value(volumeLevel),
+      pumpLevel: Value(pumpLevel),
     );
   }
 
@@ -7063,6 +7089,9 @@ class PostMuscleGroupCheckin extends DataClass
       volumeLevel: $PostMuscleGroupCheckinsTable.$convertervolumeLevel.fromJson(
         serializer.fromJson<String>(json['volumeLevel']),
       ),
+      pumpLevel: $PostMuscleGroupCheckinsTable.$converterpumpLevel.fromJson(
+        serializer.fromJson<String>(json['pumpLevel']),
+      ),
     );
   }
   @override
@@ -7080,6 +7109,9 @@ class PostMuscleGroupCheckin extends DataClass
       'volumeLevel': serializer.toJson<String>(
         $PostMuscleGroupCheckinsTable.$convertervolumeLevel.toJson(volumeLevel),
       ),
+      'pumpLevel': serializer.toJson<String>(
+        $PostMuscleGroupCheckinsTable.$converterpumpLevel.toJson(pumpLevel),
+      ),
     };
   }
 
@@ -7089,12 +7121,14 @@ class PostMuscleGroupCheckin extends DataClass
     MuscleGroup? muscleGroup,
     Effort? effortLevel,
     Volume? volumeLevel,
+    Pump? pumpLevel,
   }) => PostMuscleGroupCheckin(
     id: id ?? this.id,
     completedWorkoutId: completedWorkoutId ?? this.completedWorkoutId,
     muscleGroup: muscleGroup ?? this.muscleGroup,
     effortLevel: effortLevel ?? this.effortLevel,
     volumeLevel: volumeLevel ?? this.volumeLevel,
+    pumpLevel: pumpLevel ?? this.pumpLevel,
   );
   PostMuscleGroupCheckin copyWithCompanion(
     PostMuscleGroupCheckinsCompanion data,
@@ -7113,6 +7147,7 @@ class PostMuscleGroupCheckin extends DataClass
       volumeLevel: data.volumeLevel.present
           ? data.volumeLevel.value
           : this.volumeLevel,
+      pumpLevel: data.pumpLevel.present ? data.pumpLevel.value : this.pumpLevel,
     );
   }
 
@@ -7123,7 +7158,8 @@ class PostMuscleGroupCheckin extends DataClass
           ..write('completedWorkoutId: $completedWorkoutId, ')
           ..write('muscleGroup: $muscleGroup, ')
           ..write('effortLevel: $effortLevel, ')
-          ..write('volumeLevel: $volumeLevel')
+          ..write('volumeLevel: $volumeLevel, ')
+          ..write('pumpLevel: $pumpLevel')
           ..write(')'))
         .toString();
   }
@@ -7135,6 +7171,7 @@ class PostMuscleGroupCheckin extends DataClass
     muscleGroup,
     effortLevel,
     volumeLevel,
+    pumpLevel,
   );
   @override
   bool operator ==(Object other) =>
@@ -7144,7 +7181,8 @@ class PostMuscleGroupCheckin extends DataClass
           other.completedWorkoutId == this.completedWorkoutId &&
           other.muscleGroup == this.muscleGroup &&
           other.effortLevel == this.effortLevel &&
-          other.volumeLevel == this.volumeLevel);
+          other.volumeLevel == this.volumeLevel &&
+          other.pumpLevel == this.pumpLevel);
 }
 
 class PostMuscleGroupCheckinsCompanion
@@ -7154,12 +7192,14 @@ class PostMuscleGroupCheckinsCompanion
   final Value<MuscleGroup> muscleGroup;
   final Value<Effort> effortLevel;
   final Value<Volume> volumeLevel;
+  final Value<Pump> pumpLevel;
   const PostMuscleGroupCheckinsCompanion({
     this.id = const Value.absent(),
     this.completedWorkoutId = const Value.absent(),
     this.muscleGroup = const Value.absent(),
     this.effortLevel = const Value.absent(),
     this.volumeLevel = const Value.absent(),
+    this.pumpLevel = const Value.absent(),
   });
   PostMuscleGroupCheckinsCompanion.insert({
     this.id = const Value.absent(),
@@ -7167,16 +7207,19 @@ class PostMuscleGroupCheckinsCompanion
     required MuscleGroup muscleGroup,
     required Effort effortLevel,
     required Volume volumeLevel,
+    required Pump pumpLevel,
   }) : completedWorkoutId = Value(completedWorkoutId),
        muscleGroup = Value(muscleGroup),
        effortLevel = Value(effortLevel),
-       volumeLevel = Value(volumeLevel);
+       volumeLevel = Value(volumeLevel),
+       pumpLevel = Value(pumpLevel);
   static Insertable<PostMuscleGroupCheckin> custom({
     Expression<int>? id,
     Expression<int>? completedWorkoutId,
     Expression<String>? muscleGroup,
     Expression<String>? effortLevel,
     Expression<String>? volumeLevel,
+    Expression<String>? pumpLevel,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -7185,6 +7228,7 @@ class PostMuscleGroupCheckinsCompanion
       if (muscleGroup != null) 'muscle_group': muscleGroup,
       if (effortLevel != null) 'effort_level': effortLevel,
       if (volumeLevel != null) 'volume_level': volumeLevel,
+      if (pumpLevel != null) 'pump_level': pumpLevel,
     });
   }
 
@@ -7194,6 +7238,7 @@ class PostMuscleGroupCheckinsCompanion
     Value<MuscleGroup>? muscleGroup,
     Value<Effort>? effortLevel,
     Value<Volume>? volumeLevel,
+    Value<Pump>? pumpLevel,
   }) {
     return PostMuscleGroupCheckinsCompanion(
       id: id ?? this.id,
@@ -7201,6 +7246,7 @@ class PostMuscleGroupCheckinsCompanion
       muscleGroup: muscleGroup ?? this.muscleGroup,
       effortLevel: effortLevel ?? this.effortLevel,
       volumeLevel: volumeLevel ?? this.volumeLevel,
+      pumpLevel: pumpLevel ?? this.pumpLevel,
     );
   }
 
@@ -7234,6 +7280,13 @@ class PostMuscleGroupCheckinsCompanion
         ),
       );
     }
+    if (pumpLevel.present) {
+      map['pump_level'] = Variable<String>(
+        $PostMuscleGroupCheckinsTable.$converterpumpLevel.toSql(
+          pumpLevel.value,
+        ),
+      );
+    }
     return map;
   }
 
@@ -7244,7 +7297,8 @@ class PostMuscleGroupCheckinsCompanion
           ..write('completedWorkoutId: $completedWorkoutId, ')
           ..write('muscleGroup: $muscleGroup, ')
           ..write('effortLevel: $effortLevel, ')
-          ..write('volumeLevel: $volumeLevel')
+          ..write('volumeLevel: $volumeLevel, ')
+          ..write('pumpLevel: $pumpLevel')
           ..write(')'))
         .toString();
   }
@@ -14730,6 +14784,7 @@ typedef $$PostMuscleGroupCheckinsTableCreateCompanionBuilder =
       required MuscleGroup muscleGroup,
       required Effort effortLevel,
       required Volume volumeLevel,
+      required Pump pumpLevel,
     });
 typedef $$PostMuscleGroupCheckinsTableUpdateCompanionBuilder =
     PostMuscleGroupCheckinsCompanion Function({
@@ -14738,6 +14793,7 @@ typedef $$PostMuscleGroupCheckinsTableUpdateCompanionBuilder =
       Value<MuscleGroup> muscleGroup,
       Value<Effort> effortLevel,
       Value<Volume> volumeLevel,
+      Value<Pump> pumpLevel,
     });
 
 final class $$PostMuscleGroupCheckinsTableReferences
@@ -14808,6 +14864,12 @@ class $$PostMuscleGroupCheckinsTableFilterComposer
         builder: (column) => ColumnWithTypeConverterFilters(column),
       );
 
+  ColumnWithTypeConverterFilters<Pump, Pump, String> get pumpLevel =>
+      $composableBuilder(
+        column: $table.pumpLevel,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
   $$CompletedWorkoutsTableFilterComposer get completedWorkoutId {
     final $$CompletedWorkoutsTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -14858,6 +14920,11 @@ class $$PostMuscleGroupCheckinsTableOrderingComposer
 
   ColumnOrderings<String> get volumeLevel => $composableBuilder(
     column: $table.volumeLevel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pumpLevel => $composableBuilder(
+    column: $table.pumpLevel,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -14914,6 +14981,9 @@ class $$PostMuscleGroupCheckinsTableAnnotationComposer
         column: $table.volumeLevel,
         builder: (column) => column,
       );
+
+  GeneratedColumnWithTypeConverter<Pump, String> get pumpLevel =>
+      $composableBuilder(column: $table.pumpLevel, builder: (column) => column);
 
   $$CompletedWorkoutsTableAnnotationComposer get completedWorkoutId {
     final $$CompletedWorkoutsTableAnnotationComposer composer =
@@ -14984,12 +15054,14 @@ class $$PostMuscleGroupCheckinsTableTableManager
                 Value<MuscleGroup> muscleGroup = const Value.absent(),
                 Value<Effort> effortLevel = const Value.absent(),
                 Value<Volume> volumeLevel = const Value.absent(),
+                Value<Pump> pumpLevel = const Value.absent(),
               }) => PostMuscleGroupCheckinsCompanion(
                 id: id,
                 completedWorkoutId: completedWorkoutId,
                 muscleGroup: muscleGroup,
                 effortLevel: effortLevel,
                 volumeLevel: volumeLevel,
+                pumpLevel: pumpLevel,
               ),
           createCompanionCallback:
               ({
@@ -14998,12 +15070,14 @@ class $$PostMuscleGroupCheckinsTableTableManager
                 required MuscleGroup muscleGroup,
                 required Effort effortLevel,
                 required Volume volumeLevel,
+                required Pump pumpLevel,
               }) => PostMuscleGroupCheckinsCompanion.insert(
                 id: id,
                 completedWorkoutId: completedWorkoutId,
                 muscleGroup: muscleGroup,
                 effortLevel: effortLevel,
                 volumeLevel: volumeLevel,
+                pumpLevel: pumpLevel,
               ),
           withReferenceMapper: (p0) => p0
               .map(

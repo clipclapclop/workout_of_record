@@ -38,6 +38,7 @@ class PostMuscleGroupCheckins extends Table {
   TextColumn get muscleGroup => textEnum<MuscleGroup>()();
   TextColumn get effortLevel => textEnum<Effort>()();
   TextColumn get volumeLevel => textEnum<Volume>()();
+  TextColumn get pumpLevel => textEnum<Pump>()();
 
   @override
   List<Set<Column>> get uniqueKeys => [
