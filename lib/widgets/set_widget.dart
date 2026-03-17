@@ -96,7 +96,11 @@ class _SetWidgetState extends State<SetWidget> {
           isDense: true,
           border: const OutlineInputBorder(),
         ),
-        onTap: _maybeResetTimer,
+        onTap: () {
+          ctrl.selection =
+              TextSelection(baseOffset: 0, extentOffset: ctrl.text.length);
+          _maybeResetTimer();
+        },
         onChanged: (v) {
           setState(() {});
           _maybeResetTimer();

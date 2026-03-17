@@ -302,7 +302,7 @@ final kMovementSeeds = <MovementSeedEntry>[
   // ── L ──────────────────────────────────────────────────────────────────────
   _bb('Landmine Row', MuscleGroup.back),
   _mc('Leg Extension', MuscleGroup.quads),
-  _pm('Leg Press Calves', MuscleGroup.calves),,
+  _pm('Leg Press Calves', MuscleGroup.calves),
   _mc('Lying Leg Curl', MuscleGroup.hamstrings),
 
   // ── M ──────────────────────────────────────────────────────────────────────
