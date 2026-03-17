@@ -55,14 +55,16 @@ class AppDatabase extends _$AppDatabase {
           await _seedData();
         },
         onUpgrade: (Migrator m, int from, int to) async {
-          // Dev only — no migrations; nuke and recreate.
-          await customStatement('PRAGMA foreign_keys = OFF');
-          for (final table in allTables) {
-            await m.deleteTable(table.actualTableName);
+          for (var version = from; version < to; version++) {
+            switch (version) {
+              case 8:
+                // 8 → 9: Added pump_level to post_muscle_group_checkins.
+                await customStatement(
+                  "ALTER TABLE post_muscle_group_checkins "
+                  "ADD COLUMN pump_level TEXT NOT NULL DEFAULT 'none'",
+                );
+            }
           }
-          await customStatement('PRAGMA foreign_keys = ON');
-          await m.createAll();
-          await _seedData();
         },
       );
 
