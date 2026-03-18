@@ -11,6 +11,7 @@ enum MuscleGroup {
   forearms,
   glutes,
   calves,
+  fullBody,
   other,
 }
 
@@ -18,7 +19,7 @@ enum Soreness { none, aLittle, some, lots }
 
 enum CurrentState { bad, notGood, good, great }
 
-enum Effort { tooEasy, easy, hard, tooHard }
+enum Effort { tooEasy, good, hard, tooHard }
 
 enum Volume { tooLittle, good, aLot, wayTooMuch }
 

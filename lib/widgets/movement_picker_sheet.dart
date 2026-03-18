@@ -72,9 +72,10 @@ class _MovementPickerSheetState extends State<_MovementPickerSheet> {
     return _movements.where((m) {
       if (m.category != _filterCategory) return false;
       if (_filterMg != null && m.muscleGroup != _filterMg) return false;
-      if (_query.isNotEmpty &&
-          !m.name.toLowerCase().contains(_query.toLowerCase())) {
-        return false;
+      if (_query.isNotEmpty) {
+        final name = m.name.toLowerCase();
+        final words = _query.toLowerCase().split(RegExp(r'\s+'));
+        if (!words.every((w) => name.contains(w))) return false;
       }
       return true;
     }).toList();

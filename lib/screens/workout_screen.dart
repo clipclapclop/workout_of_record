@@ -380,7 +380,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                 segments: const [
                   ButtonSegment(
                       value: Effort.tooEasy, label: Text('Too Easy')),
-                  ButtonSegment(value: Effort.easy, label: Text('Easy')),
+                  ButtonSegment(value: Effort.good, label: Text('Good')),
                   ButtonSegment(value: Effort.hard, label: Text('Hard')),
                   ButtonSegment(
                       value: Effort.tooHard, label: Text('Too Hard')),

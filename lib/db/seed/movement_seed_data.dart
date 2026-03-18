@@ -260,6 +260,7 @@ final kMovementSeeds = <MovementSeedEntry>[
   _ez('EZ Bar Spider Curl', MuscleGroup.biceps),
 
   // ── F ──────────────────────────────────────────────────────────────────────
+  _db('Farmers Carry', MuscleGroup.fullBody),
   _ca('Freemotion Curl (Facing Away)', MuscleGroup.biceps),
   _ca('Freemotion Curl (Facing Machine)', MuscleGroup.biceps),
   _ca('Freemotion Curl (Single-Arm)', MuscleGroup.biceps),

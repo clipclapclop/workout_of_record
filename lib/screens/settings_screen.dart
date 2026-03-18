@@ -326,6 +326,11 @@ class _SettingsScreenState extends State<SettingsScreen>
     return false;
   }
 
+  Widget _sectionLabel(String label) => Padding(
+        padding: const EdgeInsets.only(left: 4, bottom: 8),
+        child: Text(label, style: Theme.of(context).textTheme.labelLarge),
+      );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -354,215 +359,239 @@ class _SettingsScreenState extends State<SettingsScreen>
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
-          // ── Units ─────────────────────────────────────────────────────────
-          SwitchListTile(
-            title: const Text('Use metric units'),
-            subtitle: Text(_unitsMetric ? 'kg' : 'lbs'),
-            value: _unitsMetric,
-            contentPadding: EdgeInsets.zero,
-            onChanged: (v) => setState(() => _unitsMetric = v),
-          ),
-          const SizedBox(height: 8),
-
-          // ── AI Recommendations ────────────────────────────────────────────
-          SwitchListTile(
-            title: const Text('AI Recommendations'),
-            subtitle: const Text(
-                'Use AI to pre-fill set targets based on your history and profile.'),
-            value: _aiEnabled,
-            contentPadding: EdgeInsets.zero,
-            onChanged: (v) => setState(() => _aiEnabled = v),
+          // ── General ───────────────────────────────────────────────────────
+          _sectionLabel('General'),
+          Card.outlined(
+            child: SwitchListTile(
+              title: const Text('Metric units'),
+              subtitle: Text(_unitsMetric ? 'kg' : 'lbs'),
+              value: _unitsMetric,
+              onChanged: (v) => setState(() => _unitsMetric = v),
+            ),
           ),
           const SizedBox(height: 24),
 
-          // ── API Key ───────────────────────────────────────────────────────
-          Text('OpenRouter API Key (not implimented)',
-              style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 8),
-          if (_apiKeyLoading)
-            const LinearProgressIndicator()
-          else
-            TextField(
-              controller: _apiKeyController,
-              obscureText: _obscureApiKey,
-              decoration: InputDecoration(
-                border: const OutlineInputBorder(),
-                hintText: 'sk-or-...',
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscureApiKey ? Icons.visibility : Icons.visibility_off,
-                  ),
-                  onPressed: () =>
-                      setState(() => _obscureApiKey = !_obscureApiKey),
+          // ── AI Recommendations ────────────────────────────────────────────
+          _sectionLabel('AI Recommendations'),
+          Card.outlined(
+            child: Column(
+              children: [
+                SwitchListTile(
+                  title: const Text('AI Recommendations'),
+                  subtitle: const Text(
+                      'Pre-fill set targets based on your history and profile.'),
+                  value: _aiEnabled,
+                  onChanged: (v) => setState(() => _aiEnabled = v),
                 ),
-              ),
+                const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('OpenRouter API Key (not implemented)',
+                          style: Theme.of(context).textTheme.bodySmall),
+                      const SizedBox(height: 8),
+                      if (_apiKeyLoading)
+                        const LinearProgressIndicator()
+                      else
+                        TextField(
+                          controller: _apiKeyController,
+                          obscureText: _obscureApiKey,
+                          decoration: InputDecoration(
+                            border: const OutlineInputBorder(),
+                            hintText: 'sk-or-...',
+                            isDense: true,
+                            suffixIcon: IconButton(
+                              icon: Icon(_obscureApiKey
+                                  ? Icons.visibility
+                                  : Icons.visibility_off),
+                              onPressed: () => setState(
+                                  () => _obscureApiKey = !_obscureApiKey),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
+          ),
           const SizedBox(height: 24),
 
           // ── Rest Timer ────────────────────────────────────────────────────
-          SwitchListTile(
-            title: const Text('Rest Timer'),
-            subtitle: const Text('Show a countdown timer between sets.'),
-            value: _timerEnabled,
-            contentPadding: EdgeInsets.zero,
-            onChanged: (v) => setState(() => _timerEnabled = v),
-          ),
-          if (_timerEnabled) ...[
-            const SizedBox(height: 4),
-            TextField(
-              controller: _timerSecondsCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Default rest (seconds)',
-                isDense: true,
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.number,
-              onChanged: (v) {
-                final seconds = int.tryParse(v.trim());
-                if (seconds != null && seconds > 0) {
-                  setState(() => _timerDefaultSeconds = seconds);
-                }
-              },
-            ),
-            const SizedBox(height: 8),
-            const Text('Sound'),
-            RadioGroup<TimerSound>(
-              groupValue: _timerSound,
-              onChanged: (v) => setState(() => _timerSound = v!),
-              child: Column(
-                children: const [
-                  RadioListTile<TimerSound>(
-                    title: Text('Read target value aloud'),
-                    value: TimerSound.tts,
-                    contentPadding: EdgeInsets.zero,
+          _sectionLabel('Rest Timer'),
+          Card.outlined(
+            child: Column(
+              children: [
+                SwitchListTile(
+                  title: const Text('Rest Timer'),
+                  subtitle: const Text('Countdown timer between sets.'),
+                  value: _timerEnabled,
+                  onChanged: (v) => setState(() => _timerEnabled = v),
+                ),
+                if (_timerEnabled) ...[
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: TextField(
+                      controller: _timerSecondsCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Default rest (seconds)',
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                      onChanged: (v) {
+                        final seconds = int.tryParse(v.trim());
+                        if (seconds != null && seconds > 0) {
+                          setState(() => _timerDefaultSeconds = seconds);
+                        }
+                      },
+                    ),
                   ),
-                  RadioListTile<TimerSound>(
-                    title: Text('Chime ("ready")'),
-                    value: TimerSound.chime,
-                    contentPadding: EdgeInsets.zero,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('Alert sound',
+                          style: Theme.of(context).textTheme.bodySmall),
+                    ),
                   ),
-                  RadioListTile<TimerSound>(
-                    title: Text('Silent'),
-                    value: TimerSound.silent,
-                    contentPadding: EdgeInsets.zero,
+                  RadioGroup<TimerSound>(
+                    groupValue: _timerSound,
+                    onChanged: (v) => setState(() => _timerSound = v!),
+                    child: const Column(
+                      children: [
+                        RadioListTile<TimerSound>(
+                          title: Text('Read target value aloud'),
+                          value: TimerSound.tts,
+                        ),
+                        RadioListTile<TimerSound>(
+                          title: Text('Chime ("ready")'),
+                          value: TimerSound.chime,
+                        ),
+                        RadioListTile<TimerSound>(
+                          title: Text('Silent'),
+                          value: TimerSound.silent,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  SwitchListTile(
+                    title: const Text('Haptic feedback'),
+                    subtitle: const Text('Vibrate when the timer reaches zero.'),
+                    value: _timerHaptic,
+                    onChanged: (v) => setState(() => _timerHaptic = v),
+                  ),
+                  SwitchListTile(
+                    title: const Text('Keep screen awake'),
+                    subtitle: const Text('Prevent sleep during a workout.'),
+                    value: _timerKeepAwake,
+                    onChanged: (v) => setState(() => _timerKeepAwake = v),
                   ),
                 ],
-              ),
+              ],
             ),
-            SwitchListTile(
-              title: const Text('Haptic feedback'),
-              subtitle: const Text('Vibrate when the timer reaches zero.'),
-              value: _timerHaptic,
-              contentPadding: EdgeInsets.zero,
-              onChanged: (v) => setState(() => _timerHaptic = v),
-            ),
-            SwitchListTile(
-              title: const Text('Keep screen awake'),
-              subtitle: const Text('Prevent the screen from sleeping during a workout.'),
-              value: _timerKeepAwake,
-              contentPadding: EdgeInsets.zero,
-              onChanged: (v) => setState(() => _timerKeepAwake = v),
-            ),
-          ],
-          const SizedBox(height: 32),
-
-          // ── Backup ────────────────────────────────────────────────────────
-          SwitchListTile(
-            title: const Text('Enable Backups'),
-            value: _backupEnabled,
-            contentPadding: EdgeInsets.zero,
-            onChanged: _isBusy
-                ? null
-                : (v) => setState(() => _backupEnabled = v),
           ),
-          if (_backupEnabled) ...[
-            const SizedBox(height: 4),
-            Row(
+          const SizedBox(height: 24),
+
+          // ── Backup & Restore ──────────────────────────────────────────────
+          _sectionLabel('Backup & Restore'),
+          Card.outlined(
+            child: Column(
               children: [
-                Expanded(
-                  child: Text(
-                    _backupDirPath ?? 'No backup location set',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                TextButton(
-                  onPressed: _isBusy ? null : _pickBackupLocation,
-                  child: const Text('Export Folder'),
-                ),
-              ],
-            ),
-            if (_lastBackupTimestamp != null) ...[
-              const SizedBox(height: 2),
-              Text(
-                'Last backup: ${_formatTimestamp(_lastBackupTimestamp!)}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-            const SizedBox(height: 4),
-            SwitchListTile(
-              title: const Text('Automatic Backups'),
-              subtitle: const Text('Run a backup daily at the scheduled time.'),
-              value: _autoBackupEnabled,
-              contentPadding: EdgeInsets.zero,
-              onChanged: _isBusy
-                  ? null
-                  : (v) => setState(() => _autoBackupEnabled = v),
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Backup time: ${_backupHour.toString().padLeft(2, '0')}:${_backupMinute.toString().padLeft(2, '0')}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
-                TextButton(
-                  onPressed: _isBusy
+                SwitchListTile(
+                  title: const Text('Enable Backups'),
+                  value: _backupEnabled,
+                  onChanged: _isBusy
                       ? null
-                      : () async {
-                          final picked = await showTimePicker(
-                            context: context,
-                            initialTime: TimeOfDay(
-                                hour: _backupHour, minute: _backupMinute),
-                          );
-                          if (picked == null || !mounted) return;
-                          setState(() {
-                            _backupHour = picked.hour;
-                            _backupMinute = picked.minute;
-                          });
-                        },
-                  child: const Text('Change time'),
+                      : (v) => setState(() => _backupEnabled = v),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: (_backupDirPath == null || _isBusy) ? null : _backupNow,
-                    child: _isBusy
-                        ? const SizedBox(
-                            height: 16,
-                            width: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                if (_backupEnabled) ...[
+                  const Divider(height: 1),
+                  ListTile(
+                    title: Text(
+                      _backupDirPath ?? 'No backup location set',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: _lastBackupTimestamp != null
+                        ? Text(
+                            'Last backup: ${_formatTimestamp(_lastBackupTimestamp!)}',
+                            style: Theme.of(context).textTheme.bodySmall,
                           )
-                        : const Text('Back Up Now'),
+                        : null,
+                    trailing: TextButton(
+                      onPressed: _isBusy ? null : _pickBackupLocation,
+                      child: const Text('Choose folder'),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isBusy ? null : _restoreFromBackup,
-                    child: const Text('Restore'),
+                  const Divider(height: 1),
+                  SwitchListTile(
+                    title: const Text('Automatic Backups'),
+                    subtitle: const Text('Run a backup daily at the scheduled time.'),
+                    value: _autoBackupEnabled,
+                    onChanged: _isBusy
+                        ? null
+                        : (v) => setState(() => _autoBackupEnabled = v),
                   ),
-                ),
+                  ListTile(
+                    title: Text(
+                      'Backup time: ${_backupHour.toString().padLeft(2, '0')}:${_backupMinute.toString().padLeft(2, '0')}',
+                    ),
+                    trailing: TextButton(
+                      onPressed: _isBusy
+                          ? null
+                          : () async {
+                              final picked = await showTimePicker(
+                                context: context,
+                                initialTime: TimeOfDay(
+                                    hour: _backupHour, minute: _backupMinute),
+                              );
+                              if (picked == null || !mounted) return;
+                              setState(() {
+                                _backupHour = picked.hour;
+                                _backupMinute = picked.minute;
+                              });
+                            },
+                      child: const Text('Change'),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed:
+                                (_backupDirPath == null || _isBusy) ? null : _backupNow,
+                            child: _isBusy
+                                ? const SizedBox(
+                                    height: 16,
+                                    width: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Text('Back Up Now'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _isBusy ? null : _restoreFromBackup,
+                            child: const Text('Restore'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
-          ],
+          ),
         ],
       ),
     );
