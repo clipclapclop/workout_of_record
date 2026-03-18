@@ -17,7 +17,8 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends State<SettingsScreen>
+    with WidgetsBindingObserver {
   late bool _aiEnabled;
   late bool _unitsMetric;
   final _apiKeyController = TextEditingController();
@@ -38,6 +39,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _backupDirPath;
   DateTime? _lastBackupTimestamp;
   bool _isBusy = false;
+  bool _pendingFolderPick = false;
 
   // Initial values for dirty-checking
   late bool _initAiEnabled;
@@ -102,11 +104,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _initBackupMinute = _backupMinute;
     _initBackupDirPath = _backupDirPath;
 
+    WidgetsBinding.instance.addObserver(this);
     _loadApiKey();
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _pendingFolderPick) {
+      _pendingFolderPick = false;
+      _continueFolderPick();
+    }
+  }
+
+  Future<void> _continueFolderPick() async {
+    final status = await Permission.manageExternalStorage.status;
+    if (!status.isGranted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Storage permission required to set backup location.'),
+            action: SnackBarAction(label: 'Settings', onPressed: openAppSettings),
+          ),
+        );
+      }
+      return;
+    }
+    final dirPath = await FilePicker.platform.getDirectoryPath();
+    if (dirPath == null) return;
+    if (mounted) setState(() => _backupDirPath = dirPath);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _apiKeyController.dispose();
     _timerSecondsCtrl.dispose();
     super.dispose();
@@ -124,22 +154,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _pickBackupLocation() async {
-    var status = await Permission.manageExternalStorage.status;
-    if (!status.isGranted) {
-      status = await Permission.manageExternalStorage.request();
-      if (!status.isGranted && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Storage permission required to set backup location.'),
-            action: SnackBarAction(label: 'Settings', onPressed: openAppSettings),
-          ),
-        );
-        return;
-      }
+    final status = await Permission.manageExternalStorage.status;
+    if (status.isGranted) {
+      await _continueFolderPick();
+      return;
     }
-    final dirPath = await FilePicker.platform.getDirectoryPath();
-    if (dirPath == null) return;
-    if (mounted) setState(() => _backupDirPath = dirPath);
+    // MANAGE_EXTERNAL_STORAGE always redirects to system settings.
+    // Set the flag first; didChangeAppLifecycleState resumes the flow when
+    // the user returns to the app (whether they granted or denied).
+    _pendingFolderPick = true;
+    await Permission.manageExternalStorage.request();
   }
 
   Future<void> _backupNow() async {

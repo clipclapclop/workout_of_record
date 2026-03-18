@@ -8,7 +8,7 @@
 PRODUCT_NAME = workout_of_record
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.workoutOfRecord
+PRODUCT_BUNDLE_IDENTIFIER = com.clipclapclop.workoutofrecord
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 com.example. All rights reserved.

@@ -1,4 +1,4 @@
-package com.example.workout_of_record
+package com.clipclapclop.workoutofrecord
 
 import io.flutter.embedding.android.FlutterActivity
 
