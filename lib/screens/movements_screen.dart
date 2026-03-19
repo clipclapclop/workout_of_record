@@ -56,7 +56,11 @@ class _MovementsScreenState extends State<MovementsScreen> {
 
   List<Movement> _filter(List<Movement> all) {
     if (_query.isEmpty) return all;
-    return all.where((m) => m.name.toLowerCase().contains(_query)).toList();
+    final words = _query.split(RegExp(r'\s+'));
+    return all.where((m) {
+      final name = m.name.toLowerCase();
+      return words.every((w) => name.contains(w));
+    }).toList();
   }
 
   @override
