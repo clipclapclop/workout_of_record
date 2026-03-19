@@ -6,6 +6,8 @@ import '../db/tables/enums.dart';
 import '../widgets/app_nav_menu.dart';
 import 'movement_detail_screen.dart';
 
+enum _SortMode { muscleGroup, alphabetical }
+
 class MovementsScreen extends StatefulWidget {
   const MovementsScreen({
     super.key,
@@ -22,11 +24,23 @@ class MovementsScreen extends StatefulWidget {
 
 class _MovementsScreenState extends State<MovementsScreen> {
   late Future<List<Movement>> _movementsFuture;
+  final _searchController = TextEditingController();
+  String _query = '';
+  _SortMode _sortMode = _SortMode.muscleGroup;
 
   @override
   void initState() {
     super.initState();
     _movementsFuture = db.getMovements();
+    _searchController.addListener(() {
+      setState(() => _query = _searchController.text.trim().toLowerCase());
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   void _reload() {
@@ -40,6 +54,11 @@ class _MovementsScreenState extends State<MovementsScreen> {
     return name[0].toUpperCase() + name.substring(1);
   }
 
+  List<Movement> _filter(List<Movement> all) {
+    if (_query.isEmpty) return all;
+    return all.where((m) => m.name.toLowerCase().contains(_query)).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -47,6 +66,21 @@ class _MovementsScreenState extends State<MovementsScreen> {
         title: const Text('Exercises'),
         automaticallyImplyLeading: false,
         actions: [
+          IconButton(
+            tooltip: _sortMode == _SortMode.muscleGroup
+                ? 'Sort alphabetically'
+                : 'Sort by muscle group',
+            icon: Icon(
+              _sortMode == _SortMode.muscleGroup
+                  ? Icons.sort_by_alpha
+                  : Icons.category_outlined,
+            ),
+            onPressed: () => setState(() {
+              _sortMode = _sortMode == _SortMode.muscleGroup
+                  ? _SortMode.alphabetical
+                  : _SortMode.muscleGroup;
+            }),
+          ),
           AppNavMenu(
             current: AppScreen.exercises,
             activeWorkoutId: widget.activeWorkoutId,
@@ -69,60 +103,112 @@ class _MovementsScreenState extends State<MovementsScreen> {
         },
         child: const Icon(Icons.add),
       ),
-      body: FutureBuilder<List<Movement>>(
-        future: _movementsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-          final allMovements = snapshot.data!;
-
-          // Group by muscle group (DB already sorted by muscleGroup then name).
-          final groups = <MuscleGroup, List<Movement>>{};
-          for (final m in allMovements) {
-            groups.putIfAbsent(m.muscleGroup, () => []).add(m);
-          }
-          final sortedGroups = groups.keys.toList()
-            ..sort((a, b) => a.name.compareTo(b.name));
-
-          return ListView.builder(
-            itemCount: sortedGroups.fold<int>(0, (sum, mg) => sum + 1 + groups[mg]!.length),
-            itemBuilder: (context, index) {
-              // Map flat index → (group header or item).
-              var remaining = index;
-              for (final mg in sortedGroups) {
-                if (remaining == 0) {
-                  return _GroupHeader(label: _mgLabel(mg));
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search exercises…',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _query.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () => _searchController.clear(),
+                      )
+                    : null,
+                isDense: true,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ),
+          Expanded(
+            child: FutureBuilder<List<Movement>>(
+              future: _movementsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
                 }
-                remaining--;
-                final items = groups[mg]!;
-                if (remaining < items.length) {
-                  return _MovementTile(
-                    movement: items[remaining],
-                    onTap: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => MovementDetailScreen(
-                            movement: items[remaining],
-                            activeWorkoutId: widget.activeWorkoutId,
-                            activeWorkoutName: widget.activeWorkoutName,
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
+                final movements = _filter(snapshot.data!);
+
+                if (movements.isEmpty) {
+                  return const Center(child: Text('No exercises found.'));
+                }
+
+                if (_sortMode == _SortMode.alphabetical) {
+                  final sorted = [...movements]
+                    ..sort((a, b) => a.name.compareTo(b.name));
+                  return ListView.builder(
+                    itemCount: sorted.length,
+                    itemBuilder: (context, i) => _MovementTile(
+                      movement: sorted[i],
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => MovementDetailScreen(
+                              movement: sorted[i],
+                              activeWorkoutId: widget.activeWorkoutId,
+                              activeWorkoutName: widget.activeWorkoutName,
+                            ),
                           ),
-                        ),
-                      );
-                      _reload();
-                    },
+                        );
+                        _reload();
+                      },
+                    ),
                   );
                 }
-                remaining -= items.length;
-              }
-              return const SizedBox.shrink();
-            },
-          );
-        },
+
+                // Muscle-group mode
+                final groups = <MuscleGroup, List<Movement>>{};
+                for (final m in movements) {
+                  groups.putIfAbsent(m.muscleGroup, () => []).add(m);
+                }
+                final sortedGroups = groups.keys.toList()
+                  ..sort((a, b) => a.name.compareTo(b.name));
+
+                return ListView.builder(
+                  itemCount: sortedGroups.fold<int>(
+                      0, (sum, mg) => sum + 1 + groups[mg]!.length),
+                  itemBuilder: (context, index) {
+                    var remaining = index;
+                    for (final mg in sortedGroups) {
+                      if (remaining == 0) {
+                        return _GroupHeader(label: _mgLabel(mg));
+                      }
+                      remaining--;
+                      final items = groups[mg]!;
+                      if (remaining < items.length) {
+                        return _MovementTile(
+                          movement: items[remaining],
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => MovementDetailScreen(
+                                  movement: items[remaining],
+                                  activeWorkoutId: widget.activeWorkoutId,
+                                  activeWorkoutName: widget.activeWorkoutName,
+                                ),
+                              ),
+                            );
+                            _reload();
+                          },
+                        );
+                      }
+                      remaining -= items.length;
+                    }
+                    return const SizedBox.shrink();
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
