@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../db/tables/enums.dart';
 import '../db/workout_data.dart';
+import '../services/workout_foreground_service.dart';
 import 'rest_timer_controller.dart';
 import 'rest_timer_widget.dart';
 import 'set_ui_state.dart';
@@ -121,7 +122,10 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
         RestTimerController(durationSeconds: widget.timerDurationSeconds);
     if (_timerRunnable) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _timerController.start();
+        if (mounted) {
+          _timerController.start();
+          _pushToService();
+        }
       });
     }
   }
@@ -147,16 +151,24 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
     // Exercise became active and ready — start the timer.
     if (!wasRunnable && isRunnable && widget.timerEnabled && widget.workoutTimerOn) {
       _timerController.start();
+      _pushToService();
     }
 
     // Exercise became inactive, skipped, or all sets done — stop the timer.
     if (wasRunnable && !isRunnable) {
       _timerController.stop();
+      _pushToService();
     }
 
     // Per-workout timer toggled off.
     if (old.workoutTimerOn && !widget.workoutTimerOn) {
       _timerController.stop();
+      _pushToService();
+    }
+
+    // Cue text changed (next set updated) — keep background in sync.
+    if (old.cueText != widget.cueText && widget.isActive) {
+      _pushToService();
     }
   }
 
@@ -164,6 +176,23 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
   void dispose() {
     _timerController.dispose();
     super.dispose();
+  }
+
+  /// Push current exercise/timer state to the foreground service notification.
+  void _pushToService() {
+    if (!widget.isActive || !_showTimer) {
+      WorkoutForegroundService.clearTimer();
+      return;
+    }
+    WorkoutForegroundService.clearCued();
+    WorkoutForegroundService.update(
+      exerciseName: widget.exercise.movement.name,
+      cueText: widget.cueText,
+      timerEndsAt: _timerController.isRunning
+          ? DateTime.now()
+              .add(Duration(milliseconds: _timerController.remainingMs))
+          : null,
+    );
   }
 
   /// Called by a SetWidget on its first interaction. Resets and restarts the
@@ -174,6 +203,7 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
         widget.workoutTimerOn) {
       _timerController.reset();
       _timerController.start();
+      _pushToService();
     }
   }
 

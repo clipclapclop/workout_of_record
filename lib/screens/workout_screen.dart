@@ -7,6 +7,7 @@ import '../db/db.dart';
 import '../db/history_data.dart';
 import '../db/tables/enums.dart';
 import '../db/workout_data.dart';
+import '../services/workout_foreground_service.dart';
 import '../widgets/app_nav_menu.dart';
 import '../widgets/exercise_widget.dart';
 import '../widgets/movement_picker_sheet.dart';
@@ -45,6 +46,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   void initState() {
     super.initState();
     _load();
+    WorkoutForegroundService.start();
   }
 
   @override
@@ -53,6 +55,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       s.dispose();
     }
     WakelockPlus.disable();
+    WorkoutForegroundService.stop();
     super.dispose();
   }
 

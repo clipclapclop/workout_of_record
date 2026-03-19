@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../services/workout_cue_service.dart';
+import '../services/workout_foreground_service.dart';
 import 'rest_timer_controller.dart';
 
 /// Displays a countdown rest timer with stop / reset / per-workout-toggle controls.
@@ -66,7 +67,13 @@ class _RestTimerWidgetState extends State<RestTimerWidget> {
     // Fire cue once when the running timer first hits zero.
     if (ctrl.isRunning && ctrl.remainingMs <= 0 && !ctrl.cued) {
       ctrl.markCued(); // stops ticking, sets cued=true, notifies
-      WorkoutCueService.fire(widget.cueText);
+      if (WorkoutForegroundService.cuedByBackground) {
+        // Background already fired the cue — skip TTS/haptic but still stop the ticker.
+        WorkoutForegroundService.clearCued();
+      } else {
+        WorkoutCueService.fire(widget.cueText);
+        WorkoutForegroundService.notifyWidgetCued();
+      }
     }
     if (mounted) setState(() {});
   }

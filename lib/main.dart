@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 import 'app_preferences.dart';
 import 'screens/home_screen.dart';
 import 'services/backup_scheduler.dart';
+import 'services/workout_foreground_service.dart';
 import 'theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  FlutterForegroundTask.initCommunicationPort();
+  WorkoutForegroundService.init();
+  WorkoutForegroundService.initReceiver();
   await AppPreferences.init();
   if (AppPreferences.getBackupEnabled() && AppPreferences.getAutoBackupEnabled()) {
     await BackupScheduler.schedule(

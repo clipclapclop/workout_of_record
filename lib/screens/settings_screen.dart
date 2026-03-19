@@ -503,7 +503,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   ListTile(
                     title: Text(
-                      'Backup time: ${_backupHour.toString().padLeft(2, '0')}:${_backupMinute.toString().padLeft(2, '0')}',
+                      'Backup time: ${TimeOfDay(hour: _backupHour, minute: _backupMinute).format(context)}',
                     ),
                     trailing: TextButton(
                       onPressed: _isBusy
