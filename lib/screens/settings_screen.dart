@@ -5,6 +5,7 @@ import '../app_preferences.dart';
 import '../db/tables/enums.dart';
 import '../services/backup_scheduler.dart';
 import '../services/backup_service.dart';
+import '../services/saf_service.dart';
 import '../widgets/app_nav_menu.dart';
 import 'home_screen.dart';
 
@@ -122,9 +123,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _pickBackupLocation() async {
-    final dirPath = await FilePicker.platform.getDirectoryPath();
-    if (dirPath == null) return;
-    if (mounted) setState(() => _backupDirPath = dirPath);
+    final uri = await SafService.pickFolder();
+    if (uri == null) return;
+    await AppPreferences.setBackupDirectoryPath(uri);
+    if (mounted) setState(() => _backupDirPath = uri);
   }
 
   Future<void> _backupNow() async {
@@ -528,8 +530,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         Expanded(
                           child: OutlinedButton(
-                            onPressed:
-                                (_backupDirPath == null || _isBusy) ? null : _backupNow,
+                            onPressed: (_isBusy || _backupDirPath == null) ? null : _backupNow,
                             child: _isBusy
                                 ? const SizedBox(
                                     height: 16,

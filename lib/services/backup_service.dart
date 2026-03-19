@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
@@ -7,13 +8,15 @@ import 'package:path_provider/path_provider.dart';
 
 import '../app_preferences.dart';
 import '../db/tables/enums.dart';
+import 'saf_service.dart';
 
 class BackupService {
   static const _dbFileName = 'workout_of_record.sqlite';
   static const _settingsFileName = 'settings.json';
   static const zipFileName = 'workout_of_record.zip';
 
-  static Future<void> backup(String dirPath) async {
+  /// Builds the backup zip and returns raw bytes without writing to disk.
+  static Future<Uint8List> buildBackupBytes() async {
     final docsDir = await getApplicationDocumentsDirectory();
     final dbFile = File(p.join(docsDir.path, _dbFileName));
     if (!await dbFile.exists()) throw Exception('Database file not found');
@@ -27,10 +30,15 @@ class BackupService {
 
     final zipBytes = ZipEncoder().encode(archive);
     if (zipBytes == null) throw Exception('Failed to create ZIP');
+    return Uint8List.fromList(zipBytes);
+  }
 
-    final destZip = File(p.join(dirPath, zipFileName));
-    await destZip.writeAsBytes(zipBytes);
-
+  /// Writes backup zip to the user-chosen SAF folder at [folderUri].
+  /// Used by both "Backup Now" and is mirrored natively by [SafBackupWorker]
+  /// for scheduled auto-backup.
+  static Future<void> backup(String folderUri) async {
+    final zipBytes = await buildBackupBytes();
+    await SafService.writeFile(folderUri, zipBytes);
     await AppPreferences.setLastBackupTimestamp(DateTime.now());
   }
 

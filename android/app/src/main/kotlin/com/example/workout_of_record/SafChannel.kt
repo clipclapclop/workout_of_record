@@ -1,0 +1,116 @@
+package com.clipclapclop.workoutofrecord
+
+import android.app.Activity
+import android.content.Intent
+import android.net.Uri
+import androidx.documentfile.provider.DocumentFile
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import io.flutter.plugin.common.MethodCall
+import io.flutter.plugin.common.MethodChannel
+import java.util.Calendar
+import java.util.concurrent.TimeUnit
+
+class SafChannel(private val activity: MainActivity) {
+
+    companion object {
+        const val CHANNEL = "workout_of_record/saf"
+        private const val REQUEST_PICK_FOLDER = 1001
+        private const val WORK_NAME = "saf_backup"
+    }
+
+    private var pendingResult: MethodChannel.Result? = null
+
+    fun handleMethodCall(call: MethodCall, result: MethodChannel.Result) {
+        when (call.method) {
+            "pickFolder" -> pickFolder(result)
+            "writeFile" -> {
+                val uri = call.argument<String>("uri")!!
+                val bytes = call.argument<ByteArray>("bytes")!!
+                writeFile(uri, bytes, result)
+            }
+            "scheduleBackup" -> {
+                val hour = call.argument<Int>("hour")!!
+                val minute = call.argument<Int>("minute")!!
+                scheduleBackup(hour, minute, result)
+            }
+            "cancelBackup" -> cancelBackup(result)
+            else -> result.notImplemented()
+        }
+    }
+
+    private fun pickFolder(result: MethodChannel.Result) {
+        pendingResult = result
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+            )
+        }
+        @Suppress("DEPRECATION")
+        activity.startActivityForResult(intent, REQUEST_PICK_FOLDER)
+    }
+
+    fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode != REQUEST_PICK_FOLDER) return
+        val result = pendingResult ?: return
+        pendingResult = null
+        if (resultCode != Activity.RESULT_OK || data?.data == null) {
+            result.success(null)
+            return
+        }
+        val uri = data.data!!
+        activity.contentResolver.takePersistableUriPermission(
+            uri,
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        )
+        result.success(uri.toString())
+    }
+
+    private fun writeFile(uriString: String, bytes: ByteArray, result: MethodChannel.Result) {
+        try {
+            val treeUri = Uri.parse(uriString)
+            val tree = DocumentFile.fromTreeUri(activity, treeUri)
+                ?: throw Exception("Cannot access folder")
+            val existing = tree.findFile(SafBackupWorker.ZIP_FILENAME)
+            val target = existing ?: tree.createFile("application/zip", SafBackupWorker.ZIP_FILENAME)
+                ?: throw Exception("Cannot create file in folder")
+            activity.contentResolver.openOutputStream(target.uri, "w")!!.use {
+                it.write(bytes)
+            }
+            result.success(null)
+        } catch (e: Exception) {
+            result.error("WRITE_FAILED", e.message, null)
+        }
+    }
+
+    private fun scheduleBackup(hour: Int, minute: Int, result: MethodChannel.Result) {
+        try {
+            val now = Calendar.getInstance()
+            val next = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, hour)
+                set(Calendar.MINUTE, minute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            if (!next.after(now)) next.add(Calendar.DAY_OF_MONTH, 1)
+            val initialDelayMs = next.timeInMillis - now.timeInMillis
+            val request = PeriodicWorkRequestBuilder<SafBackupWorker>(24, TimeUnit.HOURS)
+                .setInitialDelay(initialDelayMs, TimeUnit.MILLISECONDS)
+                .build()
+            @Suppress("DEPRECATION")
+            WorkManager.getInstance(activity)
+                .enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.REPLACE, request)
+            result.success(null)
+        } catch (e: Exception) {
+            result.error("SCHEDULE_FAILED", e.message, null)
+        }
+    }
+
+    private fun cancelBackup(result: MethodChannel.Result) {
+        WorkManager.getInstance(activity).cancelUniqueWork(WORK_NAME)
+        result.success(null)
+    }
+}
