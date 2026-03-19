@@ -367,39 +367,31 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
                             ),
                           ),
                         ListTile(
-                          tileColor: ex.aiPlanned
-                              ? null
-                              : Colors.amber.shade50,
                           leading: ReorderableDragStartListener(
                             index: i,
                             child: const Icon(Icons.drag_handle),
                           ),
                           title: Text(m.name),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete_outline),
+                            tooltip: 'Remove',
+                            onPressed: () => _removeExercise(dayIndex, i),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(72, 0, 16, 8),
+                          child: Row(
                             children: [
-                              Tooltip(
-                                message: ex.aiPlanned
-                                    ? 'AI controlled — tap to set as PT'
-                                    : 'PT (manual) — tap to set as AI',
-                                child: IconButton(
-                                  icon: Icon(
-                                    ex.aiPlanned
-                                        ? Icons.psychology_outlined
-                                        : Icons.fitness_center,
-                                    size: 20,
-                                    color: ex.aiPlanned
-                                        ? Theme.of(context).colorScheme.primary
-                                        : Colors.amber.shade700,
-                                  ),
-                                  onPressed: () => setState(
-                                      () => ex.aiPlanned = !ex.aiPlanned),
+                              Text(
+                                'AI planned',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurface.withAlpha(160),
                                 ),
                               ),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline),
-                                tooltip: 'Remove',
-                                onPressed: () => _removeExercise(dayIndex, i),
+                              const Spacer(),
+                              Switch(
+                                value: ex.aiPlanned,
+                                onChanged: (v) => setState(() => ex.aiPlanned = v),
                               ),
                             ],
                           ),
