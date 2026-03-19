@@ -61,6 +61,14 @@ class AppPreferences {
   static Future<void> setCalorieState(CalorieState? v) =>
       v == null ? _prefs.remove(_kProfileCalorieState) : _prefs.setString(_kProfileCalorieState, v.name);
 
+  static DateTime? getTrainingStartDate() {
+    final s = _prefs.getString(_kProfileTrainingStartDate);
+    return s == null ? null : DateTime.parse(s);
+  }
+  static Future<void> setTrainingStartDate(DateTime? v) => v == null
+      ? _prefs.remove(_kProfileTrainingStartDate)
+      : _prefs.setString(_kProfileTrainingStartDate, v.toIso8601String());
+
   // ── Settings ───────────────────────────────────────────────────────────────
 
   static bool getAiEnabled() => _prefs.getBool(_kSettingsAiEnabled) ?? true;
@@ -134,6 +142,7 @@ class AppPreferences {
   static const _kProfileWeight = 'profile_weight_kg';
   static const _kProfileTrainingGoal = 'profile_training_goal';
   static const _kProfileCalorieState = 'profile_calorie_state';
+  static const _kProfileTrainingStartDate = 'profile_training_start_date';
   static const _kSettingsAiEnabled = 'settings_ai_enabled';
   static const _kSettingsUnitsMetric = 'settings_units_metric';
   static const _kSettingsApiKey = 'settings_api_key';

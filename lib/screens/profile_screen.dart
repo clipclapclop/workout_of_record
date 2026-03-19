@@ -15,6 +15,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   DateTime? _dateOfBirth;
   final _weightController = TextEditingController();
+  final _liftingYearsController = TextEditingController();
   TrainingGoal? _trainingGoal;
   CalorieState? _calorieState;
 
@@ -26,11 +27,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (weight != null) _weightController.text = weight.toString();
     _trainingGoal = AppPreferences.getTrainingGoal();
     _calorieState = AppPreferences.getCalorieState();
+    final startDate = AppPreferences.getTrainingStartDate();
+    if (startDate != null) {
+      final years = DateTime.now().difference(startDate).inDays / 365.25;
+      final rounded = double.parse(years.toStringAsFixed(1));
+      _liftingYearsController.text =
+          rounded == rounded.truncateToDouble() ? rounded.toInt().toString() : rounded.toString();
+    }
   }
 
   @override
   void dispose() {
     _weightController.dispose();
+    _liftingYearsController.dispose();
     super.dispose();
   }
 
@@ -48,10 +57,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _save() async {
     final weight = double.tryParse(_weightController.text.trim());
+    final liftingYears = double.tryParse(_liftingYearsController.text.trim());
+    DateTime? trainingStartDate;
+    if (liftingYears != null && liftingYears > 0) {
+      final days = (liftingYears * 365.25).round();
+      trainingStartDate = DateTime.now().subtract(Duration(days: days));
+    }
     await AppPreferences.setDateOfBirth(_dateOfBirth);
     await AppPreferences.setWeight(weight);
     await AppPreferences.setTrainingGoal(_trainingGoal);
     await AppPreferences.setCalorieState(_calorieState);
+    await AppPreferences.setTrainingStartDate(trainingStartDate);
     if (mounted) {
       Navigator.pushAndRemoveUntil(
         context,
@@ -146,6 +162,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
               labelText: 'Weight',
               border: const OutlineInputBorder(),
               suffixText: AppPreferences.getUnitsMetric() ? 'kg' : 'lbs',
+            ),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Years Lifting ─────────────────────────────────────────────────
+          TextField(
+            controller: _liftingYearsController,
+            decoration: const InputDecoration(
+              labelText: 'Years lifting / exercising',
+              hintText: 'e.g. 3.5',
+              border: OutlineInputBorder(),
+              suffixText: 'yrs',
             ),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
           ),
