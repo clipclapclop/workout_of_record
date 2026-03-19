@@ -6,14 +6,21 @@ import '../db/template_data.dart';
 import '../widgets/app_nav_menu.dart';
 import '../widgets/movement_picker_sheet.dart';
 
+/// Per-exercise draft state within a day — tracks movement + AI-control flag.
+class _ExDraft {
+  _ExDraft(this.movement, {this.aiPlanned = true});
+  final Movement movement;
+  bool aiPlanned;
+}
+
 /// In-memory representation of one day while the user is building the template.
 class _DayDraft {
-  _DayDraft({required this.name, required this.isRestDay, List<Movement>? exercises})
+  _DayDraft({required this.name, required this.isRestDay, List<_ExDraft>? exercises})
       : exercises = exercises ?? [];
 
   String name;
   bool isRestDay;
-  List<Movement> exercises;
+  List<_ExDraft> exercises;
 }
 
 class MesoTemplateBuilderScreen extends StatefulWidget {
@@ -62,7 +69,9 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
             .map((d) => _DayDraft(
                   name: d.template.name,
                   isRestDay: d.template.isRestDay,
-                  exercises: List<Movement>.from(d.movements),
+                  exercises: d.exercises
+                      .map((e) => _ExDraft(e.movement, aiPlanned: e.aiPlanned))
+                      .toList(),
                 ))
             .toList()
         : [];
@@ -141,8 +150,8 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
     await showMovementPickerSheet(
       context: context,
       allMovements: movs,
-      alreadyAdded: {for (final e in day.exercises) e.id},
-      onAdd: (m) => setState(() => day.exercises.add(m)),
+      alreadyAdded: {for (final e in day.exercises) e.movement.id},
+      onAdd: (m) => setState(() => day.exercises.add(_ExDraft(m))),
     );
   }
 
@@ -188,7 +197,12 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
           .map((d) => WorkoutDaySpec(
                 name: d.name.trim(),
                 isRestDay: d.isRestDay,
-                movementIds: d.exercises.map((e) => e.id).toList(),
+                exercises: d.exercises
+                    .map((e) => ExerciseSpec(
+                          movementId: e.movement.id,
+                          aiPlanned: e.aiPlanned,
+                        ))
+                    .toList(),
               ))
           .toList();
 
@@ -326,9 +340,10 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
                   onReorder: (old, newIdx) =>
                       _reorderExercises(dayIndex, old, newIdx),
                   itemBuilder: (context, i) {
-                    final m = day.exercises[i];
+                    final ex = day.exercises[i];
+                    final m = ex.movement;
                     final showHeader = i == 0 ||
-                        day.exercises[i - 1].muscleGroup != m.muscleGroup;
+                        day.exercises[i - 1].movement.muscleGroup != m.muscleGroup;
                     final mgLabel = m.muscleGroup.name[0].toUpperCase() +
                         m.muscleGroup.name.substring(1);
                     return Column(
@@ -352,15 +367,41 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
                             ),
                           ),
                         ListTile(
+                          tileColor: ex.aiPlanned
+                              ? null
+                              : Colors.amber.shade50,
                           leading: ReorderableDragStartListener(
                             index: i,
                             child: const Icon(Icons.drag_handle),
                           ),
                           title: Text(m.name),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline),
-                            tooltip: 'Remove',
-                            onPressed: () => _removeExercise(dayIndex, i),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Tooltip(
+                                message: ex.aiPlanned
+                                    ? 'AI controlled — tap to set as PT'
+                                    : 'PT (manual) — tap to set as AI',
+                                child: IconButton(
+                                  icon: Icon(
+                                    ex.aiPlanned
+                                        ? Icons.psychology_outlined
+                                        : Icons.fitness_center,
+                                    size: 20,
+                                    color: ex.aiPlanned
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Colors.amber.shade700,
+                                  ),
+                                  onPressed: () => setState(
+                                      () => ex.aiPlanned = !ex.aiPlanned),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                tooltip: 'Remove',
+                                onPressed: () => _removeExercise(dayIndex, i),
+                              ),
+                            ],
                           ),
                         ),
                       ],

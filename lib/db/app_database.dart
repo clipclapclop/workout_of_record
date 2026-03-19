@@ -46,7 +46,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.withExecutor(super.e);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -98,6 +98,21 @@ class AppDatabase extends _$AppDatabase {
                   'RENAME TO completed_exercises',
                 );
                 await customStatement('PRAGMA foreign_keys = ON');
+              case 10:
+                // 10 → 11: Add aiPlanned flag to exercise_templates,
+                // planned_exercises, and completed_exercises (default true).
+                await customStatement(
+                  'ALTER TABLE exercise_templates '
+                  'ADD COLUMN ai_planned INTEGER NOT NULL DEFAULT 1',
+                );
+                await customStatement(
+                  'ALTER TABLE planned_exercises '
+                  'ADD COLUMN ai_planned INTEGER NOT NULL DEFAULT 1',
+                );
+                await customStatement(
+                  'ALTER TABLE completed_exercises '
+                  'ADD COLUMN ai_planned INTEGER NOT NULL DEFAULT 1',
+                );
             }
           }
         },
@@ -273,6 +288,7 @@ class AppDatabase extends _$AppDatabase {
         PlannedExercisesCompanion.insert(
           plannedWorkoutId: plannedWorkoutId,
           movementId: et.movementId,
+          aiPlanned: Value(et.aiPlanned),
         ),
       );
       await into(plannedSets)
@@ -323,6 +339,7 @@ class AppDatabase extends _$AppDatabase {
         PlannedExercisesCompanion.insert(
           plannedWorkoutId: plannedWorkoutId,
           movementId: priorEx.movementId,
+          aiPlanned: Value(priorEx.aiPlanned),
         ),
       );
 
@@ -417,6 +434,7 @@ class AppDatabase extends _$AppDatabase {
           completedWorkoutId: completedWorkoutId,
           movementId: plannedEx.movementId,
           orderIndex: i,
+          aiPlanned: Value(plannedEx.aiPlanned),
         ));
 
         final setsForEx = await (select(plannedSets)
@@ -650,12 +668,12 @@ class AppDatabase extends _$AppDatabase {
             ..orderBy([(et) => OrderingTerm.asc(et.exerciseIndex)]))
           .get();
 
-      final movs = <Movement>[];
+      final entries = <ExerciseDayEntry>[];
       for (final et in exTemplates) {
         final m = await (select(movements)..where((m) => m.id.equals(et.movementId))).getSingle();
-        movs.add(m);
+        entries.add(ExerciseDayEntry(movement: m, aiPlanned: et.aiPlanned));
       }
-      days.add(WorkoutDayData(template: wt, movements: movs));
+      days.add(WorkoutDayData(template: wt, exercises: entries));
     }
 
     return MesoTemplateData(template: template, days: days);
@@ -757,12 +775,14 @@ class AppDatabase extends _$AppDatabase {
         ),
       );
 
-      for (var j = 0; j < day.movementIds.length; j++) {
+      for (var j = 0; j < day.exercises.length; j++) {
+        final ex = day.exercises[j];
         await into(exerciseTemplates).insert(
           ExerciseTemplatesCompanion.insert(
             workoutTemplateId: workoutTemplateId,
-            movementId: day.movementIds[j],
+            movementId: ex.movementId,
             exerciseIndex: j,
+            aiPlanned: Value(ex.aiPlanned),
           ),
         );
       }
@@ -809,6 +829,65 @@ class AppDatabase extends _$AppDatabase {
       (update(completedExercises)
             ..where((e) => e.id.equals(completedExerciseId)))
           .write(CompletedExercisesCompanion(persistence: Value(persistence)));
+
+  /// Toggles the AI-control flag for an exercise instance, and propagates the
+  /// change up through [PlannedExercises] and [ExerciseTemplates] so all future
+  /// weeks inherit the setting automatically.
+  Future<void> setExerciseAiPlanned(
+      int completedExerciseId, bool aiPlanned) async {
+    // 1. Update the current CompletedExercise.
+    final ex = await (select(completedExercises)
+          ..where((e) => e.id.equals(completedExerciseId)))
+        .getSingle();
+
+    await (update(completedExercises)
+          ..where((e) => e.id.equals(completedExerciseId)))
+        .write(CompletedExercisesCompanion(aiPlanned: Value(aiPlanned)));
+
+    // 2. Update the matching PlannedExercise (for _generateFromPriorWeeks).
+    final cw = await (select(completedWorkouts)
+          ..where((w) => w.id.equals(ex.completedWorkoutId)))
+        .getSingle();
+
+    final pw = await (select(plannedWorkouts)
+          ..where((pw) => pw.workoutId.equals(cw.workoutId)))
+        .getSingleOrNull();
+
+    if (pw != null) {
+      await (update(plannedExercises)
+            ..where((pe) =>
+                pe.plannedWorkoutId.equals(pw.id) &
+                pe.movementId.equals(ex.movementId)))
+          .write(PlannedExercisesCompanion(aiPlanned: Value(aiPlanned)));
+
+      // 3. Update the ExerciseTemplate (for _generateFromTemplate / week 1).
+      final workout = await (select(workouts)
+            ..where((w) => w.id.equals(cw.workoutId)))
+          .getSingle();
+
+      final wt = await (select(workoutTemplates).join([
+        innerJoin(weekTemplates,
+            weekTemplates.id.equalsExp(workoutTemplates.weekTemplateId)),
+        innerJoin(mesocycles,
+            mesocycles.mesoTemplateId.equalsExp(weekTemplates.mesoTemplateId)),
+        innerJoin(
+            weeks, weeks.mesocycleId.equalsExp(mesocycles.id)),
+      ])
+            ..where(weeks.id.equals(workout.weekId) &
+                workoutTemplates.dayIndex.equals(workout.orderIndex))
+            ..limit(1))
+          .map((row) => row.readTable(workoutTemplates))
+          .getSingleOrNull();
+
+      if (wt != null) {
+        await (update(exerciseTemplates)
+              ..where((et) =>
+                  et.workoutTemplateId.equals(wt.id) &
+                  et.movementId.equals(ex.movementId)))
+            .write(ExerciseTemplatesCompanion(aiPlanned: Value(aiPlanned)));
+      }
+    }
+  }
 
   Future<void> addExerciseAfter(
     int completedWorkoutId,
