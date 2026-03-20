@@ -11,6 +11,7 @@ import '../db/workout_data.dart';
 import '../services/workout_foreground_service.dart';
 import '../widgets/app_nav_menu.dart';
 import '../widgets/exercise_widget.dart';
+import '../widgets/meso_calendar_sheet.dart';
 import '../widgets/movement_picker_sheet.dart';
 import '../widgets/set_ui_state.dart';
 import 'home_screen.dart';
@@ -20,10 +21,12 @@ class WorkoutScreen extends StatefulWidget {
     super.key,
     required this.completedWorkoutId,
     required this.workoutName,
+    required this.mesocycleId,
   });
 
   final int completedWorkoutId;
   final String workoutName;
+  final int mesocycleId;
 
   @override
   State<WorkoutScreen> createState() => _WorkoutScreenState();
@@ -1002,6 +1005,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           title: Text(widget.workoutName),
           automaticallyImplyLeading: false,
           actions: [
+            IconButton(
+              icon: const Icon(Icons.calendar_today),
+              onPressed: () => showMesoCalendarSheet(
+                  context, widget.mesocycleId, widget.completedWorkoutId),
+            ),
             AppNavMenu(
               current: AppScreen.workout,
               activeWorkoutId: widget.completedWorkoutId,
@@ -1022,6 +1030,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         title: Text(widget.workoutName),
         automaticallyImplyLeading: false,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_today),
+            onPressed: () => showMesoCalendarSheet(
+                context, widget.mesocycleId, widget.completedWorkoutId),
+          ),
           AppNavMenu(
             current: AppScreen.workout,
             activeWorkoutId: widget.completedWorkoutId,

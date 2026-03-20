@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app_preferences.dart';
 import '../screens/history_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/meso_template_list_screen.dart';
@@ -74,6 +75,7 @@ class AppNavMenu extends StatelessWidget {
           ? WorkoutScreen(
               completedWorkoutId: activeWorkoutId!,
               workoutName: activeWorkoutName!,
+              mesocycleId: AppPreferences.getCurrentMesocycleId()!,
             )
           : const HomeScreen(),
       AppScreen.exercises => MovementsScreen(

@@ -5,6 +5,7 @@ import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import 'calendar_data.dart';
 import 'history_data.dart';
 import 'seed/meso_template_seed_data.dart';
 import 'seed/movement_seed_data.dart';
@@ -1030,6 +1031,134 @@ class AppDatabase extends _$AppDatabase {
     if (last == null) return DateTime.now();
     final lastDay = DateTime(last.year, last.month, last.day);
     return lastDay.add(const Duration(days: 1));
+  }
+
+  /// Returns the full mesocycle calendar — materialized weeks with actual data,
+  /// plus template-based entries for future weeks not yet in the DB.
+  Future<MesocycleCalendar> getMesocycleCalendar(int mesocycleId) async {
+    final meso = await (select(mesocycles)
+          ..where((m) => m.id.equals(mesocycleId)))
+        .getSingle();
+
+    // ── Materialized weeks ───────────────────────────────────────────────────
+    final weeksList = await (select(weeks)
+          ..where((w) => w.mesocycleId.equals(mesocycleId))
+          ..orderBy([(w) => OrderingTerm.asc(w.weekNumber)]))
+        .get();
+
+    final calendarWeeks = <CalendarWeek>[];
+    for (final week in weeksList) {
+      final workoutsList = await (select(workouts)
+            ..where(
+                (w) => w.weekId.equals(week.id) & w.isRestDay.equals(false))
+            ..orderBy([(w) => OrderingTerm.asc(w.orderIndex)]))
+          .get();
+
+      final cells = <CalendarCell>[];
+      for (final workout in workoutsList) {
+        final cw = await (select(completedWorkouts)
+              ..where((cw) => cw.workoutId.equals(workout.id)))
+            .getSingleOrNull();
+        cells.add(CalendarCell(
+          workoutId: workout.id,
+          workoutName: workout.name,
+          orderIndex: workout.orderIndex,
+          completedWorkout: cw,
+        ));
+      }
+      calendarWeeks.add(CalendarWeek(
+        weekNumber: week.weekNumber,
+        goal: week.goal,
+        cells: cells,
+      ));
+    }
+
+    // ── Template-based future weeks ──────────────────────────────────────────
+    final materializedCount = weeksList.length;
+    if (materializedCount < meso.totalWeekCount) {
+      final templateSlots = await (select(workoutTemplates).join([
+        innerJoin(weekTemplates,
+            weekTemplates.id.equalsExp(workoutTemplates.weekTemplateId)),
+      ])
+            ..where(weekTemplates.mesoTemplateId.equals(meso.mesoTemplateId) &
+                workoutTemplates.isRestDay.equals(false))
+            ..orderBy([OrderingTerm.asc(workoutTemplates.dayIndex)]))
+          .map((row) => row.readTable(workoutTemplates))
+          .get();
+
+      for (var wn = materializedCount + 1;
+          wn <= meso.totalWeekCount;
+          wn++) {
+        final goal =
+            wn == meso.totalWeekCount ? WeekGoal.deload : WeekGoal.hard;
+        final cells = [
+          for (var i = 0; i < templateSlots.length; i++)
+            CalendarCell(
+              workoutName: templateSlots[i].name,
+              orderIndex: i,
+              workoutTemplateId: templateSlots[i].id,
+            ),
+        ];
+        calendarWeeks.add(CalendarWeek(
+          weekNumber: wn,
+          goal: goal,
+          cells: cells,
+        ));
+      }
+    }
+
+    return MesocycleCalendar(
+      mesoName: meso.name,
+      totalWeekCount: meso.totalWeekCount,
+      weeks: calendarWeeks,
+    );
+  }
+
+  /// Returns planned exercises for a workout that hasn't started yet.
+  /// Returns an empty list if no plan has been generated.
+  Future<List<PlannedExerciseEntry>> getPlannedExerciseList(
+      int workoutId) async {
+    final plannedWorkout = await (select(plannedWorkouts)
+          ..where((pw) => pw.workoutId.equals(workoutId)))
+        .getSingleOrNull();
+    if (plannedWorkout == null) return [];
+
+    final exercises = await (select(plannedExercises)
+          ..where((pe) => pe.plannedWorkoutId.equals(plannedWorkout.id)))
+        .get();
+
+    final result = <PlannedExerciseEntry>[];
+    for (final ex in exercises) {
+      final movement = await (select(movements)
+            ..where((m) => m.id.equals(ex.movementId)))
+          .getSingle();
+      final sets = await (select(plannedSets)
+            ..where((ps) => ps.plannedExerciseId.equals(ex.id)))
+          .get();
+      result.add(PlannedExerciseEntry(
+        movementName: movement.name,
+        setCount: sets.length,
+      ));
+    }
+    return result;
+  }
+
+  /// Returns movement names for a template workout (future non-materialized week).
+  Future<List<String>> getTemplateExerciseNames(
+      int workoutTemplateId) async {
+    final exercises = await (select(exerciseTemplates)
+          ..where((et) => et.workoutTemplateId.equals(workoutTemplateId))
+          ..orderBy([(et) => OrderingTerm.asc(et.exerciseIndex)]))
+        .get();
+
+    final result = <String>[];
+    for (final ex in exercises) {
+      final movement = await (select(movements)
+            ..where((m) => m.id.equals(ex.movementId)))
+          .getSingle();
+      result.add(movement.name);
+    }
+    return result;
   }
 
   // ── Private helpers ─────────────────────────────────────────────────────────

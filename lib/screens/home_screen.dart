@@ -83,6 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
               builder: (_) => WorkoutScreen(
                 completedWorkoutId: activeId,
                 workoutName: data.workout.name,
+                mesocycleId: AppPreferences.getCurrentMesocycleId()!,
               ),
             ),
           );

@@ -71,6 +71,7 @@ class _PreWorkoutCheckinScreenState extends State<PreWorkoutCheckinScreen> {
         builder: (_) => WorkoutScreen(
           completedWorkoutId: completedWorkoutId,
           workoutName: widget.workoutName,
+          mesocycleId: AppPreferences.getCurrentMesocycleId()!,
         ),
       ),
     );
