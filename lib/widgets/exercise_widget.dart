@@ -9,7 +9,7 @@ import 'rest_timer_widget.dart';
 import 'set_ui_state.dart';
 import 'set_widget.dart';
 
-enum _ExMenuAction { skipExercise, addSet, replace, togglePersistent, addExercise, moveUp, moveDown, deleteExercise, toggleAiPlanned }
+enum _ExMenuAction { skipExercise, addSet, replace, togglePersistent, addExercise, moveUp, moveDown, deleteExercise, toggleAiPlanned, addNote }
 
 /// A card for a single exercise within a workout.
 ///
@@ -56,6 +56,7 @@ class ExerciseWidget extends StatefulWidget {
     required this.onWeightChanged,
     required this.onDistanceChanged,
     this.onToggleAiPlanned,
+    required this.onEditNote,
   });
 
   final ExerciseData exercise;
@@ -93,6 +94,7 @@ class ExerciseWidget extends StatefulWidget {
   final void Function(SetData setData, String value) onWeightChanged;
   final void Function(SetData setData, String value) onDistanceChanged;
   final VoidCallback? onToggleAiPlanned;
+  final VoidCallback onEditNote;
 
   @override
   State<ExerciseWidget> createState() => _ExerciseWidgetState();
@@ -236,6 +238,8 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                 widget.onMoveDown?.call();
               } else if (action == _ExMenuAction.toggleAiPlanned) {
                 widget.onToggleAiPlanned?.call();
+              } else if (action == _ExMenuAction.addNote) {
+                widget.onEditNote();
               } else {
                 widget.onTogglePersistence();
               }
@@ -243,18 +247,38 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
             itemBuilder: (_) => [
               const PopupMenuItem(
                 value: _ExMenuAction.replace,
-                child: Text('Replace'),
+                child: ListTile(
+                  leading: Icon(Icons.swap_horiz),
+                  title: Text('Replace'),
+                  contentPadding: EdgeInsets.zero,
+                ),
               ),
               if (widget.onMoveUp != null)
                 const PopupMenuItem(
                   value: _ExMenuAction.moveUp,
-                  child: Text('Move Up'),
+                  child: ListTile(
+                    leading: Icon(Icons.arrow_upward),
+                    title: Text('Move Up'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 ),
               if (widget.onMoveDown != null)
                 const PopupMenuItem(
                   value: _ExMenuAction.moveDown,
-                  child: Text('Move Down'),
+                  child: ListTile(
+                    leading: Icon(Icons.arrow_downward),
+                    title: Text('Move Down'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 ),
+              PopupMenuItem(
+                value: _ExMenuAction.addNote,
+                child: ListTile(
+                  leading: const Icon(Icons.edit_note),
+                  title: Text(movement.note1 != null ? 'Edit Note' : 'Add Note'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
               PopupMenuItem(
                 value: _ExMenuAction.togglePersistent,
                 child: Row(
@@ -317,6 +341,8 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                 widget.onDeleteExercise?.call();
               } else if (action == _ExMenuAction.toggleAiPlanned) {
                 widget.onToggleAiPlanned?.call();
+              } else if (action == _ExMenuAction.addNote) {
+                widget.onEditNote();
               } else {
                 widget.onTogglePersistence();
               }
@@ -327,36 +353,72 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                 PopupMenuItem(
                   value: _ExMenuAction.skipExercise,
                   enabled: !widget.anySetChecked && !widget.isExLocked,
-                  child: const Text('Skip Exercise'),
+                  child: const ListTile(
+                    leading: Icon(Icons.block),
+                    title: Text('Skip Exercise'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 ),
                 const PopupMenuItem(
                   value: _ExMenuAction.addSet,
-                  child: Text('Add Set'),
+                  child: ListTile(
+                    leading: Icon(Icons.add),
+                    title: Text('Add Set'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 ),
                 const PopupMenuItem(
                   value: _ExMenuAction.replace,
-                  child: Text('Replace'),
+                  child: ListTile(
+                    leading: Icon(Icons.swap_horiz),
+                    title: Text('Replace'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 ),
                 if (!isExCompleted && widget.onAddExercise != null)
                   const PopupMenuItem(
                     value: _ExMenuAction.addExercise,
-                    child: Text('Add Exercise'),
+                    child: ListTile(
+                      leading: Icon(Icons.fitness_center),
+                      title: Text('Add Exercise'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
                 if (widget.onMoveUp != null)
                   const PopupMenuItem(
                     value: _ExMenuAction.moveUp,
-                    child: Text('Move Up'),
+                    child: ListTile(
+                      leading: Icon(Icons.arrow_upward),
+                      title: Text('Move Up'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
                 if (widget.onMoveDown != null)
                   const PopupMenuItem(
                     value: _ExMenuAction.moveDown,
-                    child: Text('Move Down'),
+                    child: ListTile(
+                      leading: Icon(Icons.arrow_downward),
+                      title: Text('Move Down'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
                 if (widget.onDeleteExercise != null)
                   const PopupMenuItem(
                     value: _ExMenuAction.deleteExercise,
-                    child: Text('Delete Exercise'),
+                    child: ListTile(
+                      leading: Icon(Icons.delete_outline),
+                      title: Text('Delete Exercise'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
+                PopupMenuItem(
+                  value: _ExMenuAction.addNote,
+                  child: ListTile(
+                    leading: const Icon(Icons.edit_note),
+                    title: Text(movement.note1 != null ? 'Edit Note' : 'Add Note'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
                 const PopupMenuDivider(),
                 PopupMenuItem(
                   value: _ExMenuAction.togglePersistent,
@@ -474,13 +536,16 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
             cueText: widget.cueText,
           ),
         if (movement.note1 != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              movement.note1!,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+          GestureDetector(
+            onTap: widget.onEditNote,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                movement.note1!,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
             ),
           ),
         ...setRows,

@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -723,6 +724,43 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     await _load();
   }
 
+  Future<void> _editNote(ExerciseData exercise) async {
+    final movement = exercise.movement;
+    final controller = TextEditingController(text: movement.note1 ?? '');
+    final result = await showDialog<String?>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Exercise Note'),
+        content: TextField(
+          controller: controller,
+          maxLines: 4,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Add a note…',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null) return;
+    final trimmed = result.trim().isEmpty ? null : result.trim();
+    await db.updateMovement(
+      MovementsCompanion(id: Value(movement.id), note1: Value(trimmed)),
+    );
+    await _load();
+  }
+
   Future<void> _deleteExercise(ExerciseData exercise) async {
     await db.deleteExercise(exercise.completed.id);
     _setStates.removeWhere((key, _) =>
@@ -1101,6 +1139,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       onToggleAiPlanned: AppPreferences.getAiEnabled()
           ? () => _toggleAiPlanned(exercise)
           : null,
+      onEditNote: () => _editNote(exercise),
     );
   }
 }
