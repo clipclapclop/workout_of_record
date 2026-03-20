@@ -9,7 +9,7 @@ import 'rest_timer_widget.dart';
 import 'set_ui_state.dart';
 import 'set_widget.dart';
 
-enum _ExMenuAction { skipExercise, addSet, replace, togglePersistent, addExercise, moveUp, moveDown, deleteExercise }
+enum _ExMenuAction { skipExercise, addSet, replace, togglePersistent, addExercise, moveUp, moveDown, deleteExercise, toggleAiPlanned }
 
 /// A card for a single exercise within a workout.
 ///
@@ -55,6 +55,7 @@ class ExerciseWidget extends StatefulWidget {
     required this.onShowMovementHistorySheet,
     required this.onWeightChanged,
     required this.onDistanceChanged,
+    this.onToggleAiPlanned,
   });
 
   final ExerciseData exercise;
@@ -91,6 +92,7 @@ class ExerciseWidget extends StatefulWidget {
   final VoidCallback onShowMovementHistorySheet;
   final void Function(SetData setData, String value) onWeightChanged;
   final void Function(SetData setData, String value) onDistanceChanged;
+  final VoidCallback? onToggleAiPlanned;
 
   @override
   State<ExerciseWidget> createState() => _ExerciseWidgetState();
@@ -232,6 +234,8 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                 widget.onMoveUp?.call();
               } else if (action == _ExMenuAction.moveDown) {
                 widget.onMoveDown?.call();
+              } else if (action == _ExMenuAction.toggleAiPlanned) {
+                widget.onToggleAiPlanned?.call();
               } else {
                 widget.onTogglePersistence();
               }
@@ -253,10 +257,33 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                 ),
               PopupMenuItem(
                 value: _ExMenuAction.togglePersistent,
-                child: Text(widget.persistence == Persistence.persistent
-                    ? "Don't carry forward"
-                    : 'Carry forward'),
+                child: Row(
+                  children: [
+                    IgnorePointer(
+                      child: Checkbox(
+                        value: widget.persistence == Persistence.persistent,
+                        onChanged: (_) {},
+                      ),
+                    ),
+                    const Text('Carry forward'),
+                  ],
+                ),
               ),
+              if (widget.onToggleAiPlanned != null)
+                PopupMenuItem(
+                  value: _ExMenuAction.toggleAiPlanned,
+                  child: Row(
+                    children: [
+                      IgnorePointer(
+                        child: Checkbox(
+                          value: exercise.completed.aiPlanned,
+                          onChanged: (_) {},
+                        ),
+                      ),
+                      const Text('AI planned'),
+                    ],
+                  ),
+                ),
             ],
           ),
         ],
@@ -288,6 +315,8 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                 widget.onMoveDown?.call();
               } else if (action == _ExMenuAction.deleteExercise) {
                 widget.onDeleteExercise?.call();
+              } else if (action == _ExMenuAction.toggleAiPlanned) {
+                widget.onToggleAiPlanned?.call();
               } else {
                 widget.onTogglePersistence();
               }
@@ -331,10 +360,33 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                 const PopupMenuDivider(),
                 PopupMenuItem(
                   value: _ExMenuAction.togglePersistent,
-                  child: Text(widget.persistence == Persistence.persistent
-                      ? "Don't carry forward"
-                      : 'Carry forward'),
+                  child: Row(
+                    children: [
+                      IgnorePointer(
+                        child: Checkbox(
+                          value: widget.persistence == Persistence.persistent,
+                          onChanged: (_) {},
+                        ),
+                      ),
+                      const Text('Carry forward'),
+                    ],
+                  ),
                 ),
+                if (widget.onToggleAiPlanned != null)
+                  PopupMenuItem(
+                    value: _ExMenuAction.toggleAiPlanned,
+                    child: Row(
+                      children: [
+                        IgnorePointer(
+                          child: Checkbox(
+                            value: exercise.completed.aiPlanned,
+                            onChanged: (_) {},
+                          ),
+                        ),
+                        const Text('AI planned'),
+                      ],
+                    ),
+                  ),
               ];
             },
           ),

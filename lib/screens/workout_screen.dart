@@ -670,6 +670,12 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     setState(() => _persistence[exercise.completed.id] = next);
   }
 
+  Future<void> _toggleAiPlanned(ExerciseData exercise) async {
+    await db.setExerciseAiPlanned(
+        exercise.completed.id, !exercise.completed.aiPlanned);
+    await _load();
+  }
+
   Future<void> _addExerciseAfter(ExerciseData exercise) async {
     final movs = await db.getMovements();
     if (!mounted) return;
@@ -1092,6 +1098,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           _propagateWeight(exercise, setData, value),
       onDistanceChanged: (setData, value) =>
           _propagateDistance(exercise, setData, value),
+      onToggleAiPlanned: AppPreferences.getAiEnabled()
+          ? () => _toggleAiPlanned(exercise)
+          : null,
     );
   }
 }
