@@ -127,20 +127,24 @@ class WorkoutHistoryDetailScreen extends StatelessWidget {
       return v == v.truncateToDouble() ? v.toInt().toString() : v.toString();
     }
 
-    String setVal(int? reps, double? weight, double? time) {
+    String setVal(int? reps, double? weight, double? distance, double? time) {
       final parts = <String>[];
-      if (m.isRequiredReps) parts.add(reps != null ? '$reps reps' : '—');
       if (m.isRequiredWeight) {
         parts.add(weight != null ? '${fmt(weight)} $weightUnit' : '—');
+      }
+      if (m.isRequiredReps) parts.add(reps != null ? '$reps reps' : '—');
+      if (m.isRequiredDistance) {
+        final distUnit = AppPreferences.getUnitsMetric() ? 'km' : 'mi';
+        parts.add(distance != null ? '${fmt(distance)} $distUnit' : '—');
       }
       if (m.isRequiredTime) parts.add(time != null ? '${fmt(time)}s' : '—');
       return parts.join(' × ');
     }
 
-    final plannedStr = ps != null ? setVal(ps.reps, ps.weight, ps.time) : '—';
+    final plannedStr = ps != null ? setVal(ps.reps, ps.weight, ps.distance, ps.time) : '—';
     final completedStr = isSkipped
         ? 'Skipped — ${_exSkipLabel(cs.skipReason!)}'
-        : setVal(cs.reps, cs.weight, cs.time);
+        : setVal(cs.reps, cs.weight, cs.distance, cs.time);
 
     return Container(
       decoration: isSkipped

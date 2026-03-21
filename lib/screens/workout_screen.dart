@@ -903,9 +903,13 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     String setLine(CompletedSet s, Movement m) {
       if (s.skipReason != null) return 'Skipped — ${_skipReasonLabel(s.skipReason!)}';
       final parts = <String>[];
-      if (m.isRequiredReps) parts.add(s.reps != null ? '${s.reps} reps' : '—');
       if (m.isRequiredWeight) {
         parts.add(s.weight != null ? '${fmt(s.weight)} $weightUnit' : '—');
+      }
+      if (m.isRequiredReps) parts.add(s.reps != null ? '${s.reps} reps' : '—');
+      if (m.isRequiredDistance) {
+        final distUnit = AppPreferences.getUnitsMetric() ? 'km' : 'mi';
+        parts.add(s.distance != null ? '${fmt(s.distance)} $distUnit' : '—');
       }
       if (m.isRequiredTime) parts.add(s.time != null ? '${fmt(s.time)}s' : '—');
       return parts.join(' × ');
