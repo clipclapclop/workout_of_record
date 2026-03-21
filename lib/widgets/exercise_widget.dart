@@ -3,23 +3,13 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../db/tables/enums.dart';
 import '../db/workout_data.dart';
-import '../services/workout_foreground_service.dart';
-import 'rest_timer_controller.dart';
-import 'rest_timer_widget.dart';
 import 'set_ui_state.dart';
 import 'set_widget.dart';
 
 enum _ExMenuAction { skipExercise, addSet, replace, togglePersistent, addExercise, moveUp, moveDown, deleteExercise, toggleAiPlanned, addNote }
 
 /// A card for a single exercise within a workout.
-///
-/// Owns a [RestTimerController] for its rest timer. The timer auto-starts
-/// when [isActive] flips true and stops when [allSetsDone] becomes true
-/// (i.e. when the post-exercise sheet fires) or the exercise is skipped.
-///
-/// Each child [SetWidget] calls [_onTimerReset] on its first interaction,
-/// which resets and restarts the timer for that set.
-class ExerciseWidget extends StatefulWidget {
+class ExerciseWidget extends StatelessWidget {
   const ExerciseWidget({
     super.key,
     required this.exercise,
@@ -32,12 +22,8 @@ class ExerciseWidget extends StatefulWidget {
     required this.showPostMgReopen,
     required this.mgLabel,
     required this.persistence,
-    required this.timerEnabled,
-    required this.workoutTimerOn,
-    required this.timerDurationSeconds,
-    required this.cueText,
     required this.setStates,
-    required this.onToggleWorkoutTimer,
+    required this.onTimerReset,
     required this.onShowPostExerciseSheet,
     required this.onShowPostMuscleGroupSheet,
     required this.onShowExerciseSkipSheet,
@@ -69,13 +55,9 @@ class ExerciseWidget extends StatefulWidget {
   final bool showPostMgReopen;
   final String mgLabel;
   final Persistence persistence;
-  final bool timerEnabled;
-  final bool workoutTimerOn;
-  final int timerDurationSeconds;
-  final String? cueText;
   final Map<int, SetUiState> setStates;
 
-  final VoidCallback onToggleWorkoutTimer;
+  final VoidCallback onTimerReset;
   final Future<void> Function() onShowPostExerciseSheet;
   final Future<void> Function() onShowPostMuscleGroupSheet;
   final Future<void> Function() onShowExerciseSkipSheet;
@@ -97,133 +79,17 @@ class ExerciseWidget extends StatefulWidget {
   final VoidCallback onEditNote;
 
   @override
-  State<ExerciseWidget> createState() => _ExerciseWidgetState();
-}
-
-class _ExerciseWidgetState extends State<ExerciseWidget> {
-  late RestTimerController _timerController;
-
-  bool get _timerRunnable =>
-      widget.isActive &&
-      !widget.isExSkipped &&
-      !widget.allSetsDone &&
-      widget.timerEnabled &&
-      widget.workoutTimerOn &&
-      widget.timerDurationSeconds > 0;
-
-  bool get _showTimer =>
-      widget.isActive &&
-      !widget.isExSkipped &&
-      widget.timerEnabled &&
-      widget.workoutTimerOn &&
-      widget.timerDurationSeconds > 0 &&
-      !widget.allSetsDone;
-
-  @override
-  void initState() {
-    super.initState();
-    _timerController =
-        RestTimerController(durationSeconds: widget.timerDurationSeconds);
-    if (_timerRunnable) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _timerController.start();
-          _pushToService();
-        }
-      });
-    }
-  }
-
-  @override
-  void didUpdateWidget(ExerciseWidget old) {
-    super.didUpdateWidget(old);
-
-    // Duration changed (e.g. movement rest setting updated).
-    if (old.timerDurationSeconds != widget.timerDurationSeconds) {
-      _timerController.setDuration(widget.timerDurationSeconds);
-    }
-
-    final wasRunnable = old.isActive &&
-        !old.isExSkipped &&
-        !old.allSetsDone &&
-        old.timerDurationSeconds > 0;
-    final isRunnable = widget.isActive &&
-        !widget.isExSkipped &&
-        !widget.allSetsDone &&
-        widget.timerDurationSeconds > 0;
-
-    // Exercise became active and ready — start the timer.
-    if (!wasRunnable && isRunnable && widget.timerEnabled && widget.workoutTimerOn) {
-      _timerController.start();
-      _pushToService();
-    }
-
-    // Exercise became inactive, skipped, or all sets done — stop the timer.
-    if (wasRunnable && !isRunnable) {
-      _timerController.stop();
-      _pushToService();
-    }
-
-    // Per-workout timer toggled off.
-    if (old.workoutTimerOn && !widget.workoutTimerOn) {
-      _timerController.stop();
-      _pushToService();
-    }
-
-    // Cue text changed (next set updated) — keep background in sync.
-    if (old.cueText != widget.cueText && widget.isActive) {
-      _pushToService();
-    }
-  }
-
-  @override
-  void dispose() {
-    _timerController.dispose();
-    super.dispose();
-  }
-
-  /// Push current exercise/timer state to the foreground service notification.
-  void _pushToService() {
-    if (!widget.isActive || !_showTimer) {
-      WorkoutForegroundService.clearTimer();
-      return;
-    }
-    WorkoutForegroundService.clearCued();
-    WorkoutForegroundService.update(
-      exerciseName: widget.exercise.movement.name,
-      cueText: widget.cueText,
-      timerEndsAt: _timerController.isRunning
-          ? DateTime.now()
-              .add(Duration(milliseconds: _timerController.remainingMs))
-          : null,
-    );
-  }
-
-  /// Called by a SetWidget on its first interaction. Resets and restarts the
-  /// timer from the full duration.
-  void _onTimerReset() {
-    if (widget.timerDurationSeconds > 0 &&
-        widget.timerEnabled &&
-        widget.workoutTimerOn) {
-      _timerController.reset();
-      _timerController.start();
-      _pushToService();
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final exercise = widget.exercise;
     final movement = exercise.movement;
 
     // ── Header trailing widget ─────────────────────────────────────────────
     final Widget headerTrailing;
-    if (widget.isExSkipped) {
+    if (isExSkipped) {
       headerTrailing = Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           TextButton(
-            onPressed: widget.onUnskipExercise,
+            onPressed: onUnskipExercise,
             child: const Text('Unskip'),
           ),
           PopupMenuButton<_ExMenuAction>(
@@ -231,17 +97,17 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
             padding: EdgeInsets.zero,
             onSelected: (action) {
               if (action == _ExMenuAction.replace) {
-                widget.onReplace();
+                onReplace();
               } else if (action == _ExMenuAction.moveUp) {
-                widget.onMoveUp?.call();
+                onMoveUp?.call();
               } else if (action == _ExMenuAction.moveDown) {
-                widget.onMoveDown?.call();
+                onMoveDown?.call();
               } else if (action == _ExMenuAction.toggleAiPlanned) {
-                widget.onToggleAiPlanned?.call();
+                onToggleAiPlanned?.call();
               } else if (action == _ExMenuAction.addNote) {
-                widget.onEditNote();
+                onEditNote();
               } else {
-                widget.onTogglePersistence();
+                onTogglePersistence();
               }
             },
             itemBuilder: (_) => [
@@ -253,7 +119,7 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
-              if (widget.onMoveUp != null)
+              if (onMoveUp != null)
                 const PopupMenuItem(
                   value: _ExMenuAction.moveUp,
                   child: ListTile(
@@ -262,7 +128,7 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
-              if (widget.onMoveDown != null)
+              if (onMoveDown != null)
                 const PopupMenuItem(
                   value: _ExMenuAction.moveDown,
                   child: ListTile(
@@ -285,7 +151,7 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                   children: [
                     IgnorePointer(
                       child: Checkbox(
-                        value: widget.persistence == Persistence.persistent,
+                        value: persistence == Persistence.persistent,
                         onChanged: (_) {},
                       ),
                     ),
@@ -293,7 +159,7 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                   ],
                 ),
               ),
-              if (widget.onToggleAiPlanned != null)
+              if (onToggleAiPlanned != null)
                 PopupMenuItem(
                   value: _ExMenuAction.toggleAiPlanned,
                   child: Row(
@@ -316,9 +182,9 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
       headerTrailing = Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (widget.showPostExReopen)
+          if (showPostExReopen)
             TextButton(
-              onPressed: widget.onShowPostExerciseSheet,
+              onPressed: onShowPostExerciseSheet,
               child: const Text('Rate joint pain'),
             ),
           PopupMenuButton<_ExMenuAction>(
@@ -326,33 +192,33 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
             padding: EdgeInsets.zero,
             onSelected: (action) {
               if (action == _ExMenuAction.skipExercise) {
-                widget.onShowExerciseSkipSheet();
+                onShowExerciseSkipSheet();
               } else if (action == _ExMenuAction.addSet) {
-                widget.onAddSet();
+                onAddSet();
               } else if (action == _ExMenuAction.replace) {
-                widget.onReplace();
+                onReplace();
               } else if (action == _ExMenuAction.addExercise) {
-                widget.onAddExercise?.call();
+                onAddExercise?.call();
               } else if (action == _ExMenuAction.moveUp) {
-                widget.onMoveUp?.call();
+                onMoveUp?.call();
               } else if (action == _ExMenuAction.moveDown) {
-                widget.onMoveDown?.call();
+                onMoveDown?.call();
               } else if (action == _ExMenuAction.deleteExercise) {
-                widget.onDeleteExercise?.call();
+                onDeleteExercise?.call();
               } else if (action == _ExMenuAction.toggleAiPlanned) {
-                widget.onToggleAiPlanned?.call();
+                onToggleAiPlanned?.call();
               } else if (action == _ExMenuAction.addNote) {
-                widget.onEditNote();
+                onEditNote();
               } else {
-                widget.onTogglePersistence();
+                onTogglePersistence();
               }
             },
             itemBuilder: (_) {
-              final isExCompleted = widget.allSetsDone && !widget.showPostExReopen;
+              final isExCompleted = allSetsDone && !showPostExReopen;
               return [
                 PopupMenuItem(
                   value: _ExMenuAction.skipExercise,
-                  enabled: !widget.anySetChecked && !widget.isExLocked,
+                  enabled: !anySetChecked && !isExLocked,
                   child: const ListTile(
                     leading: Icon(Icons.block),
                     title: Text('Skip Exercise'),
@@ -375,7 +241,7 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
-                if (!isExCompleted && widget.onAddExercise != null)
+                if (!isExCompleted && onAddExercise != null)
                   const PopupMenuItem(
                     value: _ExMenuAction.addExercise,
                     child: ListTile(
@@ -384,7 +250,7 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
-                if (widget.onMoveUp != null)
+                if (onMoveUp != null)
                   const PopupMenuItem(
                     value: _ExMenuAction.moveUp,
                     child: ListTile(
@@ -393,7 +259,7 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
-                if (widget.onMoveDown != null)
+                if (onMoveDown != null)
                   const PopupMenuItem(
                     value: _ExMenuAction.moveDown,
                     child: ListTile(
@@ -402,7 +268,7 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
-                if (widget.onDeleteExercise != null)
+                if (onDeleteExercise != null)
                   const PopupMenuItem(
                     value: _ExMenuAction.deleteExercise,
                     child: ListTile(
@@ -426,7 +292,7 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                     children: [
                       IgnorePointer(
                         child: Checkbox(
-                          value: widget.persistence == Persistence.persistent,
+                          value: persistence == Persistence.persistent,
                           onChanged: (_) {},
                         ),
                       ),
@@ -434,7 +300,7 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
                     ],
                   ),
                 ),
-                if (widget.onToggleAiPlanned != null)
+                if (onToggleAiPlanned != null)
                   PopupMenuItem(
                     value: _ExMenuAction.toggleAiPlanned,
                     child: Row(
@@ -481,7 +347,7 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
             icon: const Icon(Icons.history, size: 20),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
-            onPressed: widget.onShowMovementHistorySheet,
+            onPressed: onShowMovementHistorySheet,
           ),
           headerTrailing,
         ],
@@ -496,29 +362,26 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
           setData: exercise.sets[i],
           movement: movement,
           setNum: i + 1,
-          isExSkipped: widget.isExSkipped,
-          isLocked: widget.isExLocked ||
+          isExSkipped: isExSkipped,
+          isLocked: isExLocked ||
               (i > 0 &&
-                  !(widget.setStates[exercise.sets[i - 1].completed.id]
+                  !(setStates[exercise.sets[i - 1].completed.id]
                           ?.isChecked ??
                       false)),
           isChecked:
-              widget.setStates[exercise.sets[i].completed.id]?.isChecked ??
-                  false,
+              setStates[exercise.sets[i].completed.id]?.isChecked ?? false,
           isSkipped:
-              widget.setStates[exercise.sets[i].completed.id]?.isSkipped ??
-                  false,
-          state: widget.setStates[exercise.sets[i].completed.id]!,
-          onTimerReset: _onTimerReset,
-          onToggle: (checked) =>
-              widget.onToggleSet(exercise.sets[i], checked),
-          onSkip: () => widget.onShowSetSkipSheet(exercise.sets[i]),
-          onDelete: () => widget.onDeleteSet(exercise.sets[i]),
+              setStates[exercise.sets[i].completed.id]?.isSkipped ?? false,
+          state: setStates[exercise.sets[i].completed.id]!,
+          onTimerReset: onTimerReset,
+          onToggle: (checked) => onToggleSet(exercise.sets[i], checked),
+          onSkip: () => onShowSetSkipSheet(exercise.sets[i]),
+          onDelete: () => onDeleteSet(exercise.sets[i]),
           onWeightChanged: movement.isRequiredWeight
-              ? (v) => widget.onWeightChanged(exercise.sets[i], v)
+              ? (v) => onWeightChanged(exercise.sets[i], v)
               : null,
           onDistanceChanged: movement.isRequiredDistance
-              ? (v) => widget.onDistanceChanged(exercise.sets[i], v)
+              ? (v) => onDistanceChanged(exercise.sets[i], v)
               : null,
         ),
       ],
@@ -529,15 +392,9 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         header,
-        if (_showTimer)
-          RestTimerWidget(
-            key: ValueKey('timer_${exercise.completed.id}'),
-            controller: _timerController,
-            cueText: widget.cueText,
-          ),
         if (movement.note1 != null)
           GestureDetector(
-            onTap: widget.onEditNote,
+            onTap: onEditNote,
             child: Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
@@ -549,19 +406,19 @@ class _ExerciseWidgetState extends State<ExerciseWidget> {
             ),
           ),
         ...setRows,
-        if (widget.showPostMgReopen)
+        if (showPostMgReopen)
           Padding(
             padding: const EdgeInsets.only(top: 4, bottom: 4),
             child: TextButton.icon(
-              onPressed: widget.onShowPostMuscleGroupSheet,
+              onPressed: onShowPostMuscleGroupSheet,
               icon: const Icon(Icons.rate_review_outlined, size: 18),
-              label: Text('Rate ${widget.mgLabel}'),
+              label: Text('Rate $mgLabel'),
             ),
           ),
       ],
     );
 
-    if (widget.isExSkipped) {
+    if (isExSkipped) {
       return Card(
         margin: const EdgeInsets.only(top: 8),
         color: Theme.of(context)

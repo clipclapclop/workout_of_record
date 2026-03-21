@@ -84,7 +84,7 @@ final kMovementSeeds = <MovementSeedEntry>[
   // ── B ──────────────────────────────────────────────────────────────────────
   const MovementSeedEntry(
     name: 'Bar Hang',
-    muscleGroup: MuscleGroup.back,
+    muscleGroup: MuscleGroup.forearms,
     isRequiredReps: false,
     isRequiredWeight: false,
     isRequiredTime: true,

@@ -95,10 +95,9 @@ class _RestTimerWidgetState extends State<RestTimerWidget> {
     final colorScheme = Theme.of(context).colorScheme;
     final Color displayColor = colorScheme.onSurface;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        children: [
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
           // Countdown display
           SizedBox(
             width: 56,
@@ -136,8 +135,7 @@ class _RestTimerWidgetState extends State<RestTimerWidget> {
             tooltip: 'Reset',
             onPressed: ctrl.reset,
           ),
-        ],
-      ),
+      ],
     );
   }
 }

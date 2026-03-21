@@ -11,6 +11,8 @@ import '../db/workout_data.dart';
 import '../services/workout_foreground_service.dart';
 import '../widgets/app_nav_menu.dart';
 import '../widgets/exercise_widget.dart';
+import '../widgets/rest_timer_controller.dart';
+import '../widgets/rest_timer_widget.dart';
 import '../widgets/meso_calendar_sheet.dart';
 import '../widgets/movement_picker_sheet.dart';
 import '../widgets/set_ui_state.dart';
@@ -43,12 +45,17 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   final Map<MuscleGroup, bool> _postMgDone = {};
   bool _loading = true;
 
-  // Per-workout timer kill-switch — toggled via the timer widget's icon button.
-  bool _timerWorkoutOn = true;
+  // Per-workout timer kill-switch — always on (no UI to toggle).
+  static const _timerWorkoutOn = true;
+
+  late RestTimerController _timerController;
+  int? _timerActiveExId;
+  String? _timerCueText;
 
   @override
   void initState() {
     super.initState();
+    _timerController = RestTimerController(durationSeconds: 0);
     _load();
     WorkoutForegroundService.start();
   }
@@ -58,6 +65,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     for (final s in _setStates.values) {
       s.dispose();
     }
+    _timerController.dispose();
     WakelockPlus.disable();
     WorkoutForegroundService.stop();
     super.dispose();
@@ -115,9 +123,75 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     return null;
   }
 
-  void _toggleWorkoutTimer() {
-    setState(() => _timerWorkoutOn = !_timerWorkoutOn);
-    // ExerciseWidget's didUpdateWidget handles stopping its own controller.
+  void _syncTimer() {
+    if (!AppPreferences.getTimerEnabled() || !_timerWorkoutOn || _data == null) {
+      _timerController.stop();
+      _pushTimerToService();
+      return;
+    }
+    final activeId = _activeExerciseId;
+    if (activeId == null) {
+      _timerController.stop();
+      _timerActiveExId = null;
+      _pushTimerToService();
+      return;
+    }
+    final activeEx = _data!.exercises.firstWhere((e) => e.completed.id == activeId);
+    final duration = _effectiveDuration(activeEx.movement);
+    _timerCueText = _cueText(activeEx);
+    if (duration <= 0) {
+      _timerController.stop();
+      _timerActiveExId = activeId;
+      _pushTimerToService();
+      return;
+    }
+    if (_timerActiveExId == activeId) {
+      // Same exercise — cue text may have changed after a set was completed.
+      _pushTimerToService();
+      return;
+    }
+    // New active exercise — update duration and restart.
+    _timerActiveExId = activeId;
+    _timerController.setDuration(duration);
+    _timerController.start();
+    _pushTimerToService();
+  }
+
+  void _onTimerReset() {
+    final activeId = _activeExerciseId;
+    if (activeId == null) return;
+    final activeEx = _data!.exercises.firstWhere((e) => e.completed.id == activeId);
+    final duration = _effectiveDuration(activeEx.movement);
+    if (duration > 0 && AppPreferences.getTimerEnabled() && _timerWorkoutOn) {
+      _timerController.reset();
+      _timerController.start();
+      _pushTimerToService();
+    }
+  }
+
+  void _pushTimerToService() {
+    if (_timerActiveExId == null || _data == null) {
+      WorkoutForegroundService.clearTimer();
+      return;
+    }
+    ExerciseData? activeEx;
+    for (final ex in _data!.exercises) {
+      if (ex.completed.id == _timerActiveExId) {
+        activeEx = ex;
+        break;
+      }
+    }
+    if (activeEx == null || !_timerController.isRunning) {
+      WorkoutForegroundService.clearTimer();
+      return;
+    }
+    WorkoutForegroundService.clearCued();
+    WorkoutForegroundService.update(
+      exerciseName: activeEx.movement.name,
+      cueText: _timerCueText,
+      timerEndsAt: DateTime.now()
+          .add(Duration(milliseconds: _timerController.remainingMs)),
+    );
   }
 
   void _applyWakeLock() {
@@ -166,6 +240,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         _loading = false;
       });
       _applyWakeLock();
+      _syncTimer();
     }
   }
 
@@ -283,6 +358,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         await _showPostExerciseSheet(exercise);
       }
     }
+    _syncTimer();
   }
 
   Future<void> _showPostExerciseSheet(ExerciseData exercise) async {
@@ -553,6 +629,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         await _showPostExerciseSheet(exercise);
       }
     }
+    _syncTimer();
   }
 
   Future<void> _showExerciseSkipSheet(ExerciseData exercise) async {
@@ -609,6 +686,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         state.timeCtrl.clear();
       }
     });
+    _syncTimer();
   }
 
   Future<void> _addSet(ExerciseData exercise) async {
@@ -662,6 +740,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         state.timeCtrl.text = _fmt(ps?.time);
       }
     });
+    _syncTimer();
   }
 
   Future<void> _togglePersistence(ExerciseData exercise) async {
@@ -1030,6 +1109,14 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         title: Text(widget.workoutName),
         automaticallyImplyLeading: false,
         actions: [
+          if (AppPreferences.getTimerEnabled() &&
+              _timerWorkoutOn &&
+              _timerActiveExId != null &&
+              _timerController.durationSeconds > 0)
+            RestTimerWidget(
+              controller: _timerController,
+              cueText: _timerCueText,
+            ),
           IconButton(
             icon: const Icon(Icons.calendar_today),
             onPressed: () => showMesoCalendarSheet(
@@ -1124,12 +1211,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       showPostMgReopen: showPostMgReopen,
       mgLabel: _mgLabel(mg),
       persistence: _persistence[exercise.completed.id] ?? Persistence.persistent,
-      timerEnabled: AppPreferences.getTimerEnabled(),
-      workoutTimerOn: _timerWorkoutOn,
-      timerDurationSeconds: _effectiveDuration(exercise.movement),
-      cueText: _cueText(exercise),
       setStates: _setStates,
-      onToggleWorkoutTimer: _toggleWorkoutTimer,
+      onTimerReset: _onTimerReset,
       onShowPostExerciseSheet: () => _showPostExerciseSheet(exercise),
       onShowPostMuscleGroupSheet: () => _showPostMuscleGroupSheet(mg),
       onShowExerciseSkipSheet: () => _showExerciseSkipSheet(exercise),
