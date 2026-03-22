@@ -32,7 +32,7 @@ const _bodyOutlineFront = 'assets/muscles/Front_no_muscles.png';
 const _bodyOutlineBack = 'assets/muscles/Back_no_muscles.png';
 
 Color _sorenessColor(Soreness s) => switch (s) {
-      Soreness.none => Colors.transparent,
+      Soreness.none => const Color(0xFF4FC3F7),
       Soreness.aLittle => const Color(0xFFFFE066),
       Soreness.some => const Color(0xFFFF8C00),
       Soreness.lots => const Color(0xFFD32F2F),
@@ -152,9 +152,7 @@ class _BodyMapWidgetState extends State<BodyMapWidget> {
                   height: 20,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: s == Soreness.none
-                        ? Theme.of(context).colorScheme.outline
-                        : _sorenessColor(s),
+                    color: _sorenessColor(s),
                   ),
                 ),
                 title: Text(_sorenessLabel(s)),
@@ -182,34 +180,37 @@ class _BodyMapWidgetState extends State<BodyMapWidget> {
     }
     return Column(
       children: [
-        _bodyView('Front', _bodyOutlineFront, _frontMuscles),
-        const SizedBox(height: 16),
-        _bodyView('Back', _bodyOutlineBack, _backMuscles),
+        _bodyView(_bodyOutlineFront, _frontMuscles),
+        _bodyView(_bodyOutlineBack, _backMuscles),
       ],
     );
   }
 
-  Widget _bodyView(String label, String outlinePath,
-      List<(MuscleGroup, String)> muscles) {
-    return Column(
-      children: [
-        Text(label, style: Theme.of(context).textTheme.labelLarge),
-        const SizedBox(height: 4),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            // Derive height from the outline image's natural aspect ratio.
-            // We don't know it until the image loads, so use BoxFit.contain
-            // and an IntrinsicHeight wrapper instead.
-            final displayWidth = constraints.maxWidth;
-            return GestureDetector(
-              onTapUp: (details) {
-                // Find rendered image bounds via the RenderBox.
-                final box =
-                    context.findRenderObject() as RenderBox?;
-                if (box == null) return;
-                final size = box.size;
-                _onTap(details.localPosition, size, muscles);
-              },
+  // Fraction of image height to trim from each end (top and bottom).
+  // Increase to crop more, decrease to show more of the image canvas.
+  static const double _cropFraction = 0.08;
+
+  Widget _bodyView(String outlinePath, List<(MuscleGroup, String)> muscles) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final displayWidth = constraints.maxWidth;
+        return GestureDetector(
+          onTapUp: (details) {
+            final box = context.findRenderObject() as RenderBox?;
+            if (box == null) return;
+            // box.size is the cropped height; correct y back to full-image space.
+            final croppedSize = box.size;
+            final fullHeight = croppedSize.height / (1 - 2 * _cropFraction);
+            final correctedTap = Offset(
+              details.localPosition.dx,
+              details.localPosition.dy + _cropFraction * fullHeight,
+            );
+            _onTap(correctedTap, Size(croppedSize.width, fullHeight), muscles);
+          },
+          child: ClipRect(
+            child: Align(
+              alignment: Alignment.center,
+              heightFactor: 1 - 2 * _cropFraction,
               child: Stack(
                 children: [
                   Image.asset(
@@ -218,24 +219,22 @@ class _BodyMapWidgetState extends State<BodyMapWidget> {
                     fit: BoxFit.contain,
                   ),
                   for (final (muscle, path) in muscles)
-                    if ((widget.soreness[muscle] ?? Soreness.none) !=
-                        Soreness.none)
-                      Positioned.fill(
-                        child: Image.asset(
-                          path,
-                          fit: BoxFit.contain,
-                          color: _sorenessColor(
-                              widget.soreness[muscle] ?? Soreness.none)
-                              .withValues(alpha: 0.7),
-                          colorBlendMode: BlendMode.srcIn,
-                        ),
+                    Positioned.fill(
+                      child: Image.asset(
+                        path,
+                        fit: BoxFit.contain,
+                        color: _sorenessColor(
+                                widget.soreness[muscle] ?? Soreness.none)
+                            .withValues(alpha: 0.7),
+                        colorBlendMode: BlendMode.srcIn,
                       ),
+                    ),
                 ],
               ),
-            );
-          },
-        ),
-      ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -82,7 +82,7 @@ class _PreWorkoutCheckinScreenState extends State<PreWorkoutCheckinScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                _sectionHeader('Soreness'),
+                _sectionHeader("Today's Soreness"),
                 BodyMapWidget(
                   soreness: _soreness,
                   onChanged: (muscle, soreness) =>
