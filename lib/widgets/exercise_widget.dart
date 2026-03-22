@@ -395,13 +395,31 @@ class ExerciseWidget extends StatelessWidget {
         if (movement.note1 != null)
           GestureDetector(
             onTap: onEditNote,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                movement.note1!,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFB8860B).withValues(alpha: 0.25),
+                border: Border(
+                  left: BorderSide(
+                    color: const Color(0xFFDAA520),
+                    width: 3,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 14, color: Color(0xFFDAA520)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      movement.note1!,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: const Color(0xFFDAA520),
+                          ),
                     ),
+                  ),
+                ],
               ),
             ),
           ),

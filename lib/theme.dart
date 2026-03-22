@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-const _seed = Color(0xFFFF6D00); // energetic orange
+const _seed = Color(0xFF1565C0); // steel blue
 
 abstract final class AppTheme {
   static ThemeData dark() {
