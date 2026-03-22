@@ -47,7 +47,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.withExecutor(super.e);
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -113,6 +113,12 @@ class AppDatabase extends _$AppDatabase {
                 await customStatement(
                   'ALTER TABLE completed_exercises '
                   'ADD COLUMN ai_planned INTEGER NOT NULL DEFAULT 1',
+                );
+              case 11:
+                // 11 → 12: Add tibialis soreness to pre_workout_checkins.
+                await customStatement(
+                  'ALTER TABLE pre_workout_checkins '
+                  'ADD COLUMN tibialis TEXT',
                 );
             }
           }

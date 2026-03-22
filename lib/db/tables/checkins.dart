@@ -19,6 +19,7 @@ class PreWorkoutCheckins extends Table {
   TextColumn get glutes => textEnum<Soreness>().nullable()();
   TextColumn get calves => textEnum<Soreness>().nullable()();
   TextColumn get shoulders => textEnum<Soreness>().nullable()();
+  TextColumn get tibialis => textEnum<Soreness>().nullable()();
   TextColumn get sleepQuality => textEnum<CurrentState>().nullable()();
   TextColumn get vimVigor => textEnum<CurrentState>().nullable()();
   TextColumn get mentalState => textEnum<CurrentState>().nullable()();

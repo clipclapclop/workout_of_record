@@ -5802,6 +5802,15 @@ class $PreWorkoutCheckinsTable extends PreWorkoutCheckins
         requiredDuringInsert: false,
       ).withConverter<Soreness?>($PreWorkoutCheckinsTable.$convertershouldersn);
   @override
+  late final GeneratedColumnWithTypeConverter<Soreness?, String> tibialis =
+      GeneratedColumn<String>(
+        'tibialis',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      ).withConverter<Soreness?>($PreWorkoutCheckinsTable.$convertertibialisn);
+  @override
   late final GeneratedColumnWithTypeConverter<CurrentState?, String>
   sleepQuality =
       GeneratedColumn<String>(
@@ -5852,6 +5861,7 @@ class $PreWorkoutCheckinsTable extends PreWorkoutCheckins
     glutes,
     calves,
     shoulders,
+    tibialis,
     sleepQuality,
     vimVigor,
     mentalState,
@@ -5968,6 +5978,12 @@ class $PreWorkoutCheckinsTable extends PreWorkoutCheckins
           data['${effectivePrefix}shoulders'],
         ),
       ),
+      tibialis: $PreWorkoutCheckinsTable.$convertertibialisn.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}tibialis'],
+        ),
+      ),
       sleepQuality: $PreWorkoutCheckinsTable.$convertersleepQualityn.fromSql(
         attachedDatabase.typeMapping.read(
           DriftSqlType.string,
@@ -6042,6 +6058,10 @@ class $PreWorkoutCheckinsTable extends PreWorkoutCheckins
       const EnumNameConverter<Soreness>(Soreness.values);
   static JsonTypeConverter2<Soreness?, String?, String?> $convertershouldersn =
       JsonTypeConverter2.asNullable($convertershoulders);
+  static JsonTypeConverter2<Soreness, String, String> $convertertibialis =
+      const EnumNameConverter<Soreness>(Soreness.values);
+  static JsonTypeConverter2<Soreness?, String?, String?> $convertertibialisn =
+      JsonTypeConverter2.asNullable($convertertibialis);
   static JsonTypeConverter2<CurrentState, String, String>
   $convertersleepQuality = const EnumNameConverter<CurrentState>(
     CurrentState.values,
@@ -6078,6 +6098,7 @@ class PreWorkoutCheckin extends DataClass
   final Soreness? glutes;
   final Soreness? calves;
   final Soreness? shoulders;
+  final Soreness? tibialis;
   final CurrentState? sleepQuality;
   final CurrentState? vimVigor;
   final CurrentState? mentalState;
@@ -6096,6 +6117,7 @@ class PreWorkoutCheckin extends DataClass
     this.glutes,
     this.calves,
     this.shoulders,
+    this.tibialis,
     this.sleepQuality,
     this.vimVigor,
     this.mentalState,
@@ -6165,6 +6187,11 @@ class PreWorkoutCheckin extends DataClass
         $PreWorkoutCheckinsTable.$convertershouldersn.toSql(shoulders),
       );
     }
+    if (!nullToAbsent || tibialis != null) {
+      map['tibialis'] = Variable<String>(
+        $PreWorkoutCheckinsTable.$convertertibialisn.toSql(tibialis),
+      );
+    }
     if (!nullToAbsent || sleepQuality != null) {
       map['sleep_quality'] = Variable<String>(
         $PreWorkoutCheckinsTable.$convertersleepQualityn.toSql(sleepQuality),
@@ -6219,6 +6246,9 @@ class PreWorkoutCheckin extends DataClass
       shoulders: shoulders == null && nullToAbsent
           ? const Value.absent()
           : Value(shoulders),
+      tibialis: tibialis == null && nullToAbsent
+          ? const Value.absent()
+          : Value(tibialis),
       sleepQuality: sleepQuality == null && nullToAbsent
           ? const Value.absent()
           : Value(sleepQuality),
@@ -6275,6 +6305,9 @@ class PreWorkoutCheckin extends DataClass
       shoulders: $PreWorkoutCheckinsTable.$convertershouldersn.fromJson(
         serializer.fromJson<String?>(json['shoulders']),
       ),
+      tibialis: $PreWorkoutCheckinsTable.$convertertibialisn.fromJson(
+        serializer.fromJson<String?>(json['tibialis']),
+      ),
       sleepQuality: $PreWorkoutCheckinsTable.$convertersleepQualityn.fromJson(
         serializer.fromJson<String?>(json['sleepQuality']),
       ),
@@ -6328,6 +6361,9 @@ class PreWorkoutCheckin extends DataClass
       'shoulders': serializer.toJson<String?>(
         $PreWorkoutCheckinsTable.$convertershouldersn.toJson(shoulders),
       ),
+      'tibialis': serializer.toJson<String?>(
+        $PreWorkoutCheckinsTable.$convertertibialisn.toJson(tibialis),
+      ),
       'sleepQuality': serializer.toJson<String?>(
         $PreWorkoutCheckinsTable.$convertersleepQualityn.toJson(sleepQuality),
       ),
@@ -6355,6 +6391,7 @@ class PreWorkoutCheckin extends DataClass
     Value<Soreness?> glutes = const Value.absent(),
     Value<Soreness?> calves = const Value.absent(),
     Value<Soreness?> shoulders = const Value.absent(),
+    Value<Soreness?> tibialis = const Value.absent(),
     Value<CurrentState?> sleepQuality = const Value.absent(),
     Value<CurrentState?> vimVigor = const Value.absent(),
     Value<CurrentState?> mentalState = const Value.absent(),
@@ -6373,6 +6410,7 @@ class PreWorkoutCheckin extends DataClass
     glutes: glutes.present ? glutes.value : this.glutes,
     calves: calves.present ? calves.value : this.calves,
     shoulders: shoulders.present ? shoulders.value : this.shoulders,
+    tibialis: tibialis.present ? tibialis.value : this.tibialis,
     sleepQuality: sleepQuality.present ? sleepQuality.value : this.sleepQuality,
     vimVigor: vimVigor.present ? vimVigor.value : this.vimVigor,
     mentalState: mentalState.present ? mentalState.value : this.mentalState,
@@ -6395,6 +6433,7 @@ class PreWorkoutCheckin extends DataClass
       glutes: data.glutes.present ? data.glutes.value : this.glutes,
       calves: data.calves.present ? data.calves.value : this.calves,
       shoulders: data.shoulders.present ? data.shoulders.value : this.shoulders,
+      tibialis: data.tibialis.present ? data.tibialis.value : this.tibialis,
       sleepQuality: data.sleepQuality.present
           ? data.sleepQuality.value
           : this.sleepQuality,
@@ -6422,6 +6461,7 @@ class PreWorkoutCheckin extends DataClass
           ..write('glutes: $glutes, ')
           ..write('calves: $calves, ')
           ..write('shoulders: $shoulders, ')
+          ..write('tibialis: $tibialis, ')
           ..write('sleepQuality: $sleepQuality, ')
           ..write('vimVigor: $vimVigor, ')
           ..write('mentalState: $mentalState')
@@ -6445,6 +6485,7 @@ class PreWorkoutCheckin extends DataClass
     glutes,
     calves,
     shoulders,
+    tibialis,
     sleepQuality,
     vimVigor,
     mentalState,
@@ -6467,6 +6508,7 @@ class PreWorkoutCheckin extends DataClass
           other.glutes == this.glutes &&
           other.calves == this.calves &&
           other.shoulders == this.shoulders &&
+          other.tibialis == this.tibialis &&
           other.sleepQuality == this.sleepQuality &&
           other.vimVigor == this.vimVigor &&
           other.mentalState == this.mentalState);
@@ -6487,6 +6529,7 @@ class PreWorkoutCheckinsCompanion extends UpdateCompanion<PreWorkoutCheckin> {
   final Value<Soreness?> glutes;
   final Value<Soreness?> calves;
   final Value<Soreness?> shoulders;
+  final Value<Soreness?> tibialis;
   final Value<CurrentState?> sleepQuality;
   final Value<CurrentState?> vimVigor;
   final Value<CurrentState?> mentalState;
@@ -6505,6 +6548,7 @@ class PreWorkoutCheckinsCompanion extends UpdateCompanion<PreWorkoutCheckin> {
     this.glutes = const Value.absent(),
     this.calves = const Value.absent(),
     this.shoulders = const Value.absent(),
+    this.tibialis = const Value.absent(),
     this.sleepQuality = const Value.absent(),
     this.vimVigor = const Value.absent(),
     this.mentalState = const Value.absent(),
@@ -6524,6 +6568,7 @@ class PreWorkoutCheckinsCompanion extends UpdateCompanion<PreWorkoutCheckin> {
     this.glutes = const Value.absent(),
     this.calves = const Value.absent(),
     this.shoulders = const Value.absent(),
+    this.tibialis = const Value.absent(),
     this.sleepQuality = const Value.absent(),
     this.vimVigor = const Value.absent(),
     this.mentalState = const Value.absent(),
@@ -6543,6 +6588,7 @@ class PreWorkoutCheckinsCompanion extends UpdateCompanion<PreWorkoutCheckin> {
     Expression<String>? glutes,
     Expression<String>? calves,
     Expression<String>? shoulders,
+    Expression<String>? tibialis,
     Expression<String>? sleepQuality,
     Expression<String>? vimVigor,
     Expression<String>? mentalState,
@@ -6562,6 +6608,7 @@ class PreWorkoutCheckinsCompanion extends UpdateCompanion<PreWorkoutCheckin> {
       if (glutes != null) 'glutes': glutes,
       if (calves != null) 'calves': calves,
       if (shoulders != null) 'shoulders': shoulders,
+      if (tibialis != null) 'tibialis': tibialis,
       if (sleepQuality != null) 'sleep_quality': sleepQuality,
       if (vimVigor != null) 'vim_vigor': vimVigor,
       if (mentalState != null) 'mental_state': mentalState,
@@ -6583,6 +6630,7 @@ class PreWorkoutCheckinsCompanion extends UpdateCompanion<PreWorkoutCheckin> {
     Value<Soreness?>? glutes,
     Value<Soreness?>? calves,
     Value<Soreness?>? shoulders,
+    Value<Soreness?>? tibialis,
     Value<CurrentState?>? sleepQuality,
     Value<CurrentState?>? vimVigor,
     Value<CurrentState?>? mentalState,
@@ -6602,6 +6650,7 @@ class PreWorkoutCheckinsCompanion extends UpdateCompanion<PreWorkoutCheckin> {
       glutes: glutes ?? this.glutes,
       calves: calves ?? this.calves,
       shoulders: shoulders ?? this.shoulders,
+      tibialis: tibialis ?? this.tibialis,
       sleepQuality: sleepQuality ?? this.sleepQuality,
       vimVigor: vimVigor ?? this.vimVigor,
       mentalState: mentalState ?? this.mentalState,
@@ -6677,6 +6726,11 @@ class PreWorkoutCheckinsCompanion extends UpdateCompanion<PreWorkoutCheckin> {
         $PreWorkoutCheckinsTable.$convertershouldersn.toSql(shoulders.value),
       );
     }
+    if (tibialis.present) {
+      map['tibialis'] = Variable<String>(
+        $PreWorkoutCheckinsTable.$convertertibialisn.toSql(tibialis.value),
+      );
+    }
     if (sleepQuality.present) {
       map['sleep_quality'] = Variable<String>(
         $PreWorkoutCheckinsTable.$convertersleepQualityn.toSql(
@@ -6716,6 +6770,7 @@ class PreWorkoutCheckinsCompanion extends UpdateCompanion<PreWorkoutCheckin> {
           ..write('glutes: $glutes, ')
           ..write('calves: $calves, ')
           ..write('shoulders: $shoulders, ')
+          ..write('tibialis: $tibialis, ')
           ..write('sleepQuality: $sleepQuality, ')
           ..write('vimVigor: $vimVigor, ')
           ..write('mentalState: $mentalState')
@@ -14122,6 +14177,7 @@ typedef $$PreWorkoutCheckinsTableCreateCompanionBuilder =
       Value<Soreness?> glutes,
       Value<Soreness?> calves,
       Value<Soreness?> shoulders,
+      Value<Soreness?> tibialis,
       Value<CurrentState?> sleepQuality,
       Value<CurrentState?> vimVigor,
       Value<CurrentState?> mentalState,
@@ -14142,6 +14198,7 @@ typedef $$PreWorkoutCheckinsTableUpdateCompanionBuilder =
       Value<Soreness?> glutes,
       Value<Soreness?> calves,
       Value<Soreness?> shoulders,
+      Value<Soreness?> tibialis,
       Value<CurrentState?> sleepQuality,
       Value<CurrentState?> vimVigor,
       Value<CurrentState?> mentalState,
@@ -14266,6 +14323,12 @@ class $$PreWorkoutCheckinsTableFilterComposer
         builder: (column) => ColumnWithTypeConverterFilters(column),
       );
 
+  ColumnWithTypeConverterFilters<Soreness?, Soreness, String> get tibialis =>
+      $composableBuilder(
+        column: $table.tibialis,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
   ColumnWithTypeConverterFilters<CurrentState?, CurrentState, String>
   get sleepQuality => $composableBuilder(
     column: $table.sleepQuality,
@@ -14382,6 +14445,11 @@ class $$PreWorkoutCheckinsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get tibialis => $composableBuilder(
+    column: $table.tibialis,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get sleepQuality => $composableBuilder(
     column: $table.sleepQuality,
     builder: (column) => ColumnOrderings(column),
@@ -14472,6 +14540,9 @@ class $$PreWorkoutCheckinsTableAnnotationComposer
   GeneratedColumnWithTypeConverter<Soreness?, String> get shoulders =>
       $composableBuilder(column: $table.shoulders, builder: (column) => column);
 
+  GeneratedColumnWithTypeConverter<Soreness?, String> get tibialis =>
+      $composableBuilder(column: $table.tibialis, builder: (column) => column);
+
   GeneratedColumnWithTypeConverter<CurrentState?, String> get sleepQuality =>
       $composableBuilder(
         column: $table.sleepQuality,
@@ -14558,6 +14629,7 @@ class $$PreWorkoutCheckinsTableTableManager
                 Value<Soreness?> glutes = const Value.absent(),
                 Value<Soreness?> calves = const Value.absent(),
                 Value<Soreness?> shoulders = const Value.absent(),
+                Value<Soreness?> tibialis = const Value.absent(),
                 Value<CurrentState?> sleepQuality = const Value.absent(),
                 Value<CurrentState?> vimVigor = const Value.absent(),
                 Value<CurrentState?> mentalState = const Value.absent(),
@@ -14576,6 +14648,7 @@ class $$PreWorkoutCheckinsTableTableManager
                 glutes: glutes,
                 calves: calves,
                 shoulders: shoulders,
+                tibialis: tibialis,
                 sleepQuality: sleepQuality,
                 vimVigor: vimVigor,
                 mentalState: mentalState,
@@ -14596,6 +14669,7 @@ class $$PreWorkoutCheckinsTableTableManager
                 Value<Soreness?> glutes = const Value.absent(),
                 Value<Soreness?> calves = const Value.absent(),
                 Value<Soreness?> shoulders = const Value.absent(),
+                Value<Soreness?> tibialis = const Value.absent(),
                 Value<CurrentState?> sleepQuality = const Value.absent(),
                 Value<CurrentState?> vimVigor = const Value.absent(),
                 Value<CurrentState?> mentalState = const Value.absent(),
@@ -14614,6 +14688,7 @@ class $$PreWorkoutCheckinsTableTableManager
                 glutes: glutes,
                 calves: calves,
                 shoulders: shoulders,
+                tibialis: tibialis,
                 sleepQuality: sleepQuality,
                 vimVigor: vimVigor,
                 mentalState: mentalState,

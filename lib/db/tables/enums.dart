@@ -13,6 +13,7 @@ enum MuscleGroup {
   calves,
   fullBody,
   other,
+  tibialis,
 }
 
 enum Soreness { none, aLittle, some, lots }
