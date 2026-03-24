@@ -99,12 +99,14 @@ class WorkoutForegroundService {
   static void update({
     required String exerciseName,
     String? cueText,
+    String? setInfo,
     DateTime? timerEndsAt,
   }) {
     FlutterForegroundTask.sendDataToTask({
       'type': 'update',
       'exerciseName': exerciseName,
       'cueText': cueText,
+      'setInfo': setInfo,
       'timerEndsAtMs': timerEndsAt?.millisecondsSinceEpoch,
     });
   }
@@ -131,6 +133,7 @@ class WorkoutForegroundService {
 class _WorkoutTaskHandler implements TaskHandler {
   String _exerciseName = '';
   String? _cueText;
+  String? _setInfo;
   DateTime? _timerEndsAt;
 
   /// Set to true when the foreground widget fires the cue first, so we skip.
@@ -152,17 +155,25 @@ class _WorkoutTaskHandler implements TaskHandler {
     }
 
     // Build notification text.
-    final String notifText;
+    final String timerText;
     if (expired || (_timerEndsAt == null && _cuedByWidget)) {
-      notifText = 'Ready!';
+      timerText = 'Ready!';
     } else if (_timerEndsAt != null && remaining != null) {
       final s = remaining.inSeconds.clamp(0, 5999);
       final m = s ~/ 60;
       final sec = s % 60;
-      notifText =
+      timerText =
           'Rest: ${m.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
     } else {
-      notifText = '';
+      timerText = '';
+    }
+    final String notifText;
+    if (_setInfo != null && timerText.isNotEmpty) {
+      notifText = '$_setInfo  |  $timerText';
+    } else if (_setInfo != null) {
+      notifText = _setInfo!;
+    } else {
+      notifText = timerText;
     }
 
     await FlutterForegroundTask.updateService(
@@ -189,6 +200,7 @@ class _WorkoutTaskHandler implements TaskHandler {
       case 'update':
         _exerciseName = map['exerciseName'] as String? ?? '';
         _cueText = map['cueText'] as String?;
+        _setInfo = map['setInfo'] as String?;
         final ms = map['timerEndsAtMs'] as int?;
         _timerEndsAt =
             ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);

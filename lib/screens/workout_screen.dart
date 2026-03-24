@@ -96,6 +96,31 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     return AppPreferences.getTimerDefaultSeconds();
   }
 
+  /// Notification set info line, e.g. "Set 2/4 · 10 reps · 80 kg".
+  String? _setInfoText(ExerciseData exercise) {
+    final sets = exercise.sets;
+    if (sets.isEmpty) return null;
+    final nextIdx = sets.indexWhere(
+        (s) => !(_setStates[s.completed.id]?.isChecked ?? false));
+    if (nextIdx < 0) return null;
+    final setNum = nextIdx + 1;
+    final ps = sets[nextIdx].planned;
+    final m = exercise.movement;
+    final metric = AppPreferences.getUnitsMetric();
+    final parts = <String>['Set $setNum/${sets.length}'];
+    if (m.isRequiredReps && ps?.reps != null) parts.add('${ps!.reps} reps');
+    if (m.isRequiredWeight && ps?.weight != null) {
+      parts.add('${_fmt(ps!.weight!)} ${metric ? 'kg' : 'lbs'}');
+    }
+    if (m.isRequiredDistance && ps?.distance != null) {
+      parts.add('${_fmt(ps!.distance!)} ${metric ? 'km' : 'mi'}');
+    }
+    if (m.isRequiredTime && ps?.time != null) {
+      parts.add('${_fmt(ps!.time!)}s');
+    }
+    return parts.join(' · ');
+  }
+
   /// Cue text spoken by TTS when the timer reaches zero.
   String? _cueText(ExerciseData exercise) {
     SetData? next;
@@ -192,6 +217,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     WorkoutForegroundService.update(
       exerciseName: activeEx.movement.name,
       cueText: _timerCueText,
+      setInfo: _setInfoText(activeEx),
       timerEndsAt: DateTime.now()
           .add(Duration(milliseconds: _timerController.remainingMs)),
     );
