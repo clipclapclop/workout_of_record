@@ -1079,6 +1079,30 @@ class AppDatabase extends _$AppDatabase {
       ));
     }
 
+    // ── Fill remaining slots in the last partially-materialized week ─────────
+    if (weeksList.isNotEmpty) {
+      final lastWeek = weeksList.last;
+      final allSlots = await _getWeekTemplateSlots(lastWeek, weeksList);
+      final trainingSlots = allSlots.where((s) => !s.isRestDay).toList();
+      final materializedTraining = calendarWeeks.last.cells.length;
+
+      if (materializedTraining < trainingSlots.length) {
+        final lastCalWeek = calendarWeeks.last;
+        final extraCells = [
+          for (var i = materializedTraining; i < trainingSlots.length; i++)
+            CalendarCell(
+              workoutName: trainingSlots[i].name,
+              orderIndex: trainingSlots[i].orderIndex,
+            ),
+        ];
+        calendarWeeks[calendarWeeks.length - 1] = CalendarWeek(
+          weekNumber: lastCalWeek.weekNumber,
+          goal: lastCalWeek.goal,
+          cells: [...lastCalWeek.cells, ...extraCells],
+        );
+      }
+    }
+
     // ── Template-based future weeks ──────────────────────────────────────────
     final materializedCount = weeksList.length;
     if (materializedCount < meso.totalWeekCount) {
