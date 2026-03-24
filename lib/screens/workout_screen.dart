@@ -808,33 +808,10 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
   Future<void> _editNote(ExerciseData exercise) async {
     final movement = exercise.movement;
-    final controller = TextEditingController(text: movement.note1 ?? '');
     final result = await showDialog<String?>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Exercise Note'),
-        content: TextField(
-          controller: controller,
-          maxLines: 4,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Add a note…',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, controller.text),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+      builder: (ctx) => _NoteDialog(initialText: movement.note1 ?? ''),
     );
-    controller.dispose();
     if (result == null) return;
     final trimmed = result.trim().isEmpty ? null : result.trim();
     await db.updateMovement(
@@ -1240,6 +1217,56 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           ? () => _toggleAiPlanned(exercise)
           : null,
       onEditNote: () => _editNote(exercise),
+    );
+  }
+}
+
+class _NoteDialog extends StatefulWidget {
+  const _NoteDialog({required this.initialText});
+  final String initialText;
+
+  @override
+  State<_NoteDialog> createState() => _NoteDialogState();
+}
+
+class _NoteDialogState extends State<_NoteDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialText);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Exercise Note'),
+      content: TextField(
+        controller: _controller,
+        maxLines: 4,
+        autofocus: true,
+        decoration: const InputDecoration(
+          hintText: 'Add a note…',
+          border: OutlineInputBorder(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _controller.text),
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }

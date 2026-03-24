@@ -28,10 +28,10 @@ class _PreWorkoutCheckinScreenState extends State<PreWorkoutCheckinScreen> {
     for (final m in MuscleGroup.values) m: Soreness.none,
   };
 
-  // Status defaults — most benign = great
-  CurrentState _sleepQuality = CurrentState.great;
-  CurrentState _vimVigor = CurrentState.great;
-  CurrentState _mentalState = CurrentState.great;
+  // Status defaults
+  CurrentState _sleepQuality = CurrentState.good;
+  CurrentState _vimVigor = CurrentState.good;
+  CurrentState _mentalState = CurrentState.good;
 
   Future<void> _submit() async {
     await db.savePreWorkoutCheckin(PreWorkoutCheckinsCompanion.insert(
