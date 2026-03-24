@@ -151,6 +151,7 @@ class _MesoTemplateListScreenState extends State<MesoTemplateListScreen> {
             );
           }
           return ListView.builder(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
             itemCount: templates.length,
             itemBuilder: (context, i) {
               final t = templates[i];

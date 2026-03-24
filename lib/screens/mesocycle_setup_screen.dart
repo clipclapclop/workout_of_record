@@ -130,7 +130,9 @@ class _MesocycleSetupScreenState extends State<MesocycleSetupScreen> {
             children: [
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: selectedTemplate == null
+                      ? EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).padding.bottom)
+                      : const EdgeInsets.all(16),
                   children: [
                     Text('Choose a Template',
                         style: Theme.of(context).textTheme.titleMedium),

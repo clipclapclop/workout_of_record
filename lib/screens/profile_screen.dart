@@ -129,7 +129,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [AppNavMenu(current: AppScreen.profile)],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).padding.bottom),
         children: [
           // ── Date of Birth ─────────────────────────────────────────────────
           InkWell(

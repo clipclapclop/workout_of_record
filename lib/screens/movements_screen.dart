@@ -147,6 +147,7 @@ class _MovementsScreenState extends State<MovementsScreen> {
                   final sorted = [...movements]
                     ..sort((a, b) => a.name.compareTo(b.name));
                   return ListView.builder(
+                    padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
                     itemCount: sorted.length,
                     itemBuilder: (context, i) => _MovementTile(
                       movement: sorted[i],
@@ -176,6 +177,7 @@ class _MovementsScreenState extends State<MovementsScreen> {
                   ..sort((a, b) => a.name.compareTo(b.name));
 
                 return ListView.builder(
+                  padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
                   itemCount: sortedGroups.fold<int>(
                       0, (sum, mg) => sum + 1 + groups[mg]!.length),
                   itemBuilder: (context, index) {

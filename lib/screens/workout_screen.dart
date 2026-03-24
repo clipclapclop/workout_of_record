@@ -1143,7 +1143,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         children: [
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + MediaQuery.of(context).padding.bottom),
               children: [
                 for (var i = 0; i < data.exercises.length; i++)
                   _buildExerciseWidget(
