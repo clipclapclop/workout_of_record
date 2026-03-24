@@ -109,6 +109,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     final ps = next!.planned!;
     final m = exercise.movement;
     final metric = AppPreferences.getUnitsMetric();
+    if (m.isRequiredReps && ps.reps != null) {
+      return '${ps.reps} reps';
+    }
     if (m.isRequiredDistance && ps.distance != null) {
       final unit = metric ? 'kilometers' : 'miles';
       return '${_fmt(ps.distance!)} $unit';
