@@ -627,28 +627,16 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
   Future<void> _skipSets(
       SetData setData, ExerciseData exercise, SkipReason reason) async {
-    final setIndex =
-        exercise.sets.indexWhere((s) => s.completed.id == setData.completed.id);
-    final toSkip = [
-      for (var i = setIndex; i < exercise.sets.length; i++)
-        if (!(_setStates[exercise.sets[i].completed.id]?.isChecked ?? false))
-          exercise.sets[i].completed.id,
-    ];
-
-    for (final id in toSkip) {
-      await db.skipSet(id, reason);
-    }
+    await db.skipSet(setData.completed.id, reason);
 
     setState(() {
-      for (final id in toSkip) {
-        final state = _setStates[id]!;
-        state.isSkipped = true;
-        state.isChecked = true;
-        state.repsCtrl.clear();
-        state.weightCtrl.clear();
-        state.distanceCtrl.clear();
-        state.timeCtrl.clear();
-      }
+      final state = _setStates[setData.completed.id]!;
+      state.isSkipped = true;
+      state.isChecked = true;
+      state.repsCtrl.clear();
+      state.weightCtrl.clear();
+      state.distanceCtrl.clear();
+      state.timeCtrl.clear();
     });
 
     if (_postExDone[exercise.completed.id] != true) {

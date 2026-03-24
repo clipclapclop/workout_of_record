@@ -24,6 +24,7 @@ class SetWidget extends StatefulWidget {
     required this.isSkipped,
     required this.state,
     required this.onTimerReset,
+    required this.isLastSet,
     required this.onToggle,
     required this.onSkip,
     required this.onDelete,
@@ -34,6 +35,7 @@ class SetWidget extends StatefulWidget {
   final SetData setData;
   final Movement movement;
   final int setNum;
+  final bool isLastSet;
   final bool isExSkipped;
   final bool isLocked;
   final bool isChecked;
@@ -193,15 +195,14 @@ class _SetWidgetState extends State<SetWidget> {
             itemBuilder: (_) => [
               PopupMenuItem(
                 value: _SetMenuAction.skip,
-                enabled: !isChecked && !isExSkipped && !isLocked,
-                child: const Text('Skip'),
+                enabled: widget.isLastSet && !isChecked && !isExSkipped && !isLocked,
+                child: const Text('Skip Today'),
               ),
-              if (widget.setData.planned == null)
-                PopupMenuItem(
-                  value: _SetMenuAction.delete,
-                  enabled: !isChecked,
-                  child: const Text('Delete'),
-                ),
+              PopupMenuItem(
+                value: _SetMenuAction.delete,
+                enabled: widget.isLastSet && !isChecked,
+                child: const Text('Delete Permanently'),
+              ),
             ],
           ),
         ],

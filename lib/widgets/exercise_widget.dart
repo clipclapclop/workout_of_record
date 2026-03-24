@@ -362,6 +362,7 @@ class ExerciseWidget extends StatelessWidget {
           setData: exercise.sets[i],
           movement: movement,
           setNum: i + 1,
+          isLastSet: i == exercise.sets.length - 1,
           isExSkipped: isExSkipped,
           isLocked: isExLocked ||
               (i > 0 &&

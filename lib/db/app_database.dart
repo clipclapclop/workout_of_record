@@ -409,7 +409,7 @@ class AppDatabase extends _$AppDatabase {
 
       final nonSkipped = allSets.where((s) => s.skipReason == null).toList();
 
-      return computeHeuristic(nonSkipped, currentWeek.goal, movement);
+      return computeHeuristic(nonSkipped, currentWeek.goal, movement, allSets.length);
     }
 
     // No valid history found across any prior week — cold start.

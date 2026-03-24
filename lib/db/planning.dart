@@ -14,35 +14,46 @@ class PlannedSetValues {
 /// Returns one [PlannedSetValues] per planned set to create.
 ///
 /// [priorSets] must be pre-filtered to exclude skipped sets (skipReason == null).
-/// Empty [priorSets] triggers cold start: 2 null sets.
+/// [targetCount] is the total number of sets from the prior week (including skipped),
+/// so that skipped sets don't reduce next week's planned volume.
+/// Zero [targetCount] triggers cold start: 2 null sets.
 ///
-/// Hard week: copy all prior sets as-is.
-/// Deload week: ceil(2/3 * count) sets at 65% weight, rounded to movement increment.
+/// Hard week: plan [targetCount] sets, filling values from [priorSets] where available.
+/// Deload week: ceil(2/3 * targetCount) sets at 65% weight, rounded to movement increment.
 List<PlannedSetValues> computeHeuristic(
   List<CompletedSet> priorSets,
   WeekGoal goal,
   Movement movement,
+  int targetCount,
 ) {
-  if (priorSets.isEmpty) {
+  if (targetCount == 0) {
     return [const PlannedSetValues(), const PlannedSetValues()];
   }
 
   switch (goal) {
     case WeekGoal.hard:
-      return priorSets
-          .map((s) => PlannedSetValues(reps: s.reps, weight: s.weight, time: s.time))
-          .toList();
+      return List.generate(
+        targetCount,
+        (i) => i < priorSets.length
+            ? PlannedSetValues(reps: priorSets[i].reps, weight: priorSets[i].weight, time: priorSets[i].time)
+            : const PlannedSetValues(),
+      );
 
     case WeekGoal.deload:
-      final count = (priorSets.length * 2 / 3).ceil();
-      return priorSets.take(count).map((s) => PlannedSetValues(
-            reps: s.reps,
-            weight: _roundToMovementIncrement(
-              s.weight != null ? s.weight! * 0.65 : null,
-              movement,
-            ),
-            time: s.time,
-          )).toList();
+      final count = (targetCount * 2 / 3).ceil();
+      return List.generate(
+        count,
+        (i) => i < priorSets.length
+            ? PlannedSetValues(
+                reps: priorSets[i].reps,
+                weight: _roundToMovementIncrement(
+                  priorSets[i].weight != null ? priorSets[i].weight! * 0.65 : null,
+                  movement,
+                ),
+                time: priorSets[i].time,
+              )
+            : const PlannedSetValues(),
+      );
   }
 }
 
