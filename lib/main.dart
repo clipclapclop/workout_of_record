@@ -3,6 +3,7 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 import 'app_preferences.dart';
 import 'screens/home_screen.dart';
+import 'scroll_behavior.dart';
 import 'services/backup_scheduler.dart';
 import 'services/workout_foreground_service.dart';
 import 'theme.dart';
@@ -32,6 +33,7 @@ class MyApp extends StatelessWidget {
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.dark,
+      scrollBehavior: const AppScrollBehavior(),
       home: const HomeScreen(),
     );
   }
