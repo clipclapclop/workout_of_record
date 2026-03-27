@@ -716,8 +716,32 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       await db.clearPostMuscleGroupCheckin(widget.completedWorkoutId, mg);
       setState(() => _postMgDone[mg] = false);
     }
+    String? lastWeight;
+    String? lastDistance;
+    if (exercise.sets.isNotEmpty) {
+      final lastState = _setStates[exercise.sets.last.completed.id];
+      if (lastState != null) {
+        final w = lastState.weightCtrl.text.trim();
+        final d = lastState.distanceCtrl.text.trim();
+        if (w.isNotEmpty) lastWeight = w;
+        if (d.isNotEmpty) lastDistance = d;
+      }
+    }
     await db.addSet(exercise.completed.id);
     await _load();
+    if (lastWeight != null || lastDistance != null) {
+      final updatedEx = _data?.exercises
+          .firstWhere((e) => e.completed.id == exercise.completed.id);
+      if (updatedEx != null && updatedEx.sets.isNotEmpty) {
+        final newState = _setStates[updatedEx.sets.last.completed.id];
+        if (newState != null && !newState.isChecked && !newState.isSkipped) {
+          setState(() {
+            if (lastWeight != null) newState.weightCtrl.text = lastWeight;
+            if (lastDistance != null) newState.distanceCtrl.text = lastDistance;
+          });
+        }
+      }
+    }
   }
 
   Future<void> _deleteSet(SetData setData, ExerciseData exercise) async {
