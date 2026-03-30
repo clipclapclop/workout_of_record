@@ -39,7 +39,8 @@ class SafBackupWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, para
     }
 
     private fun buildZip(prefs: SharedPreferences): ByteArray {
-        val dbFile = java.io.File(applicationContext.filesDir, DB_FILENAME)
+        // Flutter's getApplicationDocumentsDirectory() maps to <dataDir>/app_flutter/
+        val dbFile = java.io.File(applicationContext.filesDir.parentFile, "app_flutter/$DB_FILENAME")
         if (!dbFile.exists()) throw Exception("Database not found")
         val dbBytes = dbFile.readBytes()
         val settingsBytes = buildSettingsJson(prefs).toByteArray(Charsets.UTF_8)
