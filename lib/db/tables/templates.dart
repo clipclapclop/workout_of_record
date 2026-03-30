@@ -29,5 +29,6 @@ class ExerciseTemplates extends Table {
       integer().references(WorkoutTemplates, #id)();
   IntColumn get movementId => integer().references(Movements, #id)();
   IntColumn get exerciseIndex => integer()();
-  BoolColumn get aiPlanned => boolean().withDefault(const Constant(true))();
+  BoolColumn get autoProgress =>
+      boolean().named('ai_planned').withDefault(const Constant(true))();
 }

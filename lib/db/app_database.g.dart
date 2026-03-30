@@ -1887,11 +1887,11 @@ class $ExerciseTemplatesTable extends ExerciseTemplates
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _aiPlannedMeta = const VerificationMeta(
-    'aiPlanned',
+  static const VerificationMeta _autoProgressMeta = const VerificationMeta(
+    'autoProgress',
   );
   @override
-  late final GeneratedColumn<bool> aiPlanned = GeneratedColumn<bool>(
+  late final GeneratedColumn<bool> autoProgress = GeneratedColumn<bool>(
     'ai_planned',
     aliasedName,
     false,
@@ -1908,7 +1908,7 @@ class $ExerciseTemplatesTable extends ExerciseTemplates
     workoutTemplateId,
     movementId,
     exerciseIndex,
-    aiPlanned,
+    autoProgress,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1957,8 +1957,11 @@ class $ExerciseTemplatesTable extends ExerciseTemplates
     }
     if (data.containsKey('ai_planned')) {
       context.handle(
-        _aiPlannedMeta,
-        aiPlanned.isAcceptableOrUnknown(data['ai_planned']!, _aiPlannedMeta),
+        _autoProgressMeta,
+        autoProgress.isAcceptableOrUnknown(
+          data['ai_planned']!,
+          _autoProgressMeta,
+        ),
       );
     }
     return context;
@@ -1986,7 +1989,7 @@ class $ExerciseTemplatesTable extends ExerciseTemplates
         DriftSqlType.int,
         data['${effectivePrefix}exercise_index'],
       )!,
-      aiPlanned: attachedDatabase.typeMapping.read(
+      autoProgress: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}ai_planned'],
       )!,
@@ -2005,13 +2008,13 @@ class ExerciseTemplate extends DataClass
   final int workoutTemplateId;
   final int movementId;
   final int exerciseIndex;
-  final bool aiPlanned;
+  final bool autoProgress;
   const ExerciseTemplate({
     required this.id,
     required this.workoutTemplateId,
     required this.movementId,
     required this.exerciseIndex,
-    required this.aiPlanned,
+    required this.autoProgress,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2020,7 +2023,7 @@ class ExerciseTemplate extends DataClass
     map['workout_template_id'] = Variable<int>(workoutTemplateId);
     map['movement_id'] = Variable<int>(movementId);
     map['exercise_index'] = Variable<int>(exerciseIndex);
-    map['ai_planned'] = Variable<bool>(aiPlanned);
+    map['ai_planned'] = Variable<bool>(autoProgress);
     return map;
   }
 
@@ -2030,7 +2033,7 @@ class ExerciseTemplate extends DataClass
       workoutTemplateId: Value(workoutTemplateId),
       movementId: Value(movementId),
       exerciseIndex: Value(exerciseIndex),
-      aiPlanned: Value(aiPlanned),
+      autoProgress: Value(autoProgress),
     );
   }
 
@@ -2044,7 +2047,7 @@ class ExerciseTemplate extends DataClass
       workoutTemplateId: serializer.fromJson<int>(json['workoutTemplateId']),
       movementId: serializer.fromJson<int>(json['movementId']),
       exerciseIndex: serializer.fromJson<int>(json['exerciseIndex']),
-      aiPlanned: serializer.fromJson<bool>(json['aiPlanned']),
+      autoProgress: serializer.fromJson<bool>(json['autoProgress']),
     );
   }
   @override
@@ -2055,7 +2058,7 @@ class ExerciseTemplate extends DataClass
       'workoutTemplateId': serializer.toJson<int>(workoutTemplateId),
       'movementId': serializer.toJson<int>(movementId),
       'exerciseIndex': serializer.toJson<int>(exerciseIndex),
-      'aiPlanned': serializer.toJson<bool>(aiPlanned),
+      'autoProgress': serializer.toJson<bool>(autoProgress),
     };
   }
 
@@ -2064,13 +2067,13 @@ class ExerciseTemplate extends DataClass
     int? workoutTemplateId,
     int? movementId,
     int? exerciseIndex,
-    bool? aiPlanned,
+    bool? autoProgress,
   }) => ExerciseTemplate(
     id: id ?? this.id,
     workoutTemplateId: workoutTemplateId ?? this.workoutTemplateId,
     movementId: movementId ?? this.movementId,
     exerciseIndex: exerciseIndex ?? this.exerciseIndex,
-    aiPlanned: aiPlanned ?? this.aiPlanned,
+    autoProgress: autoProgress ?? this.autoProgress,
   );
   ExerciseTemplate copyWithCompanion(ExerciseTemplatesCompanion data) {
     return ExerciseTemplate(
@@ -2084,7 +2087,9 @@ class ExerciseTemplate extends DataClass
       exerciseIndex: data.exerciseIndex.present
           ? data.exerciseIndex.value
           : this.exerciseIndex,
-      aiPlanned: data.aiPlanned.present ? data.aiPlanned.value : this.aiPlanned,
+      autoProgress: data.autoProgress.present
+          ? data.autoProgress.value
+          : this.autoProgress,
     );
   }
 
@@ -2095,14 +2100,19 @@ class ExerciseTemplate extends DataClass
           ..write('workoutTemplateId: $workoutTemplateId, ')
           ..write('movementId: $movementId, ')
           ..write('exerciseIndex: $exerciseIndex, ')
-          ..write('aiPlanned: $aiPlanned')
+          ..write('autoProgress: $autoProgress')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, workoutTemplateId, movementId, exerciseIndex, aiPlanned);
+  int get hashCode => Object.hash(
+    id,
+    workoutTemplateId,
+    movementId,
+    exerciseIndex,
+    autoProgress,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2111,7 +2121,7 @@ class ExerciseTemplate extends DataClass
           other.workoutTemplateId == this.workoutTemplateId &&
           other.movementId == this.movementId &&
           other.exerciseIndex == this.exerciseIndex &&
-          other.aiPlanned == this.aiPlanned);
+          other.autoProgress == this.autoProgress);
 }
 
 class ExerciseTemplatesCompanion extends UpdateCompanion<ExerciseTemplate> {
@@ -2119,20 +2129,20 @@ class ExerciseTemplatesCompanion extends UpdateCompanion<ExerciseTemplate> {
   final Value<int> workoutTemplateId;
   final Value<int> movementId;
   final Value<int> exerciseIndex;
-  final Value<bool> aiPlanned;
+  final Value<bool> autoProgress;
   const ExerciseTemplatesCompanion({
     this.id = const Value.absent(),
     this.workoutTemplateId = const Value.absent(),
     this.movementId = const Value.absent(),
     this.exerciseIndex = const Value.absent(),
-    this.aiPlanned = const Value.absent(),
+    this.autoProgress = const Value.absent(),
   });
   ExerciseTemplatesCompanion.insert({
     this.id = const Value.absent(),
     required int workoutTemplateId,
     required int movementId,
     required int exerciseIndex,
-    this.aiPlanned = const Value.absent(),
+    this.autoProgress = const Value.absent(),
   }) : workoutTemplateId = Value(workoutTemplateId),
        movementId = Value(movementId),
        exerciseIndex = Value(exerciseIndex);
@@ -2141,14 +2151,14 @@ class ExerciseTemplatesCompanion extends UpdateCompanion<ExerciseTemplate> {
     Expression<int>? workoutTemplateId,
     Expression<int>? movementId,
     Expression<int>? exerciseIndex,
-    Expression<bool>? aiPlanned,
+    Expression<bool>? autoProgress,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (workoutTemplateId != null) 'workout_template_id': workoutTemplateId,
       if (movementId != null) 'movement_id': movementId,
       if (exerciseIndex != null) 'exercise_index': exerciseIndex,
-      if (aiPlanned != null) 'ai_planned': aiPlanned,
+      if (autoProgress != null) 'ai_planned': autoProgress,
     });
   }
 
@@ -2157,14 +2167,14 @@ class ExerciseTemplatesCompanion extends UpdateCompanion<ExerciseTemplate> {
     Value<int>? workoutTemplateId,
     Value<int>? movementId,
     Value<int>? exerciseIndex,
-    Value<bool>? aiPlanned,
+    Value<bool>? autoProgress,
   }) {
     return ExerciseTemplatesCompanion(
       id: id ?? this.id,
       workoutTemplateId: workoutTemplateId ?? this.workoutTemplateId,
       movementId: movementId ?? this.movementId,
       exerciseIndex: exerciseIndex ?? this.exerciseIndex,
-      aiPlanned: aiPlanned ?? this.aiPlanned,
+      autoProgress: autoProgress ?? this.autoProgress,
     );
   }
 
@@ -2183,8 +2193,8 @@ class ExerciseTemplatesCompanion extends UpdateCompanion<ExerciseTemplate> {
     if (exerciseIndex.present) {
       map['exercise_index'] = Variable<int>(exerciseIndex.value);
     }
-    if (aiPlanned.present) {
-      map['ai_planned'] = Variable<bool>(aiPlanned.value);
+    if (autoProgress.present) {
+      map['ai_planned'] = Variable<bool>(autoProgress.value);
     }
     return map;
   }
@@ -2196,7 +2206,7 @@ class ExerciseTemplatesCompanion extends UpdateCompanion<ExerciseTemplate> {
           ..write('workoutTemplateId: $workoutTemplateId, ')
           ..write('movementId: $movementId, ')
           ..write('exerciseIndex: $exerciseIndex, ')
-          ..write('aiPlanned: $aiPlanned')
+          ..write('autoProgress: $autoProgress')
           ..write(')'))
         .toString();
   }
@@ -4025,11 +4035,11 @@ class $PlannedExercisesTable extends PlannedExercises
       'REFERENCES movements (id)',
     ),
   );
-  static const VerificationMeta _aiPlannedMeta = const VerificationMeta(
-    'aiPlanned',
+  static const VerificationMeta _autoProgressMeta = const VerificationMeta(
+    'autoProgress',
   );
   @override
-  late final GeneratedColumn<bool> aiPlanned = GeneratedColumn<bool>(
+  late final GeneratedColumn<bool> autoProgress = GeneratedColumn<bool>(
     'ai_planned',
     aliasedName,
     false,
@@ -4045,7 +4055,7 @@ class $PlannedExercisesTable extends PlannedExercises
     id,
     plannedWorkoutId,
     movementId,
-    aiPlanned,
+    autoProgress,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4083,8 +4093,11 @@ class $PlannedExercisesTable extends PlannedExercises
     }
     if (data.containsKey('ai_planned')) {
       context.handle(
-        _aiPlannedMeta,
-        aiPlanned.isAcceptableOrUnknown(data['ai_planned']!, _aiPlannedMeta),
+        _autoProgressMeta,
+        autoProgress.isAcceptableOrUnknown(
+          data['ai_planned']!,
+          _autoProgressMeta,
+        ),
       );
     }
     return context;
@@ -4108,7 +4121,7 @@ class $PlannedExercisesTable extends PlannedExercises
         DriftSqlType.int,
         data['${effectivePrefix}movement_id'],
       )!,
-      aiPlanned: attachedDatabase.typeMapping.read(
+      autoProgress: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}ai_planned'],
       )!,
@@ -4125,12 +4138,12 @@ class PlannedExercise extends DataClass implements Insertable<PlannedExercise> {
   final int id;
   final int plannedWorkoutId;
   final int movementId;
-  final bool aiPlanned;
+  final bool autoProgress;
   const PlannedExercise({
     required this.id,
     required this.plannedWorkoutId,
     required this.movementId,
-    required this.aiPlanned,
+    required this.autoProgress,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4138,7 +4151,7 @@ class PlannedExercise extends DataClass implements Insertable<PlannedExercise> {
     map['id'] = Variable<int>(id);
     map['planned_workout_id'] = Variable<int>(plannedWorkoutId);
     map['movement_id'] = Variable<int>(movementId);
-    map['ai_planned'] = Variable<bool>(aiPlanned);
+    map['ai_planned'] = Variable<bool>(autoProgress);
     return map;
   }
 
@@ -4147,7 +4160,7 @@ class PlannedExercise extends DataClass implements Insertable<PlannedExercise> {
       id: Value(id),
       plannedWorkoutId: Value(plannedWorkoutId),
       movementId: Value(movementId),
-      aiPlanned: Value(aiPlanned),
+      autoProgress: Value(autoProgress),
     );
   }
 
@@ -4160,7 +4173,7 @@ class PlannedExercise extends DataClass implements Insertable<PlannedExercise> {
       id: serializer.fromJson<int>(json['id']),
       plannedWorkoutId: serializer.fromJson<int>(json['plannedWorkoutId']),
       movementId: serializer.fromJson<int>(json['movementId']),
-      aiPlanned: serializer.fromJson<bool>(json['aiPlanned']),
+      autoProgress: serializer.fromJson<bool>(json['autoProgress']),
     );
   }
   @override
@@ -4170,7 +4183,7 @@ class PlannedExercise extends DataClass implements Insertable<PlannedExercise> {
       'id': serializer.toJson<int>(id),
       'plannedWorkoutId': serializer.toJson<int>(plannedWorkoutId),
       'movementId': serializer.toJson<int>(movementId),
-      'aiPlanned': serializer.toJson<bool>(aiPlanned),
+      'autoProgress': serializer.toJson<bool>(autoProgress),
     };
   }
 
@@ -4178,12 +4191,12 @@ class PlannedExercise extends DataClass implements Insertable<PlannedExercise> {
     int? id,
     int? plannedWorkoutId,
     int? movementId,
-    bool? aiPlanned,
+    bool? autoProgress,
   }) => PlannedExercise(
     id: id ?? this.id,
     plannedWorkoutId: plannedWorkoutId ?? this.plannedWorkoutId,
     movementId: movementId ?? this.movementId,
-    aiPlanned: aiPlanned ?? this.aiPlanned,
+    autoProgress: autoProgress ?? this.autoProgress,
   );
   PlannedExercise copyWithCompanion(PlannedExercisesCompanion data) {
     return PlannedExercise(
@@ -4194,7 +4207,9 @@ class PlannedExercise extends DataClass implements Insertable<PlannedExercise> {
       movementId: data.movementId.present
           ? data.movementId.value
           : this.movementId,
-      aiPlanned: data.aiPlanned.present ? data.aiPlanned.value : this.aiPlanned,
+      autoProgress: data.autoProgress.present
+          ? data.autoProgress.value
+          : this.autoProgress,
     );
   }
 
@@ -4204,13 +4219,14 @@ class PlannedExercise extends DataClass implements Insertable<PlannedExercise> {
           ..write('id: $id, ')
           ..write('plannedWorkoutId: $plannedWorkoutId, ')
           ..write('movementId: $movementId, ')
-          ..write('aiPlanned: $aiPlanned')
+          ..write('autoProgress: $autoProgress')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, plannedWorkoutId, movementId, aiPlanned);
+  int get hashCode =>
+      Object.hash(id, plannedWorkoutId, movementId, autoProgress);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -4218,38 +4234,38 @@ class PlannedExercise extends DataClass implements Insertable<PlannedExercise> {
           other.id == this.id &&
           other.plannedWorkoutId == this.plannedWorkoutId &&
           other.movementId == this.movementId &&
-          other.aiPlanned == this.aiPlanned);
+          other.autoProgress == this.autoProgress);
 }
 
 class PlannedExercisesCompanion extends UpdateCompanion<PlannedExercise> {
   final Value<int> id;
   final Value<int> plannedWorkoutId;
   final Value<int> movementId;
-  final Value<bool> aiPlanned;
+  final Value<bool> autoProgress;
   const PlannedExercisesCompanion({
     this.id = const Value.absent(),
     this.plannedWorkoutId = const Value.absent(),
     this.movementId = const Value.absent(),
-    this.aiPlanned = const Value.absent(),
+    this.autoProgress = const Value.absent(),
   });
   PlannedExercisesCompanion.insert({
     this.id = const Value.absent(),
     required int plannedWorkoutId,
     required int movementId,
-    this.aiPlanned = const Value.absent(),
+    this.autoProgress = const Value.absent(),
   }) : plannedWorkoutId = Value(plannedWorkoutId),
        movementId = Value(movementId);
   static Insertable<PlannedExercise> custom({
     Expression<int>? id,
     Expression<int>? plannedWorkoutId,
     Expression<int>? movementId,
-    Expression<bool>? aiPlanned,
+    Expression<bool>? autoProgress,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (plannedWorkoutId != null) 'planned_workout_id': plannedWorkoutId,
       if (movementId != null) 'movement_id': movementId,
-      if (aiPlanned != null) 'ai_planned': aiPlanned,
+      if (autoProgress != null) 'ai_planned': autoProgress,
     });
   }
 
@@ -4257,13 +4273,13 @@ class PlannedExercisesCompanion extends UpdateCompanion<PlannedExercise> {
     Value<int>? id,
     Value<int>? plannedWorkoutId,
     Value<int>? movementId,
-    Value<bool>? aiPlanned,
+    Value<bool>? autoProgress,
   }) {
     return PlannedExercisesCompanion(
       id: id ?? this.id,
       plannedWorkoutId: plannedWorkoutId ?? this.plannedWorkoutId,
       movementId: movementId ?? this.movementId,
-      aiPlanned: aiPlanned ?? this.aiPlanned,
+      autoProgress: autoProgress ?? this.autoProgress,
     );
   }
 
@@ -4279,8 +4295,8 @@ class PlannedExercisesCompanion extends UpdateCompanion<PlannedExercise> {
     if (movementId.present) {
       map['movement_id'] = Variable<int>(movementId.value);
     }
-    if (aiPlanned.present) {
-      map['ai_planned'] = Variable<bool>(aiPlanned.value);
+    if (autoProgress.present) {
+      map['ai_planned'] = Variable<bool>(autoProgress.value);
     }
     return map;
   }
@@ -4291,7 +4307,7 @@ class PlannedExercisesCompanion extends UpdateCompanion<PlannedExercise> {
           ..write('id: $id, ')
           ..write('plannedWorkoutId: $plannedWorkoutId, ')
           ..write('movementId: $movementId, ')
-          ..write('aiPlanned: $aiPlanned')
+          ..write('autoProgress: $autoProgress')
           ..write(')'))
         .toString();
   }
@@ -4377,11 +4393,11 @@ class $CompletedExercisesTable extends CompletedExercises
       ).withConverter<SkipReason?>(
         $CompletedExercisesTable.$converterskipReasonn,
       );
-  static const VerificationMeta _aiPlannedMeta = const VerificationMeta(
-    'aiPlanned',
+  static const VerificationMeta _autoProgressMeta = const VerificationMeta(
+    'autoProgress',
   );
   @override
-  late final GeneratedColumn<bool> aiPlanned = GeneratedColumn<bool>(
+  late final GeneratedColumn<bool> autoProgress = GeneratedColumn<bool>(
     'ai_planned',
     aliasedName,
     false,
@@ -4400,7 +4416,7 @@ class $CompletedExercisesTable extends CompletedExercises
     orderIndex,
     persistence,
     skipReason,
-    aiPlanned,
+    autoProgress,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4446,8 +4462,11 @@ class $CompletedExercisesTable extends CompletedExercises
     }
     if (data.containsKey('ai_planned')) {
       context.handle(
-        _aiPlannedMeta,
-        aiPlanned.isAcceptableOrUnknown(data['ai_planned']!, _aiPlannedMeta),
+        _autoProgressMeta,
+        autoProgress.isAcceptableOrUnknown(
+          data['ai_planned']!,
+          _autoProgressMeta,
+        ),
       );
     }
     return context;
@@ -4487,7 +4506,7 @@ class $CompletedExercisesTable extends CompletedExercises
           data['${effectivePrefix}skip_reason'],
         ),
       ),
-      aiPlanned: attachedDatabase.typeMapping.read(
+      autoProgress: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}ai_planned'],
       )!,
@@ -4515,7 +4534,7 @@ class CompletedExercise extends DataClass
   final int orderIndex;
   final Persistence persistence;
   final SkipReason? skipReason;
-  final bool aiPlanned;
+  final bool autoProgress;
   const CompletedExercise({
     required this.id,
     required this.completedWorkoutId,
@@ -4523,7 +4542,7 @@ class CompletedExercise extends DataClass
     required this.orderIndex,
     required this.persistence,
     this.skipReason,
-    required this.aiPlanned,
+    required this.autoProgress,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4542,7 +4561,7 @@ class CompletedExercise extends DataClass
         $CompletedExercisesTable.$converterskipReasonn.toSql(skipReason),
       );
     }
-    map['ai_planned'] = Variable<bool>(aiPlanned);
+    map['ai_planned'] = Variable<bool>(autoProgress);
     return map;
   }
 
@@ -4556,7 +4575,7 @@ class CompletedExercise extends DataClass
       skipReason: skipReason == null && nullToAbsent
           ? const Value.absent()
           : Value(skipReason),
-      aiPlanned: Value(aiPlanned),
+      autoProgress: Value(autoProgress),
     );
   }
 
@@ -4576,7 +4595,7 @@ class CompletedExercise extends DataClass
       skipReason: $CompletedExercisesTable.$converterskipReasonn.fromJson(
         serializer.fromJson<String?>(json['skipReason']),
       ),
-      aiPlanned: serializer.fromJson<bool>(json['aiPlanned']),
+      autoProgress: serializer.fromJson<bool>(json['autoProgress']),
     );
   }
   @override
@@ -4593,7 +4612,7 @@ class CompletedExercise extends DataClass
       'skipReason': serializer.toJson<String?>(
         $CompletedExercisesTable.$converterskipReasonn.toJson(skipReason),
       ),
-      'aiPlanned': serializer.toJson<bool>(aiPlanned),
+      'autoProgress': serializer.toJson<bool>(autoProgress),
     };
   }
 
@@ -4604,7 +4623,7 @@ class CompletedExercise extends DataClass
     int? orderIndex,
     Persistence? persistence,
     Value<SkipReason?> skipReason = const Value.absent(),
-    bool? aiPlanned,
+    bool? autoProgress,
   }) => CompletedExercise(
     id: id ?? this.id,
     completedWorkoutId: completedWorkoutId ?? this.completedWorkoutId,
@@ -4612,7 +4631,7 @@ class CompletedExercise extends DataClass
     orderIndex: orderIndex ?? this.orderIndex,
     persistence: persistence ?? this.persistence,
     skipReason: skipReason.present ? skipReason.value : this.skipReason,
-    aiPlanned: aiPlanned ?? this.aiPlanned,
+    autoProgress: autoProgress ?? this.autoProgress,
   );
   CompletedExercise copyWithCompanion(CompletedExercisesCompanion data) {
     return CompletedExercise(
@@ -4632,7 +4651,9 @@ class CompletedExercise extends DataClass
       skipReason: data.skipReason.present
           ? data.skipReason.value
           : this.skipReason,
-      aiPlanned: data.aiPlanned.present ? data.aiPlanned.value : this.aiPlanned,
+      autoProgress: data.autoProgress.present
+          ? data.autoProgress.value
+          : this.autoProgress,
     );
   }
 
@@ -4645,7 +4666,7 @@ class CompletedExercise extends DataClass
           ..write('orderIndex: $orderIndex, ')
           ..write('persistence: $persistence, ')
           ..write('skipReason: $skipReason, ')
-          ..write('aiPlanned: $aiPlanned')
+          ..write('autoProgress: $autoProgress')
           ..write(')'))
         .toString();
   }
@@ -4658,7 +4679,7 @@ class CompletedExercise extends DataClass
     orderIndex,
     persistence,
     skipReason,
-    aiPlanned,
+    autoProgress,
   );
   @override
   bool operator ==(Object other) =>
@@ -4670,7 +4691,7 @@ class CompletedExercise extends DataClass
           other.orderIndex == this.orderIndex &&
           other.persistence == this.persistence &&
           other.skipReason == this.skipReason &&
-          other.aiPlanned == this.aiPlanned);
+          other.autoProgress == this.autoProgress);
 }
 
 class CompletedExercisesCompanion extends UpdateCompanion<CompletedExercise> {
@@ -4680,7 +4701,7 @@ class CompletedExercisesCompanion extends UpdateCompanion<CompletedExercise> {
   final Value<int> orderIndex;
   final Value<Persistence> persistence;
   final Value<SkipReason?> skipReason;
-  final Value<bool> aiPlanned;
+  final Value<bool> autoProgress;
   const CompletedExercisesCompanion({
     this.id = const Value.absent(),
     this.completedWorkoutId = const Value.absent(),
@@ -4688,7 +4709,7 @@ class CompletedExercisesCompanion extends UpdateCompanion<CompletedExercise> {
     this.orderIndex = const Value.absent(),
     this.persistence = const Value.absent(),
     this.skipReason = const Value.absent(),
-    this.aiPlanned = const Value.absent(),
+    this.autoProgress = const Value.absent(),
   });
   CompletedExercisesCompanion.insert({
     this.id = const Value.absent(),
@@ -4697,7 +4718,7 @@ class CompletedExercisesCompanion extends UpdateCompanion<CompletedExercise> {
     required int orderIndex,
     this.persistence = const Value.absent(),
     this.skipReason = const Value.absent(),
-    this.aiPlanned = const Value.absent(),
+    this.autoProgress = const Value.absent(),
   }) : completedWorkoutId = Value(completedWorkoutId),
        movementId = Value(movementId),
        orderIndex = Value(orderIndex);
@@ -4708,7 +4729,7 @@ class CompletedExercisesCompanion extends UpdateCompanion<CompletedExercise> {
     Expression<int>? orderIndex,
     Expression<int>? persistence,
     Expression<String>? skipReason,
-    Expression<bool>? aiPlanned,
+    Expression<bool>? autoProgress,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -4718,7 +4739,7 @@ class CompletedExercisesCompanion extends UpdateCompanion<CompletedExercise> {
       if (orderIndex != null) 'order_index': orderIndex,
       if (persistence != null) 'persistence': persistence,
       if (skipReason != null) 'skip_reason': skipReason,
-      if (aiPlanned != null) 'ai_planned': aiPlanned,
+      if (autoProgress != null) 'ai_planned': autoProgress,
     });
   }
 
@@ -4729,7 +4750,7 @@ class CompletedExercisesCompanion extends UpdateCompanion<CompletedExercise> {
     Value<int>? orderIndex,
     Value<Persistence>? persistence,
     Value<SkipReason?>? skipReason,
-    Value<bool>? aiPlanned,
+    Value<bool>? autoProgress,
   }) {
     return CompletedExercisesCompanion(
       id: id ?? this.id,
@@ -4738,7 +4759,7 @@ class CompletedExercisesCompanion extends UpdateCompanion<CompletedExercise> {
       orderIndex: orderIndex ?? this.orderIndex,
       persistence: persistence ?? this.persistence,
       skipReason: skipReason ?? this.skipReason,
-      aiPlanned: aiPlanned ?? this.aiPlanned,
+      autoProgress: autoProgress ?? this.autoProgress,
     );
   }
 
@@ -4767,8 +4788,8 @@ class CompletedExercisesCompanion extends UpdateCompanion<CompletedExercise> {
         $CompletedExercisesTable.$converterskipReasonn.toSql(skipReason.value),
       );
     }
-    if (aiPlanned.present) {
-      map['ai_planned'] = Variable<bool>(aiPlanned.value);
+    if (autoProgress.present) {
+      map['ai_planned'] = Variable<bool>(autoProgress.value);
     }
     return map;
   }
@@ -4782,7 +4803,7 @@ class CompletedExercisesCompanion extends UpdateCompanion<CompletedExercise> {
           ..write('orderIndex: $orderIndex, ')
           ..write('persistence: $persistence, ')
           ..write('skipReason: $skipReason, ')
-          ..write('aiPlanned: $aiPlanned')
+          ..write('autoProgress: $autoProgress')
           ..write(')'))
         .toString();
   }
@@ -9488,7 +9509,7 @@ typedef $$ExerciseTemplatesTableCreateCompanionBuilder =
       required int workoutTemplateId,
       required int movementId,
       required int exerciseIndex,
-      Value<bool> aiPlanned,
+      Value<bool> autoProgress,
     });
 typedef $$ExerciseTemplatesTableUpdateCompanionBuilder =
     ExerciseTemplatesCompanion Function({
@@ -9496,7 +9517,7 @@ typedef $$ExerciseTemplatesTableUpdateCompanionBuilder =
       Value<int> workoutTemplateId,
       Value<int> movementId,
       Value<int> exerciseIndex,
-      Value<bool> aiPlanned,
+      Value<bool> autoProgress,
     });
 
 final class $$ExerciseTemplatesTableReferences
@@ -9573,8 +9594,8 @@ class $$ExerciseTemplatesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<bool> get aiPlanned => $composableBuilder(
-    column: $table.aiPlanned,
+  ColumnFilters<bool> get autoProgress => $composableBuilder(
+    column: $table.autoProgress,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9644,8 +9665,8 @@ class $$ExerciseTemplatesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<bool> get aiPlanned => $composableBuilder(
-    column: $table.aiPlanned,
+  ColumnOrderings<bool> get autoProgress => $composableBuilder(
+    column: $table.autoProgress,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -9713,8 +9734,10 @@ class $$ExerciseTemplatesTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<bool> get aiPlanned =>
-      $composableBuilder(column: $table.aiPlanned, builder: (column) => column);
+  GeneratedColumn<bool> get autoProgress => $composableBuilder(
+    column: $table.autoProgress,
+    builder: (column) => column,
+  );
 
   $$WorkoutTemplatesTableAnnotationComposer get workoutTemplateId {
     final $$WorkoutTemplatesTableAnnotationComposer composer = $composerBuilder(
@@ -9800,13 +9823,13 @@ class $$ExerciseTemplatesTableTableManager
                 Value<int> workoutTemplateId = const Value.absent(),
                 Value<int> movementId = const Value.absent(),
                 Value<int> exerciseIndex = const Value.absent(),
-                Value<bool> aiPlanned = const Value.absent(),
+                Value<bool> autoProgress = const Value.absent(),
               }) => ExerciseTemplatesCompanion(
                 id: id,
                 workoutTemplateId: workoutTemplateId,
                 movementId: movementId,
                 exerciseIndex: exerciseIndex,
-                aiPlanned: aiPlanned,
+                autoProgress: autoProgress,
               ),
           createCompanionCallback:
               ({
@@ -9814,13 +9837,13 @@ class $$ExerciseTemplatesTableTableManager
                 required int workoutTemplateId,
                 required int movementId,
                 required int exerciseIndex,
-                Value<bool> aiPlanned = const Value.absent(),
+                Value<bool> autoProgress = const Value.absent(),
               }) => ExerciseTemplatesCompanion.insert(
                 id: id,
                 workoutTemplateId: workoutTemplateId,
                 movementId: movementId,
                 exerciseIndex: exerciseIndex,
-                aiPlanned: aiPlanned,
+                autoProgress: autoProgress,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -12278,14 +12301,14 @@ typedef $$PlannedExercisesTableCreateCompanionBuilder =
       Value<int> id,
       required int plannedWorkoutId,
       required int movementId,
-      Value<bool> aiPlanned,
+      Value<bool> autoProgress,
     });
 typedef $$PlannedExercisesTableUpdateCompanionBuilder =
     PlannedExercisesCompanion Function({
       Value<int> id,
       Value<int> plannedWorkoutId,
       Value<int> movementId,
-      Value<bool> aiPlanned,
+      Value<bool> autoProgress,
     });
 
 final class $$PlannedExercisesTableReferences
@@ -12374,8 +12397,8 @@ class $$PlannedExercisesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<bool> get aiPlanned => $composableBuilder(
-    column: $table.aiPlanned,
+  ColumnFilters<bool> get autoProgress => $composableBuilder(
+    column: $table.autoProgress,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12465,8 +12488,8 @@ class $$PlannedExercisesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<bool> get aiPlanned => $composableBuilder(
-    column: $table.aiPlanned,
+  ColumnOrderings<bool> get autoProgress => $composableBuilder(
+    column: $table.autoProgress,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -12529,8 +12552,10 @@ class $$PlannedExercisesTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<bool> get aiPlanned =>
-      $composableBuilder(column: $table.aiPlanned, builder: (column) => column);
+  GeneratedColumn<bool> get autoProgress => $composableBuilder(
+    column: $table.autoProgress,
+    builder: (column) => column,
+  );
 
   $$PlannedWorkoutsTableAnnotationComposer get plannedWorkoutId {
     final $$PlannedWorkoutsTableAnnotationComposer composer = $composerBuilder(
@@ -12641,24 +12666,24 @@ class $$PlannedExercisesTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<int> plannedWorkoutId = const Value.absent(),
                 Value<int> movementId = const Value.absent(),
-                Value<bool> aiPlanned = const Value.absent(),
+                Value<bool> autoProgress = const Value.absent(),
               }) => PlannedExercisesCompanion(
                 id: id,
                 plannedWorkoutId: plannedWorkoutId,
                 movementId: movementId,
-                aiPlanned: aiPlanned,
+                autoProgress: autoProgress,
               ),
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
                 required int plannedWorkoutId,
                 required int movementId,
-                Value<bool> aiPlanned = const Value.absent(),
+                Value<bool> autoProgress = const Value.absent(),
               }) => PlannedExercisesCompanion.insert(
                 id: id,
                 plannedWorkoutId: plannedWorkoutId,
                 movementId: movementId,
-                aiPlanned: aiPlanned,
+                autoProgress: autoProgress,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -12785,7 +12810,7 @@ typedef $$CompletedExercisesTableCreateCompanionBuilder =
       required int orderIndex,
       Value<Persistence> persistence,
       Value<SkipReason?> skipReason,
-      Value<bool> aiPlanned,
+      Value<bool> autoProgress,
     });
 typedef $$CompletedExercisesTableUpdateCompanionBuilder =
     CompletedExercisesCompanion Function({
@@ -12795,7 +12820,7 @@ typedef $$CompletedExercisesTableUpdateCompanionBuilder =
       Value<int> orderIndex,
       Value<Persistence> persistence,
       Value<SkipReason?> skipReason,
-      Value<bool> aiPlanned,
+      Value<bool> autoProgress,
     });
 
 final class $$CompletedExercisesTableReferences
@@ -12936,8 +12961,8 @@ class $$CompletedExercisesTableFilterComposer
     builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
-  ColumnFilters<bool> get aiPlanned => $composableBuilder(
-    column: $table.aiPlanned,
+  ColumnFilters<bool> get autoProgress => $composableBuilder(
+    column: $table.autoProgress,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -13067,8 +13092,8 @@ class $$CompletedExercisesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<bool> get aiPlanned => $composableBuilder(
-    column: $table.aiPlanned,
+  ColumnOrderings<bool> get autoProgress => $composableBuilder(
+    column: $table.autoProgress,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -13148,8 +13173,10 @@ class $$CompletedExercisesTableAnnotationComposer
         builder: (column) => column,
       );
 
-  GeneratedColumn<bool> get aiPlanned =>
-      $composableBuilder(column: $table.aiPlanned, builder: (column) => column);
+  GeneratedColumn<bool> get autoProgress => $composableBuilder(
+    column: $table.autoProgress,
+    builder: (column) => column,
+  );
 
   $$CompletedWorkoutsTableAnnotationComposer get completedWorkoutId {
     final $$CompletedWorkoutsTableAnnotationComposer composer =
@@ -13294,7 +13321,7 @@ class $$CompletedExercisesTableTableManager
                 Value<int> orderIndex = const Value.absent(),
                 Value<Persistence> persistence = const Value.absent(),
                 Value<SkipReason?> skipReason = const Value.absent(),
-                Value<bool> aiPlanned = const Value.absent(),
+                Value<bool> autoProgress = const Value.absent(),
               }) => CompletedExercisesCompanion(
                 id: id,
                 completedWorkoutId: completedWorkoutId,
@@ -13302,7 +13329,7 @@ class $$CompletedExercisesTableTableManager
                 orderIndex: orderIndex,
                 persistence: persistence,
                 skipReason: skipReason,
-                aiPlanned: aiPlanned,
+                autoProgress: autoProgress,
               ),
           createCompanionCallback:
               ({
@@ -13312,7 +13339,7 @@ class $$CompletedExercisesTableTableManager
                 required int orderIndex,
                 Value<Persistence> persistence = const Value.absent(),
                 Value<SkipReason?> skipReason = const Value.absent(),
-                Value<bool> aiPlanned = const Value.absent(),
+                Value<bool> autoProgress = const Value.absent(),
               }) => CompletedExercisesCompanion.insert(
                 id: id,
                 completedWorkoutId: completedWorkoutId,
@@ -13320,7 +13347,7 @@ class $$CompletedExercisesTableTableManager
                 orderIndex: orderIndex,
                 persistence: persistence,
                 skipReason: skipReason,
-                aiPlanned: aiPlanned,
+                autoProgress: autoProgress,
               ),
           withReferenceMapper: (p0) => p0
               .map(

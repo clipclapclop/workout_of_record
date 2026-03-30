@@ -295,7 +295,7 @@ class AppDatabase extends _$AppDatabase {
         PlannedExercisesCompanion.insert(
           plannedWorkoutId: plannedWorkoutId,
           movementId: et.movementId,
-          aiPlanned: Value(et.aiPlanned),
+          autoProgress: Value(et.autoProgress),
         ),
       );
       await into(plannedSets)
@@ -346,7 +346,7 @@ class AppDatabase extends _$AppDatabase {
         PlannedExercisesCompanion.insert(
           plannedWorkoutId: plannedWorkoutId,
           movementId: priorEx.movementId,
-          aiPlanned: Value(priorEx.aiPlanned),
+          autoProgress: Value(priorEx.autoProgress),
         ),
       );
 
@@ -356,6 +356,7 @@ class AppDatabase extends _$AppDatabase {
         week,
         allWeeks,
         movement,
+        autoProgress: priorEx.autoProgress,
       );
 
       for (final sv in plannedValues) {
@@ -377,8 +378,9 @@ class AppDatabase extends _$AppDatabase {
     int workoutOrderIndex,
     Week currentWeek,
     List<Week> allWeeks,
-    Movement movement,
-  ) async {
+    Movement movement, {
+    bool autoProgress = false,
+  }) async {
     for (var wn = currentWeek.weekNumber - 1; wn >= 1; wn--) {
       final priorWeek =
           allWeeks.firstWhere((w) => w.weekNumber == wn);
@@ -409,7 +411,7 @@ class AppDatabase extends _$AppDatabase {
 
       final nonSkipped = allSets.where((s) => s.skipReason == null).toList();
 
-      return computeHeuristic(nonSkipped, currentWeek.goal, movement, allSets.length);
+      return computeHeuristic(nonSkipped, currentWeek.goal, movement, allSets.length, autoProgress: autoProgress);
     }
 
     // No valid history found across any prior week — cold start.
@@ -441,7 +443,7 @@ class AppDatabase extends _$AppDatabase {
           completedWorkoutId: completedWorkoutId,
           movementId: plannedEx.movementId,
           orderIndex: i,
-          aiPlanned: Value(plannedEx.aiPlanned),
+          autoProgress: Value(plannedEx.autoProgress),
         ));
 
         final setsForEx = await (select(plannedSets)
@@ -678,7 +680,7 @@ class AppDatabase extends _$AppDatabase {
       final entries = <ExerciseDayEntry>[];
       for (final et in exTemplates) {
         final m = await (select(movements)..where((m) => m.id.equals(et.movementId))).getSingle();
-        entries.add(ExerciseDayEntry(movement: m, aiPlanned: et.aiPlanned));
+        entries.add(ExerciseDayEntry(movement: m, autoProgress: et.autoProgress));
       }
       days.add(WorkoutDayData(template: wt, exercises: entries));
     }
@@ -789,7 +791,7 @@ class AppDatabase extends _$AppDatabase {
             workoutTemplateId: workoutTemplateId,
             movementId: ex.movementId,
             exerciseIndex: j,
-            aiPlanned: Value(ex.aiPlanned),
+            autoProgress: Value(ex.autoProgress),
           ),
         );
       }
@@ -837,11 +839,11 @@ class AppDatabase extends _$AppDatabase {
             ..where((e) => e.id.equals(completedExerciseId)))
           .write(CompletedExercisesCompanion(persistence: Value(persistence)));
 
-  /// Toggles the AI-control flag for an exercise instance, and propagates the
-  /// change up through [PlannedExercises] and [ExerciseTemplates] so all future
-  /// weeks inherit the setting automatically.
-  Future<void> setExerciseAiPlanned(
-      int completedExerciseId, bool aiPlanned) async {
+  /// Toggles the auto-progress flag for an exercise instance, and propagates
+  /// the change up through [PlannedExercises] and [ExerciseTemplates] so all
+  /// future weeks inherit the setting automatically.
+  Future<void> setExerciseAutoProgress(
+      int completedExerciseId, bool autoProgress) async {
     // 1. Update the current CompletedExercise.
     final ex = await (select(completedExercises)
           ..where((e) => e.id.equals(completedExerciseId)))
@@ -849,7 +851,7 @@ class AppDatabase extends _$AppDatabase {
 
     await (update(completedExercises)
           ..where((e) => e.id.equals(completedExerciseId)))
-        .write(CompletedExercisesCompanion(aiPlanned: Value(aiPlanned)));
+        .write(CompletedExercisesCompanion(autoProgress: Value(autoProgress)));
 
     // 2. Update the matching PlannedExercise (for _generateFromPriorWeeks).
     final cw = await (select(completedWorkouts)
@@ -865,7 +867,7 @@ class AppDatabase extends _$AppDatabase {
             ..where((pe) =>
                 pe.plannedWorkoutId.equals(pw.id) &
                 pe.movementId.equals(ex.movementId)))
-          .write(PlannedExercisesCompanion(aiPlanned: Value(aiPlanned)));
+          .write(PlannedExercisesCompanion(autoProgress: Value(autoProgress)));
 
       // 3. Update the ExerciseTemplate (for _generateFromTemplate / week 1).
       final workout = await (select(workouts)
@@ -891,7 +893,7 @@ class AppDatabase extends _$AppDatabase {
               ..where((et) =>
                   et.workoutTemplateId.equals(wt.id) &
                   et.movementId.equals(ex.movementId)))
-            .write(ExerciseTemplatesCompanion(aiPlanned: Value(aiPlanned)));
+            .write(ExerciseTemplatesCompanion(autoProgress: Value(autoProgress)));
       }
     }
   }

@@ -6,7 +6,7 @@ import '../db/workout_data.dart';
 import 'set_ui_state.dart';
 import 'set_widget.dart';
 
-enum _ExMenuAction { skipExercise, addSet, replace, togglePersistent, addExercise, moveUp, moveDown, deleteExercise, toggleAiPlanned, addNote }
+enum _ExMenuAction { skipExercise, addSet, replace, togglePersistent, addExercise, moveUp, moveDown, deleteExercise, toggleAutoProgress, addNote }
 
 /// A card for a single exercise within a workout.
 class ExerciseWidget extends StatelessWidget {
@@ -41,7 +41,7 @@ class ExerciseWidget extends StatelessWidget {
     required this.onShowMovementHistorySheet,
     required this.onWeightChanged,
     required this.onDistanceChanged,
-    this.onToggleAiPlanned,
+    this.onToggleAutoProgress,
     required this.onEditNote,
   });
 
@@ -75,7 +75,7 @@ class ExerciseWidget extends StatelessWidget {
   final VoidCallback onShowMovementHistorySheet;
   final void Function(SetData setData, String value) onWeightChanged;
   final void Function(SetData setData, String value) onDistanceChanged;
-  final VoidCallback? onToggleAiPlanned;
+  final VoidCallback? onToggleAutoProgress;
   final VoidCallback onEditNote;
 
   @override
@@ -102,8 +102,8 @@ class ExerciseWidget extends StatelessWidget {
                 onMoveUp?.call();
               } else if (action == _ExMenuAction.moveDown) {
                 onMoveDown?.call();
-              } else if (action == _ExMenuAction.toggleAiPlanned) {
-                onToggleAiPlanned?.call();
+              } else if (action == _ExMenuAction.toggleAutoProgress) {
+                onToggleAutoProgress?.call();
               } else if (action == _ExMenuAction.addNote) {
                 onEditNote();
               } else {
@@ -159,18 +159,18 @@ class ExerciseWidget extends StatelessWidget {
                   ],
                 ),
               ),
-              if (onToggleAiPlanned != null)
+              if (onToggleAutoProgress != null)
                 PopupMenuItem(
-                  value: _ExMenuAction.toggleAiPlanned,
+                  value: _ExMenuAction.toggleAutoProgress,
                   child: Row(
                     children: [
                       IgnorePointer(
                         child: Checkbox(
-                          value: exercise.completed.aiPlanned,
+                          value: exercise.completed.autoProgress,
                           onChanged: (_) {},
                         ),
                       ),
-                      const Text('AI planned'),
+                      const Text('Auto-progress'),
                     ],
                   ),
                 ),
@@ -205,8 +205,8 @@ class ExerciseWidget extends StatelessWidget {
                 onMoveDown?.call();
               } else if (action == _ExMenuAction.deleteExercise) {
                 onDeleteExercise?.call();
-              } else if (action == _ExMenuAction.toggleAiPlanned) {
-                onToggleAiPlanned?.call();
+              } else if (action == _ExMenuAction.toggleAutoProgress) {
+                onToggleAutoProgress?.call();
               } else if (action == _ExMenuAction.addNote) {
                 onEditNote();
               } else {
@@ -300,18 +300,18 @@ class ExerciseWidget extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (onToggleAiPlanned != null)
+                if (onToggleAutoProgress != null)
                   PopupMenuItem(
-                    value: _ExMenuAction.toggleAiPlanned,
+                    value: _ExMenuAction.toggleAutoProgress,
                     child: Row(
                       children: [
                         IgnorePointer(
                           child: Checkbox(
-                            value: exercise.completed.aiPlanned,
+                            value: exercise.completed.autoProgress,
                             onChanged: (_) {},
                           ),
                         ),
-                        const Text('AI planned'),
+                        const Text('Auto-progress'),
                       ],
                     ),
                   ),

@@ -18,14 +18,18 @@ class PlannedSetValues {
 /// so that skipped sets don't reduce next week's planned volume.
 /// Zero [targetCount] triggers cold start: 2 null sets.
 ///
-/// Hard week: plan [targetCount] sets, filling values from [priorSets] where available.
-/// Deload week: ceil(2/3 * targetCount) sets at 65% weight, rounded to movement increment.
+/// [autoProgress] controls whether the built-in progression algorithm is applied.
+/// When true + hard week: +1 rep per set (only when reps are present).
+/// When false: copy last week's values exactly (user-controlled).
+///
+/// Deload week: ceil(2/3 * targetCount) sets at 65% weight, same reps (no progression).
 List<PlannedSetValues> computeHeuristic(
   List<CompletedSet> priorSets,
   WeekGoal goal,
   Movement movement,
-  int targetCount,
-) {
+  int targetCount, {
+  bool autoProgress = false,
+}) {
   if (targetCount == 0) {
     return [const PlannedSetValues(), const PlannedSetValues()];
   }
@@ -35,7 +39,13 @@ List<PlannedSetValues> computeHeuristic(
       return List.generate(
         targetCount,
         (i) => i < priorSets.length
-            ? PlannedSetValues(reps: priorSets[i].reps, weight: priorSets[i].weight, time: priorSets[i].time)
+            ? PlannedSetValues(
+                reps: autoProgress && priorSets[i].reps != null
+                    ? priorSets[i].reps! + 1
+                    : priorSets[i].reps,
+                weight: priorSets[i].weight,
+                time: priorSets[i].time,
+              )
             : const PlannedSetValues(),
       );
 

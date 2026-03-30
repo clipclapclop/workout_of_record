@@ -9,7 +9,8 @@ class PlannedExercises extends Table {
   IntColumn get plannedWorkoutId =>
       integer().references(PlannedWorkouts, #id)();
   IntColumn get movementId => integer().references(Movements, #id)();
-  BoolColumn get aiPlanned => boolean().withDefault(const Constant(true))();
+  BoolColumn get autoProgress =>
+      boolean().named('ai_planned').withDefault(const Constant(true))();
 }
 
 class CompletedExercises extends Table {
@@ -21,5 +22,6 @@ class CompletedExercises extends Table {
   IntColumn get persistence =>
       intEnum<Persistence>().withDefault(const Constant(0))();
   TextColumn get skipReason => textEnum<SkipReason>().nullable()();
-  BoolColumn get aiPlanned => boolean().withDefault(const Constant(true))();
+  BoolColumn get autoProgress =>
+      boolean().named('ai_planned').withDefault(const Constant(true))();
 }

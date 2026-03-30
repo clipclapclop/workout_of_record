@@ -794,9 +794,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     setState(() => _persistence[exercise.completed.id] = next);
   }
 
-  Future<void> _toggleAiPlanned(ExerciseData exercise) async {
-    await db.setExerciseAiPlanned(
-        exercise.completed.id, !exercise.completed.aiPlanned);
+  Future<void> _toggleAutoProgress(ExerciseData exercise) async {
+    await db.setExerciseAutoProgress(
+        exercise.completed.id, !exercise.completed.autoProgress);
     await _load();
   }
 
@@ -1254,9 +1254,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           _propagateWeight(exercise, setData, value),
       onDistanceChanged: (setData, value) =>
           _propagateDistance(exercise, setData, value),
-      onToggleAiPlanned: AppPreferences.getAiEnabled()
-          ? () => _toggleAiPlanned(exercise)
-          : null,
+      onToggleAutoProgress: () => _toggleAutoProgress(exercise),
       onEditNote: () => _editNote(exercise),
     );
   }

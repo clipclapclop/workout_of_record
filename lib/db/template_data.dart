@@ -5,11 +5,11 @@ class TemplateInUseException implements Exception {
 }
 
 /// Per-exercise spec within a [WorkoutDaySpec] — carries movement ID and the
-/// AI-control flag so templates persist the setting across weeks.
+/// auto-progress flag so templates persist the setting across weeks.
 class ExerciseSpec {
-  const ExerciseSpec({required this.movementId, this.aiPlanned = true});
+  const ExerciseSpec({required this.movementId, this.autoProgress = true});
   final int movementId;
-  final bool aiPlanned;
+  final bool autoProgress;
 }
 
 /// Spec used when creating or updating a meso template — one entry per day.
@@ -27,9 +27,9 @@ class WorkoutDaySpec {
 
 /// One exercise entry within a loaded [WorkoutDayData] — movement + AI flag.
 class ExerciseDayEntry {
-  const ExerciseDayEntry({required this.movement, required this.aiPlanned});
+  const ExerciseDayEntry({required this.movement, required this.autoProgress});
   final Movement movement;
-  final bool aiPlanned;
+  final bool autoProgress;
 }
 
 /// A single day within a loaded meso template, with its exercises resolved.

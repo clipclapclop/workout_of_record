@@ -6,11 +6,11 @@ import '../db/template_data.dart';
 import '../widgets/app_nav_menu.dart';
 import '../widgets/movement_picker_sheet.dart';
 
-/// Per-exercise draft state within a day — tracks movement + AI-control flag.
+/// Per-exercise draft state within a day — tracks movement + auto-progress flag.
 class _ExDraft {
-  _ExDraft(this.movement, {this.aiPlanned = true});
+  _ExDraft(this.movement, {this.autoProgress = true});
   final Movement movement;
-  bool aiPlanned;
+  bool autoProgress;
 }
 
 /// In-memory representation of one day while the user is building the template.
@@ -70,7 +70,7 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
                   name: d.template.name,
                   isRestDay: d.template.isRestDay,
                   exercises: d.exercises
-                      .map((e) => _ExDraft(e.movement, aiPlanned: e.aiPlanned))
+                      .map((e) => _ExDraft(e.movement, autoProgress: e.autoProgress))
                       .toList(),
                 ))
             .toList()
@@ -200,7 +200,7 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
                 exercises: d.exercises
                     .map((e) => ExerciseSpec(
                           movementId: e.movement.id,
-                          aiPlanned: e.aiPlanned,
+                          autoProgress: e.autoProgress,
                         ))
                     .toList(),
               ))
@@ -383,15 +383,15 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
                           child: Row(
                             children: [
                               Text(
-                                'AI planned',
+                                'Auto-progress',
                                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                   color: Theme.of(context).colorScheme.onSurface.withAlpha(160),
                                 ),
                               ),
                               const Spacer(),
                               Switch(
-                                value: ex.aiPlanned,
-                                onChanged: (v) => setState(() => ex.aiPlanned = v),
+                                value: ex.autoProgress,
+                                onChanged: (v) => setState(() => ex.autoProgress = v),
                               ),
                             ],
                           ),
