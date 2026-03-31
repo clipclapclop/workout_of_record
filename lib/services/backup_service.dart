@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../app_preferences.dart';
+import '../db/db.dart';
 import '../db/tables/enums.dart';
 import 'saf_service.dart';
 
@@ -17,6 +18,9 @@ class BackupService {
 
   /// Builds the backup zip and returns raw bytes without writing to disk.
   static Future<Uint8List> buildBackupBytes() async {
+    // Flush WAL data into the main database file so the backup is complete.
+    await db.customStatement('PRAGMA wal_checkpoint(TRUNCATE)');
+
     final docsDir = await getApplicationDocumentsDirectory();
     final dbFile = File(p.join(docsDir.path, _dbFileName));
     if (!await dbFile.exists()) throw Exception('Database file not found');
@@ -54,11 +58,22 @@ class BackupService {
 
     final docsDir = await getApplicationDocumentsDirectory();
 
+    // Close the active Drift connection so the file isn't locked and
+    // WAL data isn't replayed on top of the restored database.
+    await db.close();
+
     for (final file in archive) {
       if (!file.isFile) continue;
       final data = file.content as List<int>;
       if (file.name == _dbFileName) {
-        await File(p.join(docsDir.path, _dbFileName)).writeAsBytes(data);
+        final dbPath = p.join(docsDir.path, _dbFileName);
+        // Delete WAL/SHM journal files — if left behind, SQLite replays
+        // the old WAL on next open, reverting the restored data.
+        final wal = File('$dbPath-wal');
+        final shm = File('$dbPath-shm');
+        if (await wal.exists()) await wal.delete();
+        if (await shm.exists()) await shm.delete();
+        await File(dbPath).writeAsBytes(data);
       } else if (file.name == _settingsFileName) {
         final json = jsonDecode(utf8.decode(data)) as Map<String, dynamic>;
         await _applySettingsJson(json);
@@ -68,6 +83,8 @@ class BackupService {
 
   static Map<String, dynamic> _buildSettingsJson() {
     return {
+      'currentMesocycleId': AppPreferences.getCurrentMesocycleId(),
+      'currentCompletedWorkoutId': AppPreferences.getCurrentCompletedWorkoutId(),
       'dateOfBirth': AppPreferences.getDateOfBirth()?.toIso8601String(),
       'weight': AppPreferences.getWeight(),
       'trainingGoal': AppPreferences.getTrainingGoal()?.name,
@@ -79,6 +96,12 @@ class BackupService {
   }
 
   static Future<void> _applySettingsJson(Map<String, dynamic> json) async {
+    // Restore acceleration pointers so the app resumes with the correct
+    // mesocycle / in-progress workout from the backed-up database.
+    await AppPreferences.setCurrentMesocycleId(json['currentMesocycleId'] as int?);
+    await AppPreferences.setCurrentCompletedWorkoutId(
+        json['currentCompletedWorkoutId'] as int?);
+
     final dob = json['dateOfBirth'] as String?;
     await AppPreferences.setDateOfBirth(dob == null ? null : DateTime.parse(dob));
 

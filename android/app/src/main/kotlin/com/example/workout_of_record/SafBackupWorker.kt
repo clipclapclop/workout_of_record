@@ -58,6 +58,12 @@ class SafBackupWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, para
 
     private fun buildSettingsJson(prefs: SharedPreferences): String {
         val json = JSONObject()
+        if (prefs.contains("flutter.current_mesocycle_id")) {
+            json.put("currentMesocycleId", prefs.getLong("flutter.current_mesocycle_id", 0))
+        }
+        if (prefs.contains("flutter.current_completed_workout_id")) {
+            json.put("currentCompletedWorkoutId", prefs.getLong("flutter.current_completed_workout_id", 0))
+        }
         prefs.getString("flutter.profile_date_of_birth", null)?.let { json.put("dateOfBirth", it) }
         if (prefs.contains("flutter.profile_weight_kg")) {
             json.put("weight", prefs.getFloat("flutter.profile_weight_kg", 0f).toDouble())

@@ -1,6 +1,7 @@
+import 'dart:io' show exit;
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../app_preferences.dart';
 import '../db/tables/enums.dart';
 import '../services/backup_scheduler.dart';
@@ -190,7 +191,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 'Please close and reopen the app to apply the restored data.'),
             actions: [
               FilledButton(
-                onPressed: () => SystemNavigator.pop(),
+                onPressed: () => exit(0),
                 child: const Text('Close app'),
               ),
             ],
