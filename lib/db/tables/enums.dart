@@ -20,7 +20,7 @@ enum Soreness { none, aLittle, some, lots }
 
 enum CurrentState { bad, notGood, good, great }
 
-enum Effort { tooEasy, good, hard, tooHard }
+enum Effort { easy, good, hard, tooHard }
 
 enum Volume { tooLittle, good, aLot, wayTooMuch }
 
