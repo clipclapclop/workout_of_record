@@ -262,17 +262,19 @@ class AppDatabase extends _$AppDatabase {
 
       if (week.weekNumber == 1) {
         await _generateFromTemplate(
-            plannedWorkoutId, workout.orderIndex, meso.mesoTemplateId);
+            plannedWorkoutId, workout.orderIndex, meso.mesoTemplateId,
+            meso.id);
       } else {
         await _generateFromPriorWeeks(plannedWorkoutId, workout, week);
       }
     });
   }
 
-  /// Seeds the plan from the meso template (week 1 cold start).
-  /// 2 null sets per exercise — user fills in values during the workout.
-  Future<void> _generateFromTemplate(
-      int plannedWorkoutId, int orderIndex, int mesoTemplateId) async {
+  /// Seeds the plan from the meso template (week 1).
+  /// If the movement was used in a prior completed meso, seeds from the 2nd
+  /// hard-week occurrence (or 1st if only one). Otherwise cold start: 2 null sets.
+  Future<void> _generateFromTemplate(int plannedWorkoutId, int orderIndex,
+      int mesoTemplateId, int currentMesocycleId) async {
     final wts = await (select(workoutTemplates).join([
       innerJoin(weekTemplates,
           weekTemplates.id.equalsExp(workoutTemplates.weekTemplateId)),
@@ -291,6 +293,10 @@ class AppDatabase extends _$AppDatabase {
         .get();
 
     for (final et in exTemplates) {
+      final movement = await (select(movements)
+            ..where((m) => m.id.equals(et.movementId)))
+          .getSingle();
+
       final peId = await into(plannedExercises).insert(
         PlannedExercisesCompanion.insert(
           plannedWorkoutId: plannedWorkoutId,
@@ -298,10 +304,18 @@ class AppDatabase extends _$AppDatabase {
           autoProgress: Value(et.autoProgress),
         ),
       );
-      await into(plannedSets)
-          .insert(PlannedSetsCompanion.insert(plannedExerciseId: peId));
-      await into(plannedSets)
-          .insert(PlannedSetsCompanion.insert(plannedExerciseId: peId));
+
+      final historicalSets = await _resolveHistoricalSets(
+          et.movementId, currentMesocycleId, movement);
+
+      for (final sv in historicalSets) {
+        await into(plannedSets).insert(PlannedSetsCompanion(
+          plannedExerciseId: Value(peId),
+          reps: Value(sv.reps),
+          weight: Value(sv.weight),
+          time: Value(sv.time),
+        ));
+      }
     }
   }
 
@@ -415,6 +429,73 @@ class AppDatabase extends _$AppDatabase {
     }
 
     // No valid history found across any prior week — cold start.
+    return [const PlannedSetValues(), const PlannedSetValues()];
+  }
+
+  /// Searches completed prior mesos for historical set data for [movementId].
+  /// Uses the 2nd hard-week occurrence (or 1st if only one) from the most
+  /// recent completed meso where the movement was performed.
+  /// Falls back to cold start (2 null sets) if no history exists.
+  Future<List<PlannedSetValues>> _resolveHistoricalSets(
+    int movementId,
+    int currentMesocycleId,
+    Movement movement,
+  ) async {
+    // Find all prior mesos, most recent first.
+    final priorMesos = await (select(mesocycles)
+          ..where((m) => m.id.isNotValue(currentMesocycleId))
+          ..orderBy([(m) => OrderingTerm.desc(m.createdAt)]))
+        .get();
+
+    for (final meso in priorMesos) {
+      // Find all hard-week occurrences of this movement in this meso.
+      // A movement can appear on multiple days within a week, so we read the
+      // weekNumber alongside each row and group by distinct week.
+      final rows = await (select(completedExercises).join([
+        innerJoin(completedWorkouts, completedWorkouts.id
+            .equalsExp(completedExercises.completedWorkoutId)),
+        innerJoin(workouts, workouts.id.equalsExp(completedWorkouts.workoutId)),
+        innerJoin(weeks, weeks.id.equalsExp(workouts.weekId)),
+      ])
+            ..where(completedExercises.movementId.equals(movementId) &
+                completedExercises.skipReason.isNull() &
+                weeks.mesocycleId.equals(meso.id) &
+                weeks.goal.equalsValue(WeekGoal.hard))
+            ..orderBy([OrderingTerm.asc(weeks.weekNumber)]))
+          .get();
+
+      if (rows.isEmpty) continue;
+
+      // Group by distinct week number, pick the 2nd week (or 1st if only one).
+      final byWeek = <int, CompletedExercise>{};
+      for (final row in rows) {
+        final wn = row.readTable(weeks).weekNumber;
+        byWeek.putIfAbsent(wn, () => row.readTable(completedExercises));
+      }
+      final sortedWeeks = byWeek.keys.toList()..sort();
+      final targetWeek = sortedWeeks.length >= 2 ? sortedWeeks[1] : sortedWeeks[0];
+      final refExercise = byWeek[targetWeek]!;
+
+      // Fetch non-skipped sets for the chosen exercise.
+      final sets = await (select(completedSets)
+            ..where((s) =>
+                s.completedExerciseId.equals(refExercise.id) &
+                s.skipReason.isNull())
+            ..orderBy([(s) => OrderingTerm.asc(s.id)]))
+          .get();
+
+      if (sets.isEmpty) continue;
+
+      return sets
+          .map((s) => PlannedSetValues(
+                reps: s.reps,
+                weight: s.weight,
+                time: s.time,
+              ))
+          .toList();
+    }
+
+    // No history found — cold start.
     return [const PlannedSetValues(), const PlannedSetValues()];
   }
 

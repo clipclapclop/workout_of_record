@@ -214,6 +214,151 @@ void main() {
     expect(done, isNull);
   });
 
+  // ── Cross-meso seeding tests ─────────────────────────────────────────────
+
+  test('11. Cross-meso seeding: week 1 of new meso uses 2nd hard week from prior meso',
+      () async {
+    final db = _openDb();
+    addTearDown(db.close);
+
+    // ── Meso 1: 3 weeks (hard, hard, deload) ──
+    final meso1Id = await _createMeso(db, totalWeeks: 3);
+
+    // Complete all 3 weeks with real set values.
+    for (var week = 0; week < 3; week++) {
+      for (var day = 0; day < 5; day++) {
+        final w = await db.getOrCreateNextWorkout(meso1Id);
+        await db.generatePlannedWorkout(w!.id);
+        final cwId = await db.initializeWorkout(w.id);
+
+        // Fill in set values: week1=100lb×8, week2=100lb×9, week3(deload)=65lb×8.
+        final exercises = await (db.select(db.completedExercises)
+              ..where((e) => e.completedWorkoutId.equals(cwId)))
+            .get();
+        for (final ex in exercises) {
+          final sets = await (db.select(db.completedSets)
+                ..where((s) => s.completedExerciseId.equals(ex.id)))
+              .get();
+          for (final s in sets) {
+            final reps = week == 2 ? 8 : 8 + week; // w1: 8, w2: 9, w3: 8
+            final weight =
+                week == 2 ? 65.0 : 100.0; // w1: 100, w2: 100, w3: 65
+            await db.saveCompletedSet(s.id, reps: reps, weight: weight);
+          }
+        }
+
+        await db.finishWorkout(cwId);
+      }
+    }
+
+    // Meso 1 should be done.
+    expect(await db.getOrCreateNextWorkout(meso1Id), isNull);
+
+    // ── Meso 2: new meso from same template ──
+    final templates = await db.getMesoTemplates();
+    final meso2Id =
+        await db.createMesocycle(templates.first.id, 'Test Meso 2', 3);
+    final firstWorkout = await db.getOrCreateNextWorkout(meso2Id);
+    await db.generatePlannedWorkout(firstWorkout!.id);
+
+    // Check that planned sets use week 2 values (2nd hard week): 100lb × 9 reps.
+    final pw = await (db.select(db.plannedWorkouts)
+          ..where((pw) => pw.workoutId.equals(firstWorkout.id)))
+        .getSingle();
+    final plannedExs = await (db.select(db.plannedExercises)
+          ..where((pe) => pe.plannedWorkoutId.equals(pw.id)))
+        .get();
+
+    for (final pe in plannedExs) {
+      final plannedSets = await (db.select(db.plannedSets)
+            ..where((ps) => ps.plannedExerciseId.equals(pe.id)))
+          .get();
+      expect(plannedSets.length, 2); // 2 sets (matching prior week's count)
+      for (final ps in plannedSets) {
+        expect(ps.reps, 9, reason: 'Should use week 2 reps (2nd hard week)');
+        expect(ps.weight, 100.0,
+            reason: 'Should use week 2 weight, not deload weight');
+      }
+    }
+  });
+
+  test('12. Cross-meso seeding: exercise with only 1 hard week uses that week',
+      () async {
+    final db = _openDb();
+    addTearDown(db.close);
+
+    // ── Meso 1: 2 weeks (hard, deload) — only 1 hard week ──
+    final meso1Id = await _createMeso(db, totalWeeks: 2);
+
+    for (var week = 0; week < 2; week++) {
+      for (var day = 0; day < 5; day++) {
+        final w = await db.getOrCreateNextWorkout(meso1Id);
+        await db.generatePlannedWorkout(w!.id);
+        final cwId = await db.initializeWorkout(w.id);
+
+        final exercises = await (db.select(db.completedExercises)
+              ..where((e) => e.completedWorkoutId.equals(cwId)))
+            .get();
+        for (final ex in exercises) {
+          final sets = await (db.select(db.completedSets)
+                ..where((s) => s.completedExerciseId.equals(ex.id)))
+              .get();
+          for (final s in sets) {
+            final reps = week == 0 ? 10 : 10;
+            final weight = week == 0 ? 80.0 : 52.0; // deload = 65% of 80
+            await db.saveCompletedSet(s.id, reps: reps, weight: weight);
+          }
+        }
+
+        await db.finishWorkout(cwId);
+      }
+    }
+
+    expect(await db.getOrCreateNextWorkout(meso1Id), isNull);
+
+    // ── Meso 2 ──
+    final templates = await db.getMesoTemplates();
+    final meso2Id =
+        await db.createMesocycle(templates.first.id, 'Test Meso 2', 2);
+    final firstWorkout = await db.getOrCreateNextWorkout(meso2Id);
+    await db.generatePlannedWorkout(firstWorkout!.id);
+
+    final pw = await (db.select(db.plannedWorkouts)
+          ..where((pw) => pw.workoutId.equals(firstWorkout.id)))
+        .getSingle();
+    final plannedExs = await (db.select(db.plannedExercises)
+          ..where((pe) => pe.plannedWorkoutId.equals(pw.id)))
+        .get();
+
+    for (final pe in plannedExs) {
+      final plannedSets = await (db.select(db.plannedSets)
+            ..where((ps) => ps.plannedExerciseId.equals(pe.id)))
+          .get();
+      for (final ps in plannedSets) {
+        expect(ps.reps, 10,
+            reason: 'Should use the only hard week (week 1) reps');
+        expect(ps.weight, 80.0,
+            reason: 'Should use week 1 weight, not deload');
+      }
+    }
+  });
+
+  test('13. Cross-meso seeding: no prior meso falls back to cold start (null sets)',
+      () async {
+    final db = _openDb();
+    addTearDown(db.close);
+
+    // First ever meso — no prior history.
+    final mesoId = await _createMeso(db, totalWeeks: 2);
+    final workout = await db.getOrCreateNextWorkout(mesoId);
+    await db.generatePlannedWorkout(workout!.id);
+
+    final psRows = await db.select(db.plannedSets).get();
+    expect(psRows.length, 10); // 2 sets × 5 exercises
+    expect(psRows.every((s) => s.reps == null && s.weight == null), true,
+        reason: 'No prior meso — should be cold start with null values');
+  });
+
   test('10. Full flow: create meso → getOrCreate → checkin → generatePlanned → initializeWorkout',
       () async {
     final db = _openDb();
