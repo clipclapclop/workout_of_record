@@ -5,6 +5,7 @@ import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import 'ai_planning.dart';
 import 'calendar_data.dart';
 import 'history_data.dart';
 import 'seed/meso_template_seed_data.dart';
@@ -45,6 +46,17 @@ part 'app_database.g.dart';
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.withExecutor(super.e);
+
+  /// AI recommendation errors from the most recent `generatePlannedWorkout` call.
+  /// Empty if all exercises used AI successfully (or AI was disabled).
+  final List<String> _lastAiErrors = [];
+
+  /// Returns and clears any AI errors from the last plan generation.
+  List<String> consumeAiErrors() {
+    final errors = List<String>.from(_lastAiErrors);
+    _lastAiErrors.clear();
+    return errors;
+  }
 
   @override
   int get schemaVersion => 12;
@@ -240,6 +252,7 @@ class AppDatabase extends _$AppDatabase {
   /// Week 1: seeded from the meso template (2 null sets per exercise).
   /// Week 2+: based on prior week's persistent completed exercises via heuristic.
   Future<void> generatePlannedWorkout(int workoutId) async {
+    _lastAiErrors.clear();
     await transaction(() async {
       // Idempotency check.
       final existing = await (select(plannedWorkouts)
@@ -371,6 +384,8 @@ class AppDatabase extends _$AppDatabase {
         allWeeks,
         movement,
         autoProgress: priorEx.autoProgress,
+        workoutName: workout.name,
+        workoutId: workout.id,
       );
 
       for (final sv in plannedValues) {
@@ -394,6 +409,8 @@ class AppDatabase extends _$AppDatabase {
     List<Week> allWeeks,
     Movement movement, {
     bool autoProgress = false,
+    String workoutName = '',
+    int? workoutId,
   }) async {
     for (var wn = currentWeek.weekNumber - 1; wn >= 1; wn--) {
       final priorWeek =
@@ -425,11 +442,129 @@ class AppDatabase extends _$AppDatabase {
 
       final nonSkipped = allSets.where((s) => s.skipReason == null).toList();
 
+      // Try AI recommendation when autoProgress is enabled.
+      if (autoProgress) {
+        final result = await computeAiRecommendation(
+          priorSets: nonSkipped,
+          weekGoal: currentWeek.goal,
+          movement: movement,
+          targetCount: allSets.length,
+          mesocycleId: currentWeek.mesocycleId,
+          weekNumber: currentWeek.weekNumber,
+          workoutName: workoutName,
+          workoutId: workoutId,
+          autoProgress: autoProgress,
+        );
+        if (!result.usedAi && result.error != null) {
+          _lastAiErrors.add(result.error!);
+        }
+        return result.values;
+      }
+
       return computeHeuristic(nonSkipped, currentWeek.goal, movement, allSets.length, autoProgress: autoProgress);
     }
 
     // No valid history found across any prior week — cold start.
     return [const PlannedSetValues(), const PlannedSetValues()];
+  }
+
+  /// Re-runs AI recommendations for all exercises in a planned workout.
+  /// Only updates planned sets; completed sets are not touched.
+  /// Returns the number of exercises that were successfully re-planned with AI.
+  Future<int> retryAiForPlannedWorkout(int workoutId) async {
+    final pw = await (select(plannedWorkouts)
+          ..where((p) => p.workoutId.equals(workoutId)))
+        .getSingleOrNull();
+    if (pw == null) return 0;
+
+    final workout = await (select(workouts)
+          ..where((w) => w.id.equals(workoutId)))
+        .getSingle();
+    final week = await (select(weeks)
+          ..where((w) => w.id.equals(workout.weekId)))
+        .getSingle();
+    final allWeeksList = await (select(weeks)
+          ..where((w) => w.mesocycleId.equals(week.mesocycleId))
+          ..orderBy([(w) => OrderingTerm.asc(w.weekNumber)]))
+        .get();
+
+    final pes = await (select(plannedExercises)
+          ..where((pe) => pe.plannedWorkoutId.equals(pw.id)))
+        .get();
+
+    var successCount = 0;
+    for (final pe in pes) {
+      if (!pe.autoProgress) continue;
+
+      final movement = await (select(movements)
+            ..where((m) => m.id.equals(pe.movementId)))
+          .getSingle();
+
+      // Find prior week's data for this exercise (same logic as _resolvePlannedSets).
+      List<CompletedSet>? priorNonSkipped;
+      int targetCount = 0;
+      for (var wn = week.weekNumber - 1; wn >= 1; wn--) {
+        final priorWeek = allWeeksList.firstWhere((w) => w.weekNumber == wn);
+        final priorWorkout = await (select(workouts)
+              ..where((w) =>
+                  w.weekId.equals(priorWeek.id) &
+                  w.orderIndex.equals(workout.orderIndex)))
+            .getSingleOrNull();
+        if (priorWorkout == null || priorWorkout.isRestDay) continue;
+
+        final priorCompleted = await (select(completedWorkouts)
+              ..where((cw) => cw.workoutId.equals(priorWorkout.id)))
+            .getSingleOrNull();
+        if (priorCompleted == null) continue;
+
+        final priorEx = await (select(completedExercises)
+              ..where((ce) =>
+                  ce.completedWorkoutId.equals(priorCompleted.id) &
+                  ce.movementId.equals(pe.movementId)))
+            .getSingleOrNull();
+        if (priorEx == null || priorEx.skipReason != null) continue;
+
+        final allSets = await (select(completedSets)
+              ..where((s) => s.completedExerciseId.equals(priorEx.id))
+              ..orderBy([(s) => OrderingTerm.asc(s.id)]))
+            .get();
+
+        priorNonSkipped = allSets.where((s) => s.skipReason == null).toList();
+        targetCount = allSets.length;
+        break;
+      }
+
+      if (priorNonSkipped == null) continue;
+
+      final result = await computeAiRecommendation(
+        priorSets: priorNonSkipped,
+        weekGoal: week.goal,
+        movement: movement,
+        targetCount: targetCount,
+        mesocycleId: week.mesocycleId,
+        weekNumber: week.weekNumber,
+        workoutName: workout.name,
+        workoutId: workoutId,
+        autoProgress: true,
+      );
+
+      if (!result.usedAi) continue;
+
+      // Delete old planned sets and insert new ones.
+      await (delete(plannedSets)
+            ..where((ps) => ps.plannedExerciseId.equals(pe.id)))
+          .go();
+      for (final sv in result.values) {
+        await into(plannedSets).insert(PlannedSetsCompanion(
+          plannedExerciseId: Value(pe.id),
+          reps: Value(sv.reps),
+          weight: Value(sv.weight),
+          time: Value(sv.time),
+        ));
+      }
+      successCount++;
+    }
+    return successCount;
   }
 
   /// Searches completed prior mesos for historical set data for [movementId].
@@ -545,6 +680,11 @@ class AppDatabase extends _$AppDatabase {
   Future<void> savePreWorkoutCheckin(
           PreWorkoutCheckinsCompanion checkin) =>
       into(preWorkoutCheckins).insert(checkin);
+
+  Future<PreWorkoutCheckin?> getPreWorkoutCheckin(int workoutId) =>
+      (select(preWorkoutCheckins)
+            ..where((c) => c.workoutId.equals(workoutId)))
+          .getSingleOrNull();
 
   Future<WorkoutData> getWorkoutData(int completedWorkoutId) async {
     final cw = await (select(completedWorkouts)

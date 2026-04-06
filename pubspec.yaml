@@ -45,6 +45,7 @@ dependencies:
   permission_handler: ^11.0.0
   google_fonts: ^8.0.2
   flutter_tts: ^4.0.0
+  http: ^1.2.0
   wakelock_plus: ^1.0.0
   flutter_foreground_task: ^8.0.0
 

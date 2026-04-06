@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_preferences.dart';
+import '../screens/chat_screen.dart';
 import '../screens/history_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/meso_template_list_screen.dart';
@@ -9,7 +10,7 @@ import '../screens/profile_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/workout_screen.dart';
 
-enum AppScreen { workout, exercises, mesoTemplates, history, profile, settings }
+enum AppScreen { workout, exercises, mesoTemplates, history, chat, profile, settings }
 
 class AppNavMenu extends StatelessWidget {
   const AppNavMenu({
@@ -49,6 +50,11 @@ class AppNavMenu extends StatelessWidget {
           const PopupMenuItem(
             value: AppScreen.history,
             child: Text('History'),
+          ),
+        if (current != AppScreen.chat)
+          const PopupMenuItem(
+            value: AppScreen.chat,
+            child: Text('AI Chat'),
           ),
         if (current != AppScreen.profile)
           const PopupMenuItem(
@@ -90,6 +96,7 @@ class AppNavMenu extends StatelessWidget {
           activeWorkoutId: activeWorkoutId,
           activeWorkoutName: activeWorkoutName,
         ),
+      AppScreen.chat => const ChatScreen(),
       AppScreen.profile => const ProfileScreen(),
       AppScreen.settings => const SettingsScreen(),
     };

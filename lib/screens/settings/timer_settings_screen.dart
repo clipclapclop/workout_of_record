@@ -1,0 +1,221 @@
+import 'package:flutter/material.dart';
+import '../../app_preferences.dart';
+import '../../db/tables/enums.dart';
+
+class TimerSettingsScreen extends StatefulWidget {
+  const TimerSettingsScreen({super.key});
+
+  @override
+  State<TimerSettingsScreen> createState() => _TimerSettingsScreenState();
+}
+
+class _TimerSettingsScreenState extends State<TimerSettingsScreen> {
+  late bool _timerEnabled;
+  late TimerSound _timerSound;
+  late bool _timerHaptic;
+  late bool _timerKeepAwake;
+  late int _timerDefaultSeconds;
+  late final TextEditingController _timerSecondsCtrl;
+
+  late bool _initTimerEnabled;
+  late TimerSound _initTimerSound;
+  late bool _initTimerHaptic;
+  late bool _initTimerKeepAwake;
+  late int _initTimerDefaultSeconds;
+
+  bool get _hasUnsavedChanges =>
+      _timerEnabled != _initTimerEnabled ||
+      _timerDefaultSeconds != _initTimerDefaultSeconds ||
+      _timerSound != _initTimerSound ||
+      _timerHaptic != _initTimerHaptic ||
+      _timerKeepAwake != _initTimerKeepAwake;
+
+  @override
+  void initState() {
+    super.initState();
+    _timerEnabled = AppPreferences.getTimerEnabled();
+    _timerSound = AppPreferences.getTimerSound();
+    _timerHaptic = AppPreferences.getTimerHaptic();
+    _timerKeepAwake = AppPreferences.getTimerKeepAwake();
+    _timerDefaultSeconds = AppPreferences.getTimerDefaultSeconds();
+    _timerSecondsCtrl =
+        TextEditingController(text: _timerDefaultSeconds.toString());
+
+    _initTimerEnabled = _timerEnabled;
+    _initTimerSound = _timerSound;
+    _initTimerHaptic = _timerHaptic;
+    _initTimerKeepAwake = _timerKeepAwake;
+    _initTimerDefaultSeconds = _timerDefaultSeconds;
+  }
+
+  @override
+  void dispose() {
+    _timerSecondsCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    await AppPreferences.setTimerEnabled(_timerEnabled);
+    await AppPreferences.setTimerDefaultSeconds(_timerDefaultSeconds);
+    await AppPreferences.setTimerSound(_timerSound);
+    await AppPreferences.setTimerHaptic(_timerHaptic);
+    await AppPreferences.setTimerKeepAwake(_timerKeepAwake);
+
+    _initTimerEnabled = _timerEnabled;
+    _initTimerSound = _timerSound;
+    _initTimerHaptic = _timerHaptic;
+    _initTimerKeepAwake = _timerKeepAwake;
+    _initTimerDefaultSeconds = _timerDefaultSeconds;
+  }
+
+  Future<bool> _onPop() async {
+    if (!_hasUnsavedChanges) return true;
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Unsaved changes'),
+        content: const Text('You have unsaved settings.'),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(ctx, 'cancel'),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(ctx, 'dismiss'),
+                  child: const Text('Dismiss'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(ctx, 'save'),
+                  child: const Text('Save'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    if (result == 'save') {
+      await _save();
+      return true;
+    }
+    return result == 'dismiss';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final ok = await _onPop();
+        if (ok && context.mounted) Navigator.pop(context);
+      },
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Rest Timer')),
+        bottomNavigationBar: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+            child: FilledButton(
+              onPressed: () async {
+                await _save();
+                if (context.mounted) Navigator.pop(context);
+              },
+              child: const Text('Save'),
+            ),
+          ),
+        ),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+          children: [
+            Card.outlined(
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    title: const Text('Rest Timer'),
+                    subtitle: const Text('Countdown timer between sets.'),
+                    value: _timerEnabled,
+                    onChanged: (v) => setState(() => _timerEnabled = v),
+                  ),
+                  if (_timerEnabled) ...[
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                      child: TextField(
+                        controller: _timerSecondsCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Default rest (seconds)',
+                          isDense: true,
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (v) {
+                          final seconds = int.tryParse(v.trim());
+                          if (seconds != null && seconds > 0) {
+                            setState(() => _timerDefaultSeconds = seconds);
+                          }
+                        },
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text('Alert sound',
+                            style: Theme.of(context).textTheme.bodySmall),
+                      ),
+                    ),
+                    RadioGroup<TimerSound>(
+                      groupValue: _timerSound,
+                      onChanged: (v) => setState(() => _timerSound = v!),
+                      child: const Column(
+                        children: [
+                          RadioListTile<TimerSound>(
+                            title: Text('Read target value aloud'),
+                            value: TimerSound.tts,
+                          ),
+                          RadioListTile<TimerSound>(
+                            title: Text('Chime ("ready")'),
+                            value: TimerSound.chime,
+                          ),
+                          RadioListTile<TimerSound>(
+                            title: Text('Silent'),
+                            value: TimerSound.silent,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    SwitchListTile(
+                      title: const Text('Haptic feedback'),
+                      subtitle:
+                          const Text('Vibrate when the timer reaches zero.'),
+                      value: _timerHaptic,
+                      onChanged: (v) => setState(() => _timerHaptic = v),
+                    ),
+                    SwitchListTile(
+                      title: const Text('Keep screen awake'),
+                      subtitle:
+                          const Text('Prevent sleep during a workout.'),
+                      value: _timerKeepAwake,
+                      onChanged: (v) => setState(() => _timerKeepAwake = v),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

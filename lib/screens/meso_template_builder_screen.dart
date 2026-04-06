@@ -5,6 +5,7 @@ import '../db/db.dart';
 import '../db/template_data.dart';
 import '../widgets/app_nav_menu.dart';
 import '../widgets/movement_picker_sheet.dart';
+import 'chat_screen.dart';
 
 /// Per-exercise draft state within a day — tracks movement + auto-progress flag.
 class _ExDraft {
@@ -249,6 +250,20 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
         ),
         automaticallyImplyLeading: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.chat),
+            tooltip: 'AI Chat',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatScreen(
+                  initialContext:
+                      'The user is building a mesocycle template: "${_nameCtrl.text}".\n'
+                      'Help them design their training program.',
+                ),
+              ),
+            ),
+          ),
           if (_saving)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),

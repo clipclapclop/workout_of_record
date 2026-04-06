@@ -83,6 +83,53 @@ class AppPreferences {
       ? _secure.delete(key: _kSettingsApiKey)
       : _secure.write(key: _kSettingsApiKey, value: v);
 
+  // ── AI ─────────────────────────────────────────────────────────────────────
+
+  static String getAiModel() => _prefs.getString(_kAiModel) ?? defaultAiModel;
+  static Future<void> setAiModel(String v) => _prefs.setString(_kAiModel, v);
+
+  static String? getAiCreditId() => _prefs.getString(_kAiCreditId);
+  static Future<void> setAiCreditId(String? v) =>
+      v == null ? _prefs.remove(_kAiCreditId) : _prefs.setString(_kAiCreditId, v);
+
+  static String getAiRecommendationPrompt() =>
+      _prefs.getString(_kAiRecommendationPrompt) ?? defaultRecommendationPrompt;
+  static Future<void> setAiRecommendationPrompt(String v) =>
+      _prefs.setString(_kAiRecommendationPrompt, v);
+
+  static String getAiChatPrompt() =>
+      _prefs.getString(_kAiChatPrompt) ?? defaultChatPrompt;
+  static Future<void> setAiChatPrompt(String v) =>
+      _prefs.setString(_kAiChatPrompt, v);
+
+  static int getAiHistoryWeeks() => _prefs.getInt(_kAiHistoryWeeks) ?? 4;
+  static Future<void> setAiHistoryWeeks(int v) =>
+      _prefs.setInt(_kAiHistoryWeeks, v);
+
+  static const defaultAiModel = 'claude-sonnet-4-20250514';
+
+  static const defaultRecommendationPrompt = '''
+Assume you are a personal trainer who is up on the latest training literature, and who isn't concerned with following the latest fad but does want to give good, modern guidance.
+
+Your goal is to give a person exact goal values and targets for a pre-prescribed group of exercises based on their particular past workout results, feedback, and other such info.
+
+Regarding Effort, Volume, Pump, Joint Pain, and Soreness feedback, interpret it as you would if you asked "How was your..." and they responded with the associated value.
+
+Similarly, account for their training goal when setting the workout.
+
+Regarding hard vs deload weeks: each mesocycle is N hard weeks followed by one easy (deload) week, and so each week should be planned appropriately based on whether it is a hard or deload week so that they will maximize their results over the long term.
+
+You must choose from the available options provided for set count, reps, and weight. These represent what is physically loadable on the equipment. Return ONLY the JSON response, no explanation.''';
+
+  static const defaultChatPrompt = '''
+Assume you are a personal trainer who is up on the latest training literature, and who isn't concerned with following the latest fad but does want to give good, modern guidance.
+
+You have access to this person's recent workout history and profile (provided below). Answer their questions based on their actual data — reference specific numbers, exercises, and trends when relevant.
+
+Regarding Effort, Volume, Pump, Joint Pain, and Soreness feedback, interpret it as you would if you asked "How was your..." and they responded with the associated value.
+
+Keep answers focused and practical. When suggesting changes, be specific about exercises, sets, reps, and weights.''';
+
   // ── Timer ──────────────────────────────────────────────────────────────────
 
   static bool getTimerEnabled() => _prefs.getBool(_kTimerEnabled) ?? true;
@@ -146,6 +193,11 @@ class AppPreferences {
   static const _kSettingsAiEnabled = 'settings_ai_enabled';
   static const _kSettingsUnitsMetric = 'settings_units_metric';
   static const _kSettingsApiKey = 'settings_api_key';
+  static const _kAiModel = 'ai_model';
+  static const _kAiCreditId = 'ai_credit_id';
+  static const _kAiRecommendationPrompt = 'ai_recommendation_prompt';
+  static const _kAiChatPrompt = 'ai_chat_prompt';
+  static const _kAiHistoryWeeks = 'ai_history_weeks';
   static const _kTimerEnabled = 'timer_enabled';
   static const _kTimerDefaultSeconds = 'timer_default_seconds';
   static const _kTimerSound = 'timer_sound';

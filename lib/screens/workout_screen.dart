@@ -10,6 +10,7 @@ import '../db/tables/enums.dart';
 import '../db/workout_data.dart';
 import '../services/workout_foreground_service.dart';
 import '../widgets/app_nav_menu.dart';
+import 'chat_screen.dart';
 import '../widgets/exercise_widget.dart';
 import '../widgets/rest_timer_controller.dart';
 import '../widgets/rest_timer_widget.dart';
@@ -44,6 +45,10 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   // keyed by MuscleGroup
   final Map<MuscleGroup, bool> _postMgDone = {};
   bool _loading = true;
+
+  // AI recommendation retry state
+  List<String> _aiErrors = [];
+  bool _aiRetrying = false;
 
   // Per-workout timer kill-switch — always on (no UI to toggle).
   static const _timerWorkoutOn = true;
@@ -260,6 +265,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       _postMgDone[mgCheckin.muscleGroup] = true;
     }
 
+    // Check for AI recommendation failures.
+    final aiErrors = db.consumeAiErrors();
+
     if (mounted) {
       setState(() {
         _data = data;
@@ -267,9 +275,45 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           _setStates.putIfAbsent(entry.key, () => entry.value);
         }
         _loading = false;
+        if (aiErrors.isNotEmpty) _aiErrors = aiErrors;
       });
       _applyWakeLock();
       _syncTimer();
+    }
+  }
+
+  Future<void> _retryAi() async {
+    setState(() => _aiRetrying = true);
+    try {
+      final workoutId = _data!.workout.id;
+      final count = await db.retryAiForPlannedWorkout(workoutId);
+      if (count > 0 && mounted) {
+        // Clear set states so _load re-reads the new planned values.
+        _setStates.clear();
+        await _load();
+      }
+      if (mounted) {
+        setState(() {
+          _aiErrors = [];
+          _aiRetrying = false;
+        });
+        if (count > 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('AI updated $count exercise${count > 1 ? 's' : ''}.')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('AI retry failed. Using built-in progression.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _aiRetrying = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Retry failed: $e')),
+        );
+      }
     }
   }
 
@@ -1140,6 +1184,20 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
               cueText: _timerCueText,
             ),
           IconButton(
+            icon: const Icon(Icons.chat),
+            tooltip: 'AI Chat',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatScreen(
+                  initialContext:
+                      'The user is currently in a workout: "${widget.workoutName}".\n'
+                      'Completed workout ID: ${widget.completedWorkoutId}.',
+                ),
+              ),
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.calendar_today),
             onPressed: () => showMesoCalendarSheet(
                 context, widget.mesocycleId, widget.completedWorkoutId),
@@ -1153,6 +1211,31 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       ),
       body: Column(
         children: [
+          if (_aiErrors.isNotEmpty)
+            MaterialBanner(
+              content: const Text(
+                  'AI recommendations failed. Using built-in progression.'),
+              leading: const Icon(Icons.warning_amber),
+              actions: [
+                if (_aiRetrying)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: SizedBox(
+                      width: 20, height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                else
+                  TextButton(
+                    onPressed: _retryAi,
+                    child: const Text('Retry AI'),
+                  ),
+                TextButton(
+                  onPressed: () => setState(() => _aiErrors = []),
+                  child: const Text('Dismiss'),
+                ),
+              ],
+            ),
           Expanded(
             child: ListView(
               padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + MediaQuery.of(context).padding.bottom),
