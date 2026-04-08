@@ -1001,6 +1001,123 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
+  // ── Past-mesocycle → template methods ─────────────────────────────────────
+
+  /// Returns all mesocycles that have at least one week with a completed
+  /// workout, along with per-week completion counts.  Used by the
+  /// "Copy from Past Mesocycle" picker.
+  Future<List<MesocycleWeekSummary>> getMesocyclesWithCompletedWeeks() async {
+    final allMesos = await (select(mesocycles)
+          ..orderBy([(m) => OrderingTerm.desc(m.createdAt)]))
+        .get();
+
+    final result = <MesocycleWeekSummary>[];
+    for (final meso in allMesos) {
+      final mesoWeeks = await (select(weeks)
+            ..where((w) => w.mesocycleId.equals(meso.id))
+            ..orderBy([(w) => OrderingTerm.asc(w.weekNumber)]))
+          .get();
+
+      final weekSummaries = <WeekSummary>[];
+      for (final week in mesoWeeks) {
+        final weekWorkouts = await (select(workouts)
+              ..where((w) => w.weekId.equals(week.id) & w.isRestDay.equals(false)))
+            .get();
+
+        var completedCount = 0;
+        for (final w in weekWorkouts) {
+          final cw = await (select(completedWorkouts)
+                ..where((c) => c.workoutId.equals(w.id)))
+              .getSingleOrNull();
+          if (cw != null) completedCount++;
+        }
+
+        if (completedCount > 0) {
+          weekSummaries.add(WeekSummary(
+            week: week,
+            completedWorkoutCount: completedCount,
+            totalWorkoutCount: weekWorkouts.length,
+          ));
+        }
+      }
+
+      if (weekSummaries.isNotEmpty) {
+        result.add(MesocycleWeekSummary(
+          mesocycle: meso,
+          weeks: weekSummaries,
+        ));
+      }
+    }
+    return result;
+  }
+
+  /// Extracts the exercise lineup from a specific week of a mesocycle and
+  /// returns it as a [MesoTemplateData] suitable for pre-populating the
+  /// template builder.
+  Future<MesoTemplateData> getMesoTemplateDataFromWeek(int weekId) async {
+    final week =
+        await (select(weeks)..where((w) => w.id.equals(weekId))).getSingle();
+    final meso = await (select(mesocycles)
+          ..where((m) => m.id.equals(week.mesocycleId)))
+        .getSingle();
+
+    final weekWorkouts = await (select(workouts)
+          ..where((w) => w.weekId.equals(weekId))
+          ..orderBy([(w) => OrderingTerm.asc(w.orderIndex)]))
+        .get();
+
+    final days = <WorkoutDayData>[];
+    for (final workout in weekWorkouts) {
+      final exercises = <ExerciseDayEntry>[];
+
+      if (!workout.isRestDay) {
+        final completed = await (select(completedWorkouts)
+              ..where((cw) => cw.workoutId.equals(workout.id)))
+            .getSingleOrNull();
+
+        if (completed != null) {
+          // Only persistent exercises — same filter as _generateFromPriorWeeks.
+          final cExercises = await (select(completedExercises)
+                ..where((ce) =>
+                    ce.completedWorkoutId.equals(completed.id) &
+                    ce.persistence.equals(Persistence.persistent.index))
+                ..orderBy([(ce) => OrderingTerm.asc(ce.orderIndex)]))
+              .get();
+
+          for (final ce in cExercises) {
+            final movement = await (select(movements)
+                  ..where((m) => m.id.equals(ce.movementId)))
+                .getSingle();
+            exercises.add(ExerciseDayEntry(
+              movement: movement,
+              autoProgress: ce.autoProgress,
+            ));
+          }
+        }
+      }
+
+      days.add(WorkoutDayData(
+        template: WorkoutTemplate(
+          id: -1,
+          weekTemplateId: -1,
+          name: workout.name,
+          isRestDay: workout.isRestDay,
+          dayIndex: workout.orderIndex,
+        ),
+        exercises: exercises,
+      ));
+    }
+
+    return MesoTemplateData(
+      template: MesoTemplate(
+        id: -1,
+        name: 'From ${meso.name} W${week.weekNumber}',
+        createdAt: DateTime.now(),
+      ),
+      days: days,
+    );
+  }
+
   Future<List<Movement>> getMovements() =>
       (select(movements)
         ..orderBy([

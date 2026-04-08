@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -25,17 +26,22 @@ class AiService {
       throw AiServiceException('No API key configured. Set it in Settings > AI.');
     }
 
-    final response = await http.post(
-      Uri.parse('$_baseUrl/chat/completions'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $apiKey',
-      },
-      body: jsonEncode({
-        'model': model ?? AppPreferences.getAiModel(),
-        'messages': messages,
-      }),
-    );
+    final http.Response response;
+    try {
+      response = await http.post(
+        Uri.parse('$_baseUrl/chat/completions'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+        body: jsonEncode({
+          'model': model ?? AppPreferences.getAiModel(),
+          'messages': messages,
+        }),
+      );
+    } catch (e) {
+      _throwFriendlyError(e);
+    }
 
     if (response.statusCode != 200) {
       final body = _tryDecodeBody(response.body);
@@ -57,11 +63,16 @@ class AiService {
 
   /// Returns the account balance in USD for the given [creditId].
   static Future<double> getBalance(String creditId) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/credits/balance'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'credit_id': creditId}),
-    );
+    final http.Response response;
+    try {
+      response = await http.post(
+        Uri.parse('$_baseUrl/credits/balance'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'credit_id': creditId}),
+      );
+    } catch (e) {
+      _throwFriendlyError(e);
+    }
 
     if (response.statusCode != 200) {
       final body = _tryDecodeBody(response.body);
@@ -86,6 +97,28 @@ class AiService {
     } catch (_) {
       return null;
     }
+  }
+
+  static Never _throwFriendlyError(Object e) {
+    if (e is AiServiceException) throw e;
+    final msg = e.toString();
+    if (msg.contains('SocketException') || msg.contains('host lookup')) {
+      throw const AiServiceException(
+        'Unable to reach the AI service. Check your internet connection.',
+      );
+    }
+    if (e is TimeoutException || msg.contains('TimeoutException')) {
+      throw const AiServiceException(
+        'The request timed out. Please try again.',
+      );
+    }
+    if (msg.contains('HandshakeException') ||
+        msg.contains('CERTIFICATE_VERIFY')) {
+      throw const AiServiceException(
+        'Secure connection failed. Check your network settings.',
+      );
+    }
+    throw const AiServiceException('Something went wrong. Please try again.');
   }
 }
 

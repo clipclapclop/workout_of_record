@@ -4,6 +4,7 @@ import '../db/app_database.dart';
 import '../db/db.dart';
 import '../db/template_data.dart';
 import '../widgets/app_nav_menu.dart';
+import '../widgets/past_meso_picker_sheet.dart';
 import 'meso_template_builder_screen.dart';
 
 class MesoTemplateListScreen extends StatefulWidget {
@@ -69,6 +70,12 @@ class _MesoTemplateListScreenState extends State<MesoTemplateListScreen> {
     );
   }
 
+  Future<void> _onCopyFromPastMeso() async {
+    final data = await showPastMesoPickerSheet(context);
+    if (data == null || !mounted) return;
+    await _openBuilder(existing: data, isNew: true);
+  }
+
   Future<void> _onDelete(MesoTemplate t) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -109,6 +116,11 @@ class _MesoTemplateListScreenState extends State<MesoTemplateListScreen> {
         title: const Text('Meso Templates'),
         automaticallyImplyLeading: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'From past mesocycle',
+            onPressed: _onCopyFromPastMeso,
+          ),
           AppNavMenu(
             current: AppScreen.mesoTemplates,
             activeWorkoutId: widget.activeWorkoutId,

@@ -48,6 +48,30 @@ class MesoTemplateData {
   final List<WorkoutDayData> days; // ordered by dayIndex
 }
 
+/// Summary of a single week within a mesocycle — used by the past-meso picker.
+class WeekSummary {
+  const WeekSummary({
+    required this.week,
+    required this.completedWorkoutCount,
+    required this.totalWorkoutCount,
+  });
+
+  final Week week;
+  final int completedWorkoutCount;
+  final int totalWorkoutCount; // non-rest workouts in the week
+}
+
+/// A mesocycle with its weeks that have at least one completed workout.
+class MesocycleWeekSummary {
+  const MesocycleWeekSummary({
+    required this.mesocycle,
+    required this.weeks,
+  });
+
+  final Mesocycle mesocycle;
+  final List<WeekSummary> weeks;
+}
+
 /// A meso template with its history of mesocycles that used it.
 class MesoTemplateWithHistory {
   const MesoTemplateWithHistory({

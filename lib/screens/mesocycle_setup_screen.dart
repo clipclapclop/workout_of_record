@@ -6,6 +6,7 @@ import '../db/db.dart';
 import '../db/template_data.dart';
 import '../widgets/app_nav_menu.dart';
 import 'home_screen.dart';
+import '../widgets/past_meso_picker_sheet.dart';
 import 'meso_template_builder_screen.dart';
 
 class MesocycleSetupScreen extends StatefulWidget {
@@ -78,6 +79,18 @@ class _MesocycleSetupScreenState extends State<MesocycleSetupScreen> {
           ),
           isNew: true,
         ),
+      ),
+    );
+    _reload();
+  }
+
+  Future<void> _onCopyFromPastMeso() async {
+    final data = await showPastMesoPickerSheet(context);
+    if (data == null || !mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MesoTemplateBuilderScreen(existing: data, isNew: true),
       ),
     );
     _reload();
@@ -159,6 +172,12 @@ class _MesocycleSetupScreenState extends State<MesocycleSetupScreen> {
                       onPressed: _createTemplate,
                       icon: const Icon(Icons.add),
                       label: const Text('New Template'),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: _onCopyFromPastMeso,
+                      icon: const Icon(Icons.history),
+                      label: const Text('From Past Mesocycle'),
                     ),
                     if (selectedTemplate != null) ...[
                       const SizedBox(height: 24),

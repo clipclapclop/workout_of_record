@@ -114,7 +114,7 @@ class AppPreferences {
       ? _prefs.remove(_kAiLogDirectoryPath)
       : _prefs.setString(_kAiLogDirectoryPath, v);
 
-  static const defaultAiModel = 'claude-sonnet-4-20250514';
+  static const defaultAiModel = 'gpt-5.4-mini';
 
   static const defaultRecommendationPrompt = '''
 Assume you are a personal trainer who is up on the latest training literature, and who isn't concerned with following the latest fad but does want to give good, modern guidance.
