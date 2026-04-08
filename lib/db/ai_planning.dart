@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import '../app_preferences.dart';
 import '../services/ai_context_builder.dart';
+import '../services/ai_log_writer.dart';
+import '../services/ai_response_log.dart';
 import '../services/ai_service.dart';
 import 'app_database.dart';
 import 'planning.dart';
@@ -43,10 +45,8 @@ class SetOption {
 
   Map<String, dynamic> toJson() => {
         'setIndex': setIndex,
-        if (repsOptions.isNotEmpty)
-          'repsOptions': repsOptions,
-        if (weightOptions.isNotEmpty)
-          'weightOptions': weightOptions,
+        if (repsOptions.isNotEmpty) 'repsOptions': repsOptions,
+        if (weightOptions.isNotEmpty) 'weightOptions': weightOptions,
       };
 }
 
@@ -79,9 +79,40 @@ class AiRecommendationResult {
   });
 }
 
+/// Data for the test harness: the inputs that _resolvePlannedSets would have
+/// used for one exercise, plus what actually happened.
+class TestHarnessExerciseData {
+  final Movement movement;
+  final List<CompletedSet> priorSets; // prior week non-skipped
+  final int targetCount; // prior week total set count
+  final WeekGoal weekGoal;
+  final int mesocycleId;
+  final int weekNumber;
+  final String workoutName;
+  final int? workoutId;
+  final List<CompletedSet> actualSets; // what really happened
+  final bool autoProgress;
+
+  const TestHarnessExerciseData({
+    required this.movement,
+    required this.priorSets,
+    required this.targetCount,
+    required this.weekGoal,
+    required this.mesocycleId,
+    required this.weekNumber,
+    required this.workoutName,
+    this.workoutId,
+    required this.actualSets,
+    required this.autoProgress,
+  });
+}
+
 /// Builds the constrained option space and asks the AI to pick.
 /// Falls back to [computeHeuristic] on any failure.
 /// Returns [AiRecommendationResult] with metadata about whether AI was used.
+///
+/// [promptOverride] and [modelOverride] allow the test harness to pass
+/// ad-hoc values without saving to preferences.
 Future<AiRecommendationResult> computeAiRecommendation({
   required List<CompletedSet> priorSets,
   required WeekGoal weekGoal,
@@ -92,20 +123,31 @@ Future<AiRecommendationResult> computeAiRecommendation({
   required String workoutName,
   int? workoutId,
   bool autoProgress = false,
+  String? promptOverride,
+  String? modelOverride,
 }) async {
   List<PlannedSetValues> fallback() => computeHeuristic(
       priorSets, weekGoal, movement, targetCount,
       autoProgress: autoProgress);
 
   // Quick guard: if AI is disabled or no API key, fall back immediately.
-  try {
-    if (!AppPreferences.getAiEnabled()) {
+  // (Skip the guard when overrides are provided — test harness wants to run.)
+  if (promptOverride == null && modelOverride == null) {
+    try {
+      if (!AppPreferences.getAiEnabled()) {
+        return AiRecommendationResult(values: fallback(), usedAi: false);
+      }
+    } catch (_) {
+      // Prefs not initialized (e.g. in tests) — fall back.
       return AiRecommendationResult(values: fallback(), usedAi: false);
     }
-  } catch (_) {
-    // Prefs not initialized (e.g. in tests) — fall back.
-    return AiRecommendationResult(values: fallback(), usedAi: false);
   }
+
+  final heuristicValues = fallback();
+  String? rawResponse;
+  String? userMessage;
+  String? effectivePrompt;
+  String? effectiveModel;
 
   try {
     final options = _buildOptions(priorSets, weekGoal, movement, targetCount);
@@ -117,22 +159,56 @@ Future<AiRecommendationResult> computeAiRecommendation({
       workoutId: workoutId,
     );
 
-    final systemPrompt = AppPreferences.getAiRecommendationPrompt();
+    effectivePrompt = promptOverride ?? AppPreferences.getAiRecommendationPrompt();
+    effectiveModel = modelOverride ?? AppPreferences.getAiModel();
+    userMessage = _buildUserMessage(options, context);
 
-    final userMessage = _buildUserMessage(options, context);
+    rawResponse = await AiService.chatCompletion(
+      [
+        {'role': 'system', 'content': effectivePrompt},
+        {'role': 'user', 'content': userMessage},
+      ],
+      model: effectiveModel,
+    );
 
-    final response = await AiService.chatCompletion([
-      {'role': 'system', 'content': systemPrompt},
-      {'role': 'user', 'content': userMessage},
-    ]);
-
-    final pick = _parseResponse(response, options);
+    final pick = _parseResponse(rawResponse, options);
     final values = _pickToPlannedValues(pick, options, priorSets, movement);
+
+    final successEntry = AiLogEntry(
+      timestamp: DateTime.now(),
+      movementName: movement.name,
+      model: effectiveModel,
+      systemPrompt: effectivePrompt,
+      userMessage: userMessage,
+      rawResponse: rawResponse,
+      parseSuccess: true,
+      aiResult: values,
+      heuristicResult: heuristicValues,
+    );
+    AiResponseLog.instance.add(successEntry);
+    // Fire-and-forget file export.
+    AiLogWriter.writeEntry(successEntry);
+
     return AiRecommendationResult(values: values, usedAi: true);
   } catch (e) {
-    // Any failure → fall back to heuristic.
+    final errorEntry = AiLogEntry(
+      timestamp: DateTime.now(),
+      movementName: movement.name,
+      model: effectiveModel ?? 'unknown',
+      systemPrompt: effectivePrompt ?? '',
+      userMessage: userMessage ?? '',
+      rawResponse: rawResponse,
+      parseSuccess: false,
+      parseError: rawResponse != null ? e.toString() : null,
+      heuristicResult: heuristicValues,
+      error: e.toString(),
+    );
+    AiResponseLog.instance.add(errorEntry);
+    // Fire-and-forget file export.
+    AiLogWriter.writeEntry(errorEntry);
+
     return AiRecommendationResult(
-      values: fallback(),
+      values: heuristicValues,
       usedAi: false,
       error: e.toString(),
     );
@@ -156,7 +232,8 @@ ExerciseOptions _buildOptions(
   final delta = movement.weightDelta ?? 5.0;
 
   final perSetOptions = <SetOption>[];
-  final setCount = priorSets.length > targetCount ? targetCount : priorSets.length;
+  final setCount =
+      priorSets.length > targetCount ? targetCount : priorSets.length;
   for (var i = 0; i < setCount; i++) {
     final s = priorSets[i];
 
@@ -195,17 +272,23 @@ ExerciseOptions _buildOptions(
 String _buildUserMessage(ExerciseOptions options, String historyContext) {
   final buf = StringBuffer();
   buf.writeln(historyContext);
-  buf.writeln('## Exercise to Plan: ${options.movementName} (${options.muscleGroup.name})');
+  buf.writeln(
+      '## Exercise to Plan: ${options.movementName} (${options.muscleGroup.name})');
   buf.writeln();
 
   // Show last week's numbers for reference.
   if (options.perSetOptions.isNotEmpty) {
-    buf.writeln('Last week they did ${options.perSetOptions.length} sets:');
+    buf.writeln(
+        'Last week they did ${options.perSetOptions.length} sets:');
     for (final s in options.perSetOptions) {
       final parts = <String>[];
       // The middle option is "same as last week".
-      if (s.repsOptions.length >= 2) parts.add('${s.repsOptions[s.repsOptions.length ~/ 2]} reps');
-      if (s.weightOptions.length >= 2) parts.add('${s.weightOptions[s.weightOptions.length ~/ 2]}');
+      if (s.repsOptions.length >= 2) {
+        parts.add('${s.repsOptions[s.repsOptions.length ~/ 2]} reps');
+      }
+      if (s.weightOptions.length >= 2) {
+        parts.add('${s.weightOptions[s.weightOptions.length ~/ 2]}');
+      }
       buf.writeln('  Set ${s.setIndex + 1}: ${parts.join(' x ')}');
     }
     buf.writeln();
@@ -215,16 +298,22 @@ String _buildUserMessage(ExerciseOptions options, String historyContext) {
   buf.writeln('  Set count: ${options.setCountOptions.join(' or ')}');
   for (final s in options.perSetOptions) {
     final parts = <String>[];
-    if (s.repsOptions.isNotEmpty) parts.add('reps: ${s.repsOptions.join(", ")}');
-    if (s.weightOptions.isNotEmpty) parts.add('weight: ${s.weightOptions.join(", ")}');
+    if (s.repsOptions.isNotEmpty) {
+      parts.add('reps: ${s.repsOptions.join(", ")}');
+    }
+    if (s.weightOptions.isNotEmpty) {
+      parts.add('weight: ${s.weightOptions.join(", ")}');
+    }
     buf.writeln('  Set ${s.setIndex + 1}: ${parts.join(' | ')}');
   }
   buf.writeln();
 
   buf.writeln('Respond with this JSON (choose from the available options):');
-  buf.writeln('{"setCount": N, "sets": [{"setIndex": 0, "reps": N, "weight": N}, ...]}');
+  buf.writeln(
+      '{"setCount": N, "sets": [{"setIndex": 0, "reps": N, "weight": N}, ...]}');
   buf.writeln('The "sets" array must have exactly "setCount" entries.');
-  buf.writeln('If you pick a setCount higher than the number of listed sets, repeat the last set\'s values for the extra sets.');
+  buf.writeln(
+      'If you pick a setCount higher than the number of listed sets, repeat the last set\'s values for the extra sets.');
 
   return buf.toString();
 }
@@ -234,7 +323,8 @@ String _buildUserMessage(ExerciseOptions options, String historyContext) {
 ExercisePick _parseResponse(String response, ExerciseOptions options) {
   // Extract JSON from response (may be wrapped in markdown code blocks).
   var jsonStr = response.trim();
-  final jsonMatch = RegExp(r'```(?:json)?\s*([\s\S]*?)```').firstMatch(jsonStr);
+  final jsonMatch =
+      RegExp(r'```(?:json)?\s*([\s\S]*?)```').firstMatch(jsonStr);
   if (jsonMatch != null) {
     jsonStr = jsonMatch.group(1)!.trim();
   }

@@ -16,12 +16,33 @@ class WorkoutCueService {
   static final _tts = FlutterTts();
   static bool _initialized = false;
 
-  static Future<void> _init() async {
-    if (_initialized) return;
-    await _tts.setLanguage('en-US');
-    await _tts.setSpeechRate(0.9);
-    await _tts.setVolume(1.0);
-    _initialized = true;
+  /// Best-effort init. Returns true if TTS is usable, false if no engine is
+  /// available (common on GrapheneOS / de-Googled devices) or any other error.
+  static Future<bool> _init() async {
+    if (_initialized) return true;
+    try {
+      await _tts.setLanguage('en-US');
+      await _tts.setSpeechRate(0.9);
+      await _tts.setVolume(1.0);
+      _initialized = true;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Returns true if a TTS engine is installed and usable on this device.
+  /// Used by Settings to warn the user when no engine is present.
+  static Future<bool> isAvailable() async {
+    try {
+      final engines = await _tts.getEngines;
+      if (engines is! List || engines.isEmpty) return false;
+      // Some devices report an engine list but no working default.
+      final def = await _tts.getDefaultEngine;
+      return def != null && def.toString().isNotEmpty;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Call when the timer reaches zero.
@@ -29,27 +50,40 @@ class WorkoutCueService {
   /// [cueText] is the value to speak in TTS mode (e.g. "10 reps",
   /// "45 seconds", "80 kg").  Pass null when there is no meaningful value —
   /// the service will fall back to saying "ready" or doing nothing.
+  ///
+  /// All TTS calls are wrapped in try/catch so a missing engine (e.g. on
+  /// GrapheneOS without Google TTS) degrades to haptic-only instead of
+  /// crashing the workout.
   static Future<void> fire(String? cueText) async {
     final haptic = AppPreferences.getTimerHaptic();
     final sound = AppPreferences.getTimerSound();
 
     if (haptic) {
-      await HapticFeedback.heavyImpact();
+      try {
+        await HapticFeedback.heavyImpact();
+      } catch (_) {}
     }
 
     if (sound == TimerSound.silent) return;
 
-    await _init();
+    final ok = await _init();
+    if (!ok) return;
 
-    if (sound == TimerSound.tts && cueText != null) {
-      await _tts.speak(cueText);
-    } else {
-      // Chime mode, or TTS mode with no cue text: say "ready".
-      await _tts.speak('ready');
+    try {
+      if (sound == TimerSound.tts && cueText != null) {
+        await _tts.speak(cueText);
+      } else {
+        // Chime mode, or TTS mode with no cue text: say "ready".
+        await _tts.speak('ready');
+      }
+    } catch (_) {
+      // No engine, language unsupported, or platform error — silently degrade.
     }
   }
 
   static Future<void> stop() async {
-    await _tts.stop();
+    try {
+      await _tts.stop();
+    } catch (_) {}
   }
 }

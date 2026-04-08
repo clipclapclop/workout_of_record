@@ -6,11 +6,12 @@ import '../screens/history_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/meso_template_list_screen.dart';
 import '../screens/movements_screen.dart';
+import '../screens/notes_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/workout_screen.dart';
 
-enum AppScreen { workout, exercises, mesoTemplates, history, chat, profile, settings }
+enum AppScreen { workout, exercises, mesoTemplates, history, chat, notes, profile, settings }
 
 class AppNavMenu extends StatelessWidget {
   const AppNavMenu({
@@ -56,6 +57,11 @@ class AppNavMenu extends StatelessWidget {
             value: AppScreen.chat,
             child: Text('AI Chat'),
           ),
+        if (current != AppScreen.notes)
+          const PopupMenuItem(
+            value: AppScreen.notes,
+            child: Text('Notes'),
+          ),
         if (current != AppScreen.profile)
           const PopupMenuItem(
             value: AppScreen.profile,
@@ -97,6 +103,7 @@ class AppNavMenu extends StatelessWidget {
           activeWorkoutName: activeWorkoutName,
         ),
       AppScreen.chat => const ChatScreen(),
+      AppScreen.notes => const NotesScreen(),
       AppScreen.profile => const ProfileScreen(),
       AppScreen.settings => const SettingsScreen(),
     };

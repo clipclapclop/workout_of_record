@@ -106,6 +106,14 @@ class AppPreferences {
   static Future<void> setAiHistoryWeeks(int v) =>
       _prefs.setInt(_kAiHistoryWeeks, v);
 
+  static bool getAiLoggingEnabled() => _prefs.getBool(_kAiLoggingEnabled) ?? false;
+  static Future<void> setAiLoggingEnabled(bool v) => _prefs.setBool(_kAiLoggingEnabled, v);
+
+  static String? getAiLogDirectoryPath() => _prefs.getString(_kAiLogDirectoryPath);
+  static Future<void> setAiLogDirectoryPath(String? v) => v == null
+      ? _prefs.remove(_kAiLogDirectoryPath)
+      : _prefs.setString(_kAiLogDirectoryPath, v);
+
   static const defaultAiModel = 'claude-sonnet-4-20250514';
 
   static const defaultRecommendationPrompt = '''
@@ -129,6 +137,12 @@ You have access to this person's recent workout history and profile (provided be
 Regarding Effort, Volume, Pump, Joint Pain, and Soreness feedback, interpret it as you would if you asked "How was your..." and they responded with the associated value.
 
 Keep answers focused and practical. When suggesting changes, be specific about exercises, sets, reps, and weights.''';
+
+  // ── Notes ──────────────────────────────────────────────────────────────────
+
+  static String getNotes() => _prefs.getString(_kNotes) ?? '';
+  static Future<void> setNotes(String v) =>
+      v.isEmpty ? _prefs.remove(_kNotes) : _prefs.setString(_kNotes, v);
 
   // ── Timer ──────────────────────────────────────────────────────────────────
 
@@ -198,6 +212,8 @@ Keep answers focused and practical. When suggesting changes, be specific about e
   static const _kAiRecommendationPrompt = 'ai_recommendation_prompt';
   static const _kAiChatPrompt = 'ai_chat_prompt';
   static const _kAiHistoryWeeks = 'ai_history_weeks';
+  static const _kAiLoggingEnabled = 'ai_logging_enabled';
+  static const _kAiLogDirectoryPath = 'ai_log_directory_path';
   static const _kTimerEnabled = 'timer_enabled';
   static const _kTimerDefaultSeconds = 'timer_default_seconds';
   static const _kTimerSound = 'timer_sound';
@@ -209,4 +225,5 @@ Keep answers focused and practical. When suggesting changes, be specific about e
   static const _kBackupMinute = 'backup_minute';
   static const _kBackupDirectoryPath = 'backup_directory_path';
   static const _kLastBackupTimestamp = 'backup_last_timestamp';
+  static const _kNotes = 'notes';
 }

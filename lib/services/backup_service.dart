@@ -92,6 +92,7 @@ class BackupService {
       'aiEnabled': AppPreferences.getAiEnabled(),
       'unitsMetric': AppPreferences.getUnitsMetric(),
       'hasSeenProfilePrompt': AppPreferences.hasSeenProfilePrompt(),
+      'notes': AppPreferences.getNotes(),
     };
   }
 
@@ -126,6 +127,9 @@ class BackupService {
     }
     if (json['hasSeenProfilePrompt'] != null) {
       await AppPreferences.setHasSeenProfilePrompt(json['hasSeenProfilePrompt'] as bool);
+    }
+    if (json['notes'] != null) {
+      await AppPreferences.setNotes(json['notes'] as String);
     }
   }
 }

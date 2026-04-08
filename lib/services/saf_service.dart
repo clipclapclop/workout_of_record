@@ -12,6 +12,13 @@ class SafService {
   static Future<void> writeFile(String folderUri, Uint8List bytes) =>
       _channel.invokeMethod('writeFile', {'uri': folderUri, 'bytes': bytes});
 
+  /// Appends [bytes] to [fileName] in the SAF folder at [folderUri].
+  /// Creates the file if it doesn't exist.
+  static Future<void> appendToFile(
+          String folderUri, String fileName, Uint8List bytes) =>
+      _channel.invokeMethod('appendToFile',
+          {'uri': folderUri, 'fileName': fileName, 'bytes': bytes});
+
   /// Schedules the native backup worker to run daily at [hour]:[minute].
   static Future<void> scheduleBackup(int hour, int minute) =>
       _channel.invokeMethod('scheduleBackup', {'hour': hour, 'minute': minute});

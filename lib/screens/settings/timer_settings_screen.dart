@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../app_preferences.dart';
 import '../../db/tables/enums.dart';
+import '../../services/workout_cue_service.dart';
 
 class TimerSettingsScreen extends StatefulWidget {
   const TimerSettingsScreen({super.key});
@@ -22,6 +23,9 @@ class _TimerSettingsScreenState extends State<TimerSettingsScreen> {
   late bool _initTimerHaptic;
   late bool _initTimerKeepAwake;
   late int _initTimerDefaultSeconds;
+
+  /// null = still checking, true = engine present, false = no engine.
+  bool? _ttsAvailable;
 
   bool get _hasUnsavedChanges =>
       _timerEnabled != _initTimerEnabled ||
@@ -46,6 +50,38 @@ class _TimerSettingsScreenState extends State<TimerSettingsScreen> {
     _initTimerHaptic = _timerHaptic;
     _initTimerKeepAwake = _timerKeepAwake;
     _initTimerDefaultSeconds = _timerDefaultSeconds;
+
+    WorkoutCueService.isAvailable().then((ok) {
+      if (mounted) setState(() => _ttsAvailable = ok);
+    });
+  }
+
+  Future<void> _showTtsInfo() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Text-to-speech engine'),
+        content: const Text(
+          'The rest-timer alert (both "read value aloud" and "chime") is '
+          'spoken by your phone\'s text-to-speech engine — this app does not '
+          'play its own audio file.\n\n'
+          'On GrapheneOS and other de-Googled Android builds there is no '
+          'TTS engine installed by default, so the timer will be silent '
+          '(haptic still works).\n\n'
+          'Fix: install a TTS engine and select it under '
+          'Android Settings → System → Languages → Text-to-speech output. '
+          'Free options on F-Droid:\n'
+          '  • RHVoice — offline, natural-sounding\n'
+          '  • eSpeak NG — tiny, robotic',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -167,13 +203,60 @@ class _TimerSettingsScreenState extends State<TimerSettingsScreen> {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text('Alert sound',
-                            style: Theme.of(context).textTheme.bodySmall),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
+                      child: Row(
+                        children: [
+                          Text('Alert sound',
+                              style: Theme.of(context).textTheme.bodySmall),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(Icons.info_outline, size: 18),
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                                minWidth: 24, minHeight: 24),
+                            tooltip: 'About text-to-speech',
+                            onPressed: _showTtsInfo,
+                          ),
+                        ],
                       ),
                     ),
+                    if (_ttsAvailable == false &&
+                        _timerSound != TimerSound.silent)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                        child: Material(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .errorContainer
+                              .withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(8),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: _showTtsInfo,
+                            child: Padding(
+                              padding: const EdgeInsets.all(10),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.warning_amber_rounded,
+                                      size: 20),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'No text-to-speech engine found. The '
+                                      'timer alert will be silent. Tap for '
+                                      'details.',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     RadioGroup<TimerSound>(
                       groupValue: _timerSound,
                       onChanged: (v) => setState(() => _timerSound = v!),

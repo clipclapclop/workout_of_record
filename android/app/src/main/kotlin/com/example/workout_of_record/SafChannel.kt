@@ -35,6 +35,12 @@ class SafChannel(private val activity: MainActivity) {
                 val minute = call.argument<Int>("minute")!!
                 scheduleBackup(hour, minute, result)
             }
+            "appendToFile" -> {
+                val uri = call.argument<String>("uri")!!
+                val fileName = call.argument<String>("fileName")!!
+                val bytes = call.argument<ByteArray>("bytes")!!
+                appendToFile(uri, fileName, bytes, result)
+            }
             "cancelBackup" -> cancelBackup(result)
             else -> result.notImplemented()
         }
@@ -83,6 +89,29 @@ class SafChannel(private val activity: MainActivity) {
             result.success(null)
         } catch (e: Exception) {
             result.error("WRITE_FAILED", e.message, null)
+        }
+    }
+
+    private fun appendToFile(
+        uriString: String,
+        fileName: String,
+        bytes: ByteArray,
+        result: MethodChannel.Result
+    ) {
+        try {
+            val treeUri = Uri.parse(uriString)
+            val tree = DocumentFile.fromTreeUri(activity, treeUri)
+                ?: throw Exception("Cannot access folder")
+            val existing = tree.findFile(fileName)
+            val target = existing ?: tree.createFile("text/markdown", fileName)
+                ?: throw Exception("Cannot create file in folder")
+            // "wa" = write-append mode
+            activity.contentResolver.openOutputStream(target.uri, "wa")!!.use {
+                it.write(bytes)
+            }
+            result.success(null)
+        } catch (e: Exception) {
+            result.error("APPEND_FAILED", e.message, null)
         }
     }
 

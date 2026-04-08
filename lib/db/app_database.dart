@@ -399,19 +399,15 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
-  /// Walks backward through prior weeks to find the best completed set data
-  /// for [movementId] at [workoutOrderIndex]. Skips weeks where the exercise
-  /// was skipped. Falls back to cold start (2 null sets) if no history found.
-  Future<List<PlannedSetValues>> _resolvePlannedSets(
+  /// Walks backward through prior weeks to find the most recent completed set
+  /// data for [movementId] at [workoutOrderIndex]. Returns null if no history
+  /// found (exercise was always skipped or never appeared).
+  Future<({List<CompletedSet> nonSkipped, int totalCount})?> _findPriorSets(
     int movementId,
     int workoutOrderIndex,
     Week currentWeek,
     List<Week> allWeeks,
-    Movement movement, {
-    bool autoProgress = false,
-    String workoutName = '',
-    int? workoutId,
-  }) async {
+  ) async {
     for (var wn = currentWeek.weekNumber - 1; wn >= 1; wn--) {
       final priorWeek =
           allWeeks.firstWhere((w) => w.weekNumber == wn);
@@ -441,31 +437,49 @@ class AppDatabase extends _$AppDatabase {
           .get();
 
       final nonSkipped = allSets.where((s) => s.skipReason == null).toList();
+      return (nonSkipped: nonSkipped, totalCount: allSets.length);
+    }
+    return null;
+  }
 
-      // Try AI recommendation when autoProgress is enabled.
-      if (autoProgress) {
-        final result = await computeAiRecommendation(
-          priorSets: nonSkipped,
-          weekGoal: currentWeek.goal,
-          movement: movement,
-          targetCount: allSets.length,
-          mesocycleId: currentWeek.mesocycleId,
-          weekNumber: currentWeek.weekNumber,
-          workoutName: workoutName,
-          workoutId: workoutId,
-          autoProgress: autoProgress,
-        );
-        if (!result.usedAi && result.error != null) {
-          _lastAiErrors.add(result.error!);
-        }
-        return result.values;
-      }
-
-      return computeHeuristic(nonSkipped, currentWeek.goal, movement, allSets.length, autoProgress: autoProgress);
+  /// Resolves planned sets for an exercise using prior history.
+  /// Falls back to cold start (2 null sets) if no history found.
+  Future<List<PlannedSetValues>> _resolvePlannedSets(
+    int movementId,
+    int workoutOrderIndex,
+    Week currentWeek,
+    List<Week> allWeeks,
+    Movement movement, {
+    bool autoProgress = false,
+    String workoutName = '',
+    int? workoutId,
+  }) async {
+    final prior = await _findPriorSets(
+        movementId, workoutOrderIndex, currentWeek, allWeeks);
+    if (prior == null) {
+      return [const PlannedSetValues(), const PlannedSetValues()];
     }
 
-    // No valid history found across any prior week — cold start.
-    return [const PlannedSetValues(), const PlannedSetValues()];
+    if (autoProgress) {
+      final result = await computeAiRecommendation(
+        priorSets: prior.nonSkipped,
+        weekGoal: currentWeek.goal,
+        movement: movement,
+        targetCount: prior.totalCount,
+        mesocycleId: currentWeek.mesocycleId,
+        weekNumber: currentWeek.weekNumber,
+        workoutName: workoutName,
+        workoutId: workoutId,
+        autoProgress: autoProgress,
+      );
+      if (!result.usedAi && result.error != null) {
+        _lastAiErrors.add(result.error!);
+      }
+      return result.values;
+    }
+
+    return computeHeuristic(prior.nonSkipped, currentWeek.goal, movement,
+        prior.totalCount, autoProgress: autoProgress);
   }
 
   /// Re-runs AI recommendations for all exercises in a planned workout.
@@ -500,47 +514,15 @@ class AppDatabase extends _$AppDatabase {
             ..where((m) => m.id.equals(pe.movementId)))
           .getSingle();
 
-      // Find prior week's data for this exercise (same logic as _resolvePlannedSets).
-      List<CompletedSet>? priorNonSkipped;
-      int targetCount = 0;
-      for (var wn = week.weekNumber - 1; wn >= 1; wn--) {
-        final priorWeek = allWeeksList.firstWhere((w) => w.weekNumber == wn);
-        final priorWorkout = await (select(workouts)
-              ..where((w) =>
-                  w.weekId.equals(priorWeek.id) &
-                  w.orderIndex.equals(workout.orderIndex)))
-            .getSingleOrNull();
-        if (priorWorkout == null || priorWorkout.isRestDay) continue;
-
-        final priorCompleted = await (select(completedWorkouts)
-              ..where((cw) => cw.workoutId.equals(priorWorkout.id)))
-            .getSingleOrNull();
-        if (priorCompleted == null) continue;
-
-        final priorEx = await (select(completedExercises)
-              ..where((ce) =>
-                  ce.completedWorkoutId.equals(priorCompleted.id) &
-                  ce.movementId.equals(pe.movementId)))
-            .getSingleOrNull();
-        if (priorEx == null || priorEx.skipReason != null) continue;
-
-        final allSets = await (select(completedSets)
-              ..where((s) => s.completedExerciseId.equals(priorEx.id))
-              ..orderBy([(s) => OrderingTerm.asc(s.id)]))
-            .get();
-
-        priorNonSkipped = allSets.where((s) => s.skipReason == null).toList();
-        targetCount = allSets.length;
-        break;
-      }
-
-      if (priorNonSkipped == null) continue;
+      final prior = await _findPriorSets(
+          pe.movementId, workout.orderIndex, week, allWeeksList);
+      if (prior == null) continue;
 
       final result = await computeAiRecommendation(
-        priorSets: priorNonSkipped,
+        priorSets: prior.nonSkipped,
         weekGoal: week.goal,
         movement: movement,
-        targetCount: targetCount,
+        targetCount: prior.totalCount,
         mesocycleId: week.mesocycleId,
         weekNumber: week.weekNumber,
         workoutName: workout.name,

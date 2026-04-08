@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../app_preferences.dart';
 import '../../services/ai_service.dart';
+import '../../services/saf_service.dart';
+import 'ai_log_screen.dart';
 
 class AiSettingsScreen extends StatefulWidget {
   const AiSettingsScreen({super.key});
@@ -25,6 +27,10 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
   bool _balanceLoading = false;
   String? _balanceError;
 
+  // Logging
+  late bool _loggingEnabled;
+  String? _logDirPath;
+
   late bool _initAiEnabled;
   String _initApiKey = '';
   late String _initCreditId;
@@ -32,6 +38,8 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
   late String _initRecPrompt;
   late String _initChatPrompt;
   late int _initHistoryWeeks;
+  late bool _initLoggingEnabled;
+  String? _initLogDirPath;
 
   bool get _hasUnsavedChanges =>
       _aiEnabled != _initAiEnabled ||
@@ -40,7 +48,9 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
       _modelController.text.trim() != _initModel ||
       _recPromptController.text.trim() != _initRecPrompt ||
       _chatPromptController.text.trim() != _initChatPrompt ||
-      _historyWeeks != _initHistoryWeeks;
+      _historyWeeks != _initHistoryWeeks ||
+      _loggingEnabled != _initLoggingEnabled ||
+      _logDirPath != _initLogDirPath;
 
   @override
   void initState() {
@@ -51,6 +61,8 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
     _recPromptController.text = AppPreferences.getAiRecommendationPrompt();
     _chatPromptController.text = AppPreferences.getAiChatPrompt();
     _historyWeeks = AppPreferences.getAiHistoryWeeks();
+    _loggingEnabled = AppPreferences.getAiLoggingEnabled();
+    _logDirPath = AppPreferences.getAiLogDirectoryPath();
 
     _initAiEnabled = _aiEnabled;
     _initCreditId = _creditIdController.text;
@@ -58,6 +70,8 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
     _initRecPrompt = _recPromptController.text;
     _initChatPrompt = _chatPromptController.text;
     _initHistoryWeeks = _historyWeeks;
+    _initLoggingEnabled = _loggingEnabled;
+    _initLogDirPath = _logDirPath;
 
     _loadApiKey();
   }
@@ -122,6 +136,8 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
             ? AppPreferences.defaultChatPrompt
             : _chatPromptController.text.trim());
     await AppPreferences.setAiHistoryWeeks(_historyWeeks);
+    await AppPreferences.setAiLoggingEnabled(_loggingEnabled);
+    await AppPreferences.setAiLogDirectoryPath(_logDirPath);
 
     _initAiEnabled = _aiEnabled;
     _initApiKey = _apiKeyController.text.trim();
@@ -130,6 +146,8 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
     _initRecPrompt = _recPromptController.text.trim();
     _initChatPrompt = _chatPromptController.text.trim();
     _initHistoryWeeks = _historyWeeks;
+    _initLoggingEnabled = _loggingEnabled;
+    _initLogDirPath = _logDirPath;
   }
 
   Future<bool> _onPop() async {
@@ -435,6 +453,61 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // ── Logging ────────────────────────────────────────────────
+            _sectionLabel('Logging'),
+            Card.outlined(
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    title: const Text('Export AI logs to file'),
+                    subtitle: const Text(
+                        'Save each AI request/response as a markdown file.'),
+                    value: _loggingEnabled,
+                    onChanged: (v) => setState(() => _loggingEnabled = v),
+                  ),
+                  if (_loggingEnabled) ...[
+                    const Divider(height: 1),
+                    ListTile(
+                      title: const Text('Log folder'),
+                      subtitle: Text(
+                        _logDirPath != null
+                            ? Uri.decodeFull(
+                                Uri.parse(_logDirPath!).pathSegments.last)
+                            : 'No folder selected',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: const Icon(Icons.folder_open),
+                      onTap: () async {
+                        final uri = await SafService.pickFolder();
+                        if (uri != null && mounted) {
+                          setState(() => _logDirPath = uri);
+                        }
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // ── Tools ──────────────────────────────────────────────────
+            _sectionLabel('Tools'),
+            Card.outlined(
+              child: ListTile(
+                leading: const Icon(Icons.article_outlined),
+                title: const Text('View AI log'),
+                subtitle: const Text('Session requests and responses'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const AiLogScreen()),
+                ),
               ),
             ),
           ],
