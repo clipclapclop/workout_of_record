@@ -1,17 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../app_preferences.dart';
-import '../services/ai_context_builder.dart';
-import '../services/ai_service.dart';
+import '../services/chat_session_manager.dart';
 import '../widgets/app_nav_menu.dart';
-
-/// A simple chat message.
-class _ChatMessage {
-  final String role; // 'user' or 'assistant'
-  final String content;
-
-  const _ChatMessage({required this.role, required this.content});
-}
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key, this.initialContext});
@@ -26,143 +16,38 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
-  final _messages = <_ChatMessage>[];
-  bool _loading = false;
-  bool _contextLoading = true;
-  String _systemContext = '';
-  String? _error;
+  final _session = ChatSessionManager.instance;
 
   @override
   void initState() {
     super.initState();
-    _loadContext();
+    _session.addListener(_onSessionChanged);
+    // When opened with initialContext (e.g. from workout), start a fresh
+    // session so the context is relevant to what the user is doing.
+    if (widget.initialContext != null) {
+      _session.clear();
+    }
+    _session.ensureContext(initialContext: widget.initialContext);
   }
 
   @override
   void dispose() {
+    _session.removeListener(_onSessionChanged);
     _inputController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadContext() async {
-    try {
-      final context = widget.initialContext != null
-          ? '${widget.initialContext}\n\n${await AiContextBuilder.forChat()}'
-          : await AiContextBuilder.forChat();
-      if (mounted) {
-        setState(() {
-          _systemContext = context;
-          _contextLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _contextLoading = false;
-          _error = 'Failed to load context: $e';
-        });
-      }
-    }
+  void _onSessionChanged() {
+    if (mounted) setState(() {});
+    _scrollToBottom();
   }
 
-  Future<void> _send() async {
+  void _send() {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
-
-    final apiKey = await AppPreferences.getApiKey();
-    if (apiKey == null || apiKey.isEmpty) {
-      setState(() => _error = 'No API key configured. Set it in Settings > AI.');
-      return;
-    }
-
-    setState(() {
-      _messages.add(_ChatMessage(role: 'user', content: text));
-      _inputController.clear();
-      _loading = true;
-      _error = null;
-    });
-    _scrollToBottom();
-
-    try {
-      // Build the full message list for the API.
-      final apiMessages = <Map<String, String>>[
-        {
-          'role': 'system',
-          'content': '${AppPreferences.getAiChatPrompt()}\n\n$_systemContext',
-        },
-        for (final m in _messages) {'role': m.role, 'content': m.content},
-      ];
-
-      final response = await AiService.chatCompletion(apiMessages);
-
-      if (mounted) {
-        setState(() {
-          _messages.add(_ChatMessage(role: 'assistant', content: response));
-          _loading = false;
-        });
-        _scrollToBottom();
-      }
-    } on AiServiceException catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.message;
-
-          _loading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = 'Something went wrong: $e';
-
-          _loading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _retry() async {
-    if (_messages.isEmpty) return;
-
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-
-    try {
-      final apiMessages = <Map<String, String>>[
-        {
-          'role': 'system',
-          'content': '${AppPreferences.getAiChatPrompt()}\n\n$_systemContext',
-        },
-        for (final m in _messages) {'role': m.role, 'content': m.content},
-      ];
-
-      final response = await AiService.chatCompletion(apiMessages);
-
-      if (mounted) {
-        setState(() {
-          _messages.add(_ChatMessage(role: 'assistant', content: response));
-          _loading = false;
-        });
-        _scrollToBottom();
-      }
-    } on AiServiceException catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.message;
-          _loading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = 'Something went wrong: $e';
-          _loading = false;
-        });
-      }
-    }
+    _inputController.clear();
+    _session.send(text);
   }
 
   void _scrollToBottom() {
@@ -177,23 +62,61 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  void _confirmClear() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New conversation?'),
+        content: const Text(
+          'This will clear the current conversation. Continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _session.clear();
+              _session.ensureContext();
+            },
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final messages = _session.messages;
+    final loading = _session.loading;
+    final contextLoading = _session.contextLoading;
+    final error = _session.error;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('AI Chat'),
         automaticallyImplyLeading: false,
-        actions: const [AppNavMenu(current: AppScreen.chat)],
+        actions: [
+          if (_session.hasMessages || loading)
+            IconButton(
+              icon: const Icon(Icons.add_comment_outlined),
+              tooltip: 'New conversation',
+              onPressed: loading ? null : _confirmClear,
+            ),
+          const AppNavMenu(current: AppScreen.chat),
+        ],
       ),
       body: Column(
         children: [
           // Messages list
           Expanded(
-            child: _contextLoading
+            child: contextLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _messages.isEmpty
+                : messages.isEmpty
                     ? Center(
                         child: Padding(
                           padding: const EdgeInsets.all(32),
@@ -210,10 +133,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     : ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        itemCount: _messages.length + (_loading ? 1 : 0),
+                        itemCount: messages.length + (loading ? 1 : 0),
                         itemBuilder: (context, index) {
-                          if (index == _messages.length) {
-                            // Loading indicator for pending response
+                          if (index == messages.length) {
                             return const Align(
                               alignment: Alignment.centerLeft,
                               child: Padding(
@@ -225,14 +147,14 @@ class _ChatScreenState extends State<ChatScreen> {
                               ),
                             );
                           }
-                          final msg = _messages[index];
+                          final msg = messages[index];
                           return _MessageBubble(message: msg);
                         },
                       ),
           ),
 
           // Error banner
-          if (_error != null)
+          if (error != null)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -241,17 +163,18 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      _error!,
-                      style: TextStyle(color: theme.colorScheme.onErrorContainer),
+                      error,
+                      style: TextStyle(
+                          color: theme.colorScheme.onErrorContainer),
                     ),
                   ),
                   TextButton(
-                    onPressed: _retry,
+                    onPressed: _session.retry,
                     child: const Text('Retry'),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close, size: 18),
-                    onPressed: () => setState(() => _error = null),
+                    onPressed: _session.dismissError,
                   ),
                 ],
               ),
@@ -275,13 +198,13 @@ class _ChatScreenState extends State<ChatScreen> {
                       maxLines: 4,
                       minLines: 1,
                       onSubmitted: (_) => _send(),
-                      enabled: !_loading && !_contextLoading,
+                      enabled: !loading && !contextLoading,
                     ),
                   ),
                   const SizedBox(width: 8),
                   IconButton.filled(
                     icon: const Icon(Icons.send),
-                    onPressed: _loading || _contextLoading ? null : _send,
+                    onPressed: loading || contextLoading ? null : _send,
                   ),
                 ],
               ),
@@ -296,7 +219,7 @@ class _ChatScreenState extends State<ChatScreen> {
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({required this.message});
 
-  final _ChatMessage message;
+  final ChatMessage message;
 
   @override
   Widget build(BuildContext context) {
