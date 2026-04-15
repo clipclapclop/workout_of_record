@@ -106,6 +106,13 @@ class AppPreferences {
   static Future<void> setAiHistoryWeeks(int v) =>
       _prefs.setInt(_kAiHistoryWeeks, v);
 
+  /// Free-form user notes appended to the recommendation system prompt.
+  /// Meant for temporary context (injuries, travel, etc.) that shouldn't
+  /// dirty up the main prompt.
+  static String getAiUserNotes() => _prefs.getString(_kAiUserNotes) ?? '';
+  static Future<void> setAiUserNotes(String v) =>
+      v.isEmpty ? _prefs.remove(_kAiUserNotes) : _prefs.setString(_kAiUserNotes, v);
+
   static bool getAiLoggingEnabled() => _prefs.getBool(_kAiLoggingEnabled) ?? false;
   static Future<void> setAiLoggingEnabled(bool v) => _prefs.setBool(_kAiLoggingEnabled, v);
 
@@ -173,14 +180,6 @@ Keep answers focused and practical. When suggesting changes, be specific about e
   static bool getAutoBackupEnabled() => _prefs.getBool(_kAutoBackupEnabled) ?? false;
   static Future<void> setAutoBackupEnabled(bool v) => _prefs.setBool(_kAutoBackupEnabled, v);
 
-  /// Hour (0–23) for scheduled backups. Defaults to 2 (2 AM).
-  static int getBackupHour() => _prefs.getInt(_kBackupHour) ?? 2;
-  static Future<void> setBackupHour(int v) => _prefs.setInt(_kBackupHour, v);
-
-  /// Minute (0–59) for scheduled backups. Defaults to 0.
-  static int getBackupMinute() => _prefs.getInt(_kBackupMinute) ?? 0;
-  static Future<void> setBackupMinute(int v) => _prefs.setInt(_kBackupMinute, v);
-
   static String? getBackupDirectoryPath() => _prefs.getString(_kBackupDirectoryPath);
   static Future<void> setBackupDirectoryPath(String? v) => v == null
       ? _prefs.remove(_kBackupDirectoryPath)
@@ -212,6 +211,7 @@ Keep answers focused and practical. When suggesting changes, be specific about e
   static const _kAiRecommendationPrompt = 'ai_recommendation_prompt';
   static const _kAiChatPrompt = 'ai_chat_prompt';
   static const _kAiHistoryWeeks = 'ai_history_weeks';
+  static const _kAiUserNotes = 'ai_user_notes';
   static const _kAiLoggingEnabled = 'ai_logging_enabled';
   static const _kAiLogDirectoryPath = 'ai_log_directory_path';
   static const _kTimerEnabled = 'timer_enabled';
@@ -221,8 +221,6 @@ Keep answers focused and practical. When suggesting changes, be specific about e
   static const _kTimerKeepAwake = 'timer_keep_awake';
   static const _kBackupEnabled = 'backup_enabled';
   static const _kAutoBackupEnabled = 'auto_backup_enabled';
-  static const _kBackupHour = 'backup_hour';
-  static const _kBackupMinute = 'backup_minute';
   static const _kBackupDirectoryPath = 'backup_directory_path';
   static const _kLastBackupTimestamp = 'backup_last_timestamp';
   static const _kNotes = 'notes';

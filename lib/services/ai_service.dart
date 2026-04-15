@@ -10,6 +10,7 @@ class AiService {
   AiService._();
 
   static const _baseUrl = 'https://api.ppq.ai';
+  static const _requestTimeout = Duration(seconds: 30);
 
   // ── Chat completions ────────────────────────────────────────────────────────
 
@@ -28,17 +29,19 @@ class AiService {
 
     final http.Response response;
     try {
-      response = await http.post(
-        Uri.parse('$_baseUrl/chat/completions'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: jsonEncode({
-          'model': model ?? AppPreferences.getAiModel(),
-          'messages': messages,
-        }),
-      );
+      response = await http
+          .post(
+            Uri.parse('$_baseUrl/chat/completions'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $apiKey',
+            },
+            body: jsonEncode({
+              'model': model ?? AppPreferences.getAiModel(),
+              'messages': messages,
+            }),
+          )
+          .timeout(_requestTimeout);
     } catch (e) {
       _throwFriendlyError(e);
     }
@@ -65,11 +68,13 @@ class AiService {
   static Future<double> getBalance(String creditId) async {
     final http.Response response;
     try {
-      response = await http.post(
-        Uri.parse('$_baseUrl/credits/balance'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'credit_id': creditId}),
-      );
+      response = await http
+          .post(
+            Uri.parse('$_baseUrl/credits/balance'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'credit_id': creditId}),
+          )
+          .timeout(_requestTimeout);
     } catch (e) {
       _throwFriendlyError(e);
     }

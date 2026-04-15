@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -6,8 +8,10 @@ import '../app_preferences.dart';
 import '../db/app_database.dart';
 import '../db/db.dart';
 import '../db/history_data.dart';
+import '../db/planning.dart';
 import '../db/tables/enums.dart';
 import '../db/workout_data.dart';
+import '../services/backup_service.dart';
 import '../services/workout_foreground_service.dart';
 import '../widgets/app_nav_menu.dart';
 import 'chat_screen.dart';
@@ -847,22 +851,37 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   Future<void> _addExerciseAfter(ExerciseData exercise) async {
     final movs = await db.getMovements();
     if (!mounted) return;
+    final mesoId = AppPreferences.getCurrentMesocycleId();
     await showMovementPickerSheet(
       context: context,
       allMovements: movs,
       alreadyAdded: {
         for (final ex in _data!.exercises) ex.completed.movementId,
       },
-      onAdd: (m) {
-        db
-            .addExerciseAfter(
+      onAdd: (m) async {
+        final defaults = mesoId != null
+            ? await db.getHistoricalSetDefaults(m.id, mesoId, m)
+            : const [PlannedSetValues(), PlannedSetValues()];
+        await db.addExerciseAfter(
           widget.completedWorkoutId,
           exercise.completed.orderIndex,
           m.id,
-        )
-            .then((_) {
-          if (mounted) _load();
-        });
+          defaults: defaults,
+        );
+        if (mounted) _load();
+        // Fire AI refinement in the background so the user sees heuristic
+        // values immediately and the refined values whenever the single AI
+        // call returns.
+        if (AppPreferences.getAiEnabled()) {
+          unawaited(db
+              .refineAiForAddedExercise(widget.completedWorkoutId, m.id)
+              .then((_) {
+            if (mounted) _load();
+          }).catchError((_) {
+            // Refinement errors are logged inside computeAiRecommendation;
+            // swallow here so they don't become unhandled futures.
+          }));
+        }
       },
     );
   }
@@ -1083,6 +1102,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     await db.finishWorkout(widget.completedWorkoutId);
     await AppPreferences.setCurrentCompletedWorkoutId(null);
 
+    _maybeBackupInBackground();
+
     if (mounted) {
       Navigator.pushAndRemoveUntil(
         context,
@@ -1090,6 +1111,22 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         (_) => false,
       );
     }
+  }
+
+  void _maybeBackupInBackground() {
+    if (!AppPreferences.getBackupEnabled()) return;
+    if (!AppPreferences.getAutoBackupEnabled()) return;
+    final dir = AppPreferences.getBackupDirectoryPath();
+    if (dir == null) return;
+
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    unawaited(
+      BackupService.backup(dir).catchError((Object e) {
+        messenger?.showSnackBar(
+          SnackBar(content: Text('Backup failed: $e')),
+        );
+      }),
+    );
   }
 
   /// True when the exercise at [index] is unblocked.

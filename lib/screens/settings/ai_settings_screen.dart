@@ -18,6 +18,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
   final _modelController = TextEditingController();
   final _recPromptController = TextEditingController();
   final _chatPromptController = TextEditingController();
+  final _userNotesController = TextEditingController();
   late int _historyWeeks;
   bool _apiKeyLoading = true;
   bool _obscureApiKey = true;
@@ -37,6 +38,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
   late String _initModel;
   late String _initRecPrompt;
   late String _initChatPrompt;
+  late String _initUserNotes;
   late int _initHistoryWeeks;
   late bool _initLoggingEnabled;
   String? _initLogDirPath;
@@ -48,6 +50,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
       _modelController.text.trim() != _initModel ||
       _recPromptController.text.trim() != _initRecPrompt ||
       _chatPromptController.text.trim() != _initChatPrompt ||
+      _userNotesController.text.trim() != _initUserNotes ||
       _historyWeeks != _initHistoryWeeks ||
       _loggingEnabled != _initLoggingEnabled ||
       _logDirPath != _initLogDirPath;
@@ -60,6 +63,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
     _creditIdController.text = AppPreferences.getAiCreditId() ?? '';
     _recPromptController.text = AppPreferences.getAiRecommendationPrompt();
     _chatPromptController.text = AppPreferences.getAiChatPrompt();
+    _userNotesController.text = AppPreferences.getAiUserNotes();
     _historyWeeks = AppPreferences.getAiHistoryWeeks();
     _loggingEnabled = AppPreferences.getAiLoggingEnabled();
     _logDirPath = AppPreferences.getAiLogDirectoryPath();
@@ -69,6 +73,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
     _initModel = _modelController.text;
     _initRecPrompt = _recPromptController.text;
     _initChatPrompt = _chatPromptController.text;
+    _initUserNotes = _userNotesController.text;
     _initHistoryWeeks = _historyWeeks;
     _initLoggingEnabled = _loggingEnabled;
     _initLogDirPath = _logDirPath;
@@ -83,6 +88,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
     _modelController.dispose();
     _recPromptController.dispose();
     _chatPromptController.dispose();
+    _userNotesController.dispose();
     super.dispose();
   }
 
@@ -135,6 +141,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
         _chatPromptController.text.trim().isEmpty
             ? AppPreferences.defaultChatPrompt
             : _chatPromptController.text.trim());
+    await AppPreferences.setAiUserNotes(_userNotesController.text.trim());
     await AppPreferences.setAiHistoryWeeks(_historyWeeks);
     await AppPreferences.setAiLoggingEnabled(_loggingEnabled);
     await AppPreferences.setAiLogDirectoryPath(_logDirPath);
@@ -145,6 +152,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
     _initModel = _modelController.text.trim();
     _initRecPrompt = _recPromptController.text.trim();
     _initChatPrompt = _chatPromptController.text.trim();
+    _initUserNotes = _userNotesController.text.trim();
     _initHistoryWeeks = _historyWeeks;
     _initLoggingEnabled = _loggingEnabled;
     _initLogDirPath = _logDirPath;
@@ -197,6 +205,8 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
     required String title,
     required TextEditingController controller,
     required String defaultValue,
+    String hintText = 'System prompt...',
+    String resetLabel = 'Reset to default',
   }) {
     showDialog(
       context: context,
@@ -213,15 +223,15 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
                 TextField(
                   controller: editCtrl,
                   maxLines: 8,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    hintText: 'System prompt...',
+                  decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
+                    hintText: hintText,
                   ),
                 ),
                 const SizedBox(height: 8),
                 TextButton(
                   onPressed: () => editCtrl.text = defaultValue,
-                  child: const Text('Reset to default'),
+                  child: Text(resetLabel),
                 ),
               ],
             ),
@@ -450,6 +460,26 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
                       title: 'Chat Prompt',
                       controller: _chatPromptController,
                       defaultValue: AppPreferences.defaultChatPrompt,
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    title: const Text('Personal notes'),
+                    subtitle: Text(
+                      _userNotesController.text.isEmpty
+                          ? 'Temporary notes for the AI — injuries, goals, constraints. Appended to the recommendation prompt.'
+                          : _userNotesController.text,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: const Icon(Icons.edit),
+                    onTap: () => _showPromptEditor(
+                      title: 'Personal Notes',
+                      controller: _userNotesController,
+                      defaultValue: '',
+                      hintText:
+                          'e.g. shoulder is cranky, skip overhead pressing for a few weeks',
+                      resetLabel: 'Clear',
                     ),
                   ),
                 ],

@@ -9,6 +9,13 @@ import 'app_database.dart';
 import 'planning.dart';
 import 'tables/enums.dart';
 
+/// Appends user-authored notes to a system prompt, if any are set.
+String _withUserNotes(String basePrompt) {
+  final notes = AppPreferences.getAiUserNotes().trim();
+  if (notes.isEmpty) return basePrompt;
+  return '$basePrompt\n\nAdditional user notes:\n$notes';
+}
+
 /// Represents the set of options the AI can choose from for one exercise.
 class ExerciseOptions {
   final String movementName;
@@ -76,6 +83,19 @@ class AiRecommendationResult {
     required this.values,
     required this.usedAi,
     this.error,
+  });
+}
+
+/// One exercise's inputs for a batch AI recommendation call.
+class BatchExerciseInput {
+  final Movement movement;
+  final List<CompletedSet> priorSets;
+  final int targetCount;
+
+  const BatchExerciseInput({
+    required this.movement,
+    required this.priorSets,
+    required this.targetCount,
   });
 }
 
@@ -159,7 +179,8 @@ Future<AiRecommendationResult> computeAiRecommendation({
       workoutId: workoutId,
     );
 
-    effectivePrompt = promptOverride ?? AppPreferences.getAiRecommendationPrompt();
+    effectivePrompt = _withUserNotes(
+        promptOverride ?? AppPreferences.getAiRecommendationPrompt());
     effectiveModel = modelOverride ?? AppPreferences.getAiModel();
     userMessage = _buildUserMessage(options, context);
 
@@ -348,6 +369,238 @@ ExercisePick _parseResponse(String response, ExerciseOptions options) {
   }
 
   return ExercisePick(setCount: setCount, sets: sets);
+}
+
+/// Runs a single AI call for every exercise in [exercises] and returns one
+/// [AiRecommendationResult] per input (in the same order). Falls back to
+/// [computeHeuristic] for any exercise the AI didn't provide a valid pick for.
+Future<List<AiRecommendationResult>> computeBatchRecommendation({
+  required List<BatchExerciseInput> exercises,
+  required WeekGoal weekGoal,
+  required int mesocycleId,
+  required int weekNumber,
+  required String workoutName,
+  int? workoutId,
+}) async {
+  List<AiRecommendationResult> allFallback(String? error) => [
+        for (final e in exercises)
+          AiRecommendationResult(
+            values: computeHeuristic(
+                e.priorSets, weekGoal, e.movement, e.targetCount,
+                autoProgress: true),
+            usedAi: false,
+            error: error,
+          ),
+      ];
+
+  try {
+    if (!AppPreferences.getAiEnabled()) return allFallback(null);
+  } catch (_) {
+    return allFallback(null);
+  }
+
+  final optionList = [
+    for (final e in exercises)
+      _buildOptions(e.priorSets, weekGoal, e.movement, e.targetCount),
+  ];
+  final heuristics = [
+    for (final e in exercises)
+      computeHeuristic(e.priorSets, weekGoal, e.movement, e.targetCount,
+          autoProgress: true),
+  ];
+
+  String? rawResponse;
+  String? userMessage;
+  String effectivePrompt = '';
+  String effectiveModel = '';
+
+  try {
+    final context = await AiContextBuilder.forRecommendation(
+      mesocycleId: mesocycleId,
+      weekNumber: weekNumber,
+      weekGoal: weekGoal,
+      workoutName: workoutName,
+      workoutId: workoutId,
+    );
+
+    effectivePrompt = _withUserNotes(AppPreferences.getAiRecommendationPrompt());
+    effectiveModel = AppPreferences.getAiModel();
+    userMessage = _buildBatchUserMessage(optionList, context);
+
+    rawResponse = await AiService.chatCompletion(
+      [
+        {'role': 'system', 'content': effectivePrompt},
+        {'role': 'user', 'content': userMessage},
+      ],
+      model: effectiveModel,
+    );
+
+    final picks = _parseBatchResponse(rawResponse, optionList);
+
+    final results = <AiRecommendationResult>[];
+    for (var i = 0; i < exercises.length; i++) {
+      final pick = picks[i];
+      final AiRecommendationResult result;
+      if (pick == null) {
+        result = AiRecommendationResult(
+          values: heuristics[i],
+          usedAi: false,
+          error: 'No valid AI pick for ${exercises[i].movement.name}',
+        );
+      } else {
+        final values = _pickToPlannedValues(
+            pick, optionList[i], exercises[i].priorSets, exercises[i].movement);
+        result = AiRecommendationResult(values: values, usedAi: true);
+      }
+      results.add(result);
+
+      final entry = AiLogEntry(
+        timestamp: DateTime.now(),
+        movementName: exercises[i].movement.name,
+        model: effectiveModel,
+        systemPrompt: effectivePrompt,
+        userMessage: userMessage,
+        rawResponse: rawResponse,
+        parseSuccess: pick != null,
+        aiResult: pick != null ? result.values : null,
+        heuristicResult: heuristics[i],
+        error: result.error,
+      );
+      AiResponseLog.instance.add(entry);
+      AiLogWriter.writeEntry(entry);
+    }
+    return results;
+  } catch (e) {
+    for (var i = 0; i < exercises.length; i++) {
+      final entry = AiLogEntry(
+        timestamp: DateTime.now(),
+        movementName: exercises[i].movement.name,
+        model: effectiveModel.isEmpty ? 'unknown' : effectiveModel,
+        systemPrompt: effectivePrompt,
+        userMessage: userMessage ?? '',
+        rawResponse: rawResponse,
+        parseSuccess: false,
+        parseError: rawResponse != null ? e.toString() : null,
+        heuristicResult: heuristics[i],
+        error: e.toString(),
+      );
+      AiResponseLog.instance.add(entry);
+      AiLogWriter.writeEntry(entry);
+    }
+    return allFallback(e.toString());
+  }
+}
+
+String _buildBatchUserMessage(
+    List<ExerciseOptions> optionList, String historyContext) {
+  final buf = StringBuffer();
+  buf.writeln(historyContext);
+  buf.writeln('## Workout Exercises to Plan');
+  buf.writeln();
+
+  for (var i = 0; i < optionList.length; i++) {
+    final opts = optionList[i];
+    buf.writeln(
+        '### ${i + 1}. ${opts.movementName} (${opts.muscleGroup.name})');
+
+    if (opts.perSetOptions.isNotEmpty) {
+      buf.writeln('Last week:');
+      for (final s in opts.perSetOptions) {
+        final parts = <String>[];
+        if (s.repsOptions.length >= 2) {
+          parts.add('${s.repsOptions[s.repsOptions.length ~/ 2]} reps');
+        }
+        if (s.weightOptions.length >= 2) {
+          parts.add('${s.weightOptions[s.weightOptions.length ~/ 2]}');
+        }
+        buf.writeln('  Set ${s.setIndex + 1}: ${parts.join(' x ')}');
+      }
+    }
+
+    buf.writeln('Options:');
+    buf.writeln('  Set count: ${opts.setCountOptions.join(' or ')}');
+    for (final s in opts.perSetOptions) {
+      final parts = <String>[];
+      if (s.repsOptions.isNotEmpty) {
+        parts.add('reps: ${s.repsOptions.join(", ")}');
+      }
+      if (s.weightOptions.isNotEmpty) {
+        parts.add('weight: ${s.weightOptions.join(", ")}');
+      }
+      buf.writeln('  Set ${s.setIndex + 1}: ${parts.join(' | ')}');
+    }
+    buf.writeln();
+  }
+
+  buf.writeln(
+      'Respond with this JSON (one entry per exercise in the same order — match by "movement" name):');
+  buf.writeln('{"exercises": [');
+  buf.writeln(
+      '  {"movement": "name", "setCount": N, "sets": [{"setIndex": 0, "reps": N, "weight": N}, ...]}');
+  buf.writeln(']}');
+  buf.writeln('Each "sets" array must have exactly "setCount" entries.');
+  buf.writeln(
+      'If setCount is higher than the number of listed sets, repeat the last set\'s values for the extra sets.');
+
+  return buf.toString();
+}
+
+List<ExercisePick?> _parseBatchResponse(
+    String response, List<ExerciseOptions> optionList) {
+  var jsonStr = response.trim();
+  final jsonMatch =
+      RegExp(r'```(?:json)?\s*([\s\S]*?)```').firstMatch(jsonStr);
+  if (jsonMatch != null) jsonStr = jsonMatch.group(1)!.trim();
+
+  final decoded = jsonDecode(jsonStr);
+  List<dynamic> exArray;
+  if (decoded is Map<String, dynamic> && decoded['exercises'] is List) {
+    exArray = decoded['exercises'] as List<dynamic>;
+  } else if (decoded is List) {
+    exArray = decoded;
+  } else {
+    return List<ExercisePick?>.filled(optionList.length, null);
+  }
+
+  final byName = <String, Map<String, dynamic>>{};
+  for (final e in exArray) {
+    if (e is Map<String, dynamic>) {
+      final name = e['movement'];
+      if (name is String) byName[name.toLowerCase()] = e;
+    }
+  }
+
+  final out = <ExercisePick?>[];
+  for (var i = 0; i < optionList.length; i++) {
+    final opts = optionList[i];
+    Map<String, dynamic>? match = byName[opts.movementName.toLowerCase()];
+    if (match == null && i < exArray.length && exArray[i] is Map<String, dynamic>) {
+      match = exArray[i] as Map<String, dynamic>;
+    }
+    if (match == null) {
+      out.add(null);
+      continue;
+    }
+    try {
+      final setCount = match['setCount'] as int;
+      if (!opts.setCountOptions.contains(setCount)) {
+        out.add(null);
+        continue;
+      }
+      final setsJson = match['sets'] as List<dynamic>;
+      final sets = <SetPick>[
+        for (final s in setsJson)
+          SetPick(
+            reps: (s as Map<String, dynamic>)['reps'] as int?,
+            weight: (s['weight'] as num?)?.toDouble(),
+          ),
+      ];
+      out.add(ExercisePick(setCount: setCount, sets: sets));
+    } catch (_) {
+      out.add(null);
+    }
+  }
+  return out;
 }
 
 List<PlannedSetValues> _pickToPlannedValues(

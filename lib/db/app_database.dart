@@ -253,8 +253,14 @@ class AppDatabase extends _$AppDatabase {
   /// Week 2+: based on prior week's persistent completed exercises via heuristic.
   Future<void> generatePlannedWorkout(int workoutId) async {
     _lastAiErrors.clear();
+
+    Workout? workoutForAi;
+    Week? weekForAi;
+    List<_PlanSeed> seeds = const [];
+
+    // Phase 1: seed everything with heuristic values inside a fast transaction.
+    // No HTTP calls here — the DB write lock is released before any AI work.
     await transaction(() async {
-      // Idempotency check.
       final existing = await (select(plannedWorkouts)
             ..where((pw) => pw.workoutId.equals(workoutId)))
           .getSingleOrNull();
@@ -278,9 +284,18 @@ class AppDatabase extends _$AppDatabase {
             plannedWorkoutId, workout.orderIndex, meso.mesoTemplateId,
             meso.id);
       } else {
-        await _generateFromPriorWeeks(plannedWorkoutId, workout, week);
+        seeds = await _seedFromPriorWeeks(plannedWorkoutId, workout, week);
+        workoutForAi = workout;
+        weekForAi = week;
       }
     });
+
+    // Phase 2: refine autoProgress exercises with a single batched AI call.
+    // Runs outside the transaction so the SQLite write lock isn't held while
+    // we're on the network.
+    if (workoutForAi != null && weekForAi != null && seeds.isNotEmpty) {
+      await _applyBatchAiToSeeds(workoutForAi!, weekForAi!, seeds);
+    }
   }
 
   /// Seeds the plan from the meso template (week 1).
@@ -333,14 +348,15 @@ class AppDatabase extends _$AppDatabase {
   }
 
   /// Seeds the plan from the prior week's persistent completed exercises (week 2+).
-  Future<void> _generateFromPriorWeeks(
+  /// Uses heuristic values only — AI refinement happens after the transaction
+  /// commits. Returns one [_PlanSeed] per exercise that wants AI refinement.
+  Future<List<_PlanSeed>> _seedFromPriorWeeks(
       int plannedWorkoutId, Workout workout, Week week) async {
     final allWeeks = await (select(weeks)
           ..where((w) => w.mesocycleId.equals(week.mesocycleId))
           ..orderBy([(w) => OrderingTerm.asc(w.weekNumber)]))
         .get();
 
-    // The prior week's completed_workout for this slot provides the exercise list.
     final priorWeek =
         allWeeks.firstWhere((w) => w.weekNumber == week.weekNumber - 1);
     final priorWorkout = await (select(workouts)
@@ -349,13 +365,12 @@ class AppDatabase extends _$AppDatabase {
               w.orderIndex.equals(workout.orderIndex)))
         .getSingleOrNull();
 
-    if (priorWorkout == null || priorWorkout.isRestDay) return;
+    if (priorWorkout == null || priorWorkout.isRestDay) return const [];
 
     final priorCompleted = await (select(completedWorkouts)
           ..where((cw) => cw.workoutId.equals(priorWorkout.id)))
         .getSingleOrNull();
-
-    if (priorCompleted == null) return; // Workout was skipped entirely.
+    if (priorCompleted == null) return const [];
 
     final priorExercises = await (select(completedExercises)
           ..where((ce) =>
@@ -364,6 +379,7 @@ class AppDatabase extends _$AppDatabase {
           ..orderBy([(ce) => OrderingTerm.asc(ce.orderIndex)]))
         .get();
 
+    final seeds = <_PlanSeed>[];
     for (final priorEx in priorExercises) {
       final movement = await (select(movements)
             ..where((m) => m.id.equals(priorEx.movementId)))
@@ -377,18 +393,15 @@ class AppDatabase extends _$AppDatabase {
         ),
       );
 
-      final plannedValues = await _resolvePlannedSets(
-        priorEx.movementId,
-        workout.orderIndex,
-        week,
-        allWeeks,
-        movement,
-        autoProgress: priorEx.autoProgress,
-        workoutName: workout.name,
-        workoutId: workout.id,
-      );
+      final prior = await _findPriorSets(
+          priorEx.movementId, workout.orderIndex, week, allWeeks);
+      final seedValues = prior == null
+          ? const [PlannedSetValues(), PlannedSetValues()]
+          : computeHeuristic(
+              prior.nonSkipped, week.goal, movement, prior.totalCount,
+              autoProgress: priorEx.autoProgress);
 
-      for (final sv in plannedValues) {
+      for (final sv in seedValues) {
         await into(plannedSets).insert(PlannedSetsCompanion(
           plannedExerciseId: Value(peId),
           reps: Value(sv.reps),
@@ -396,7 +409,68 @@ class AppDatabase extends _$AppDatabase {
           time: Value(sv.time),
         ));
       }
+
+      if (priorEx.autoProgress && prior != null) {
+        seeds.add(_PlanSeed(
+          plannedExerciseId: peId,
+          movement: movement,
+          priorSets: prior.nonSkipped,
+          targetCount: prior.totalCount,
+        ));
+      }
     }
+    return seeds;
+  }
+
+  /// Runs a single batched AI call for all autoProgress-seeded exercises and
+  /// rewrites their planned_sets rows. Falls back to the already-seeded
+  /// heuristic values on failure.
+  Future<void> _applyBatchAiToSeeds(
+      Workout workout, Week week, List<_PlanSeed> seeds) async {
+    if (seeds.isEmpty) return;
+
+    final results = await computeBatchRecommendation(
+      exercises: [
+        for (final s in seeds)
+          BatchExerciseInput(
+            movement: s.movement,
+            priorSets: s.priorSets,
+            targetCount: s.targetCount,
+          ),
+      ],
+      weekGoal: week.goal,
+      mesocycleId: week.mesocycleId,
+      weekNumber: week.weekNumber,
+      workoutName: workout.name,
+      workoutId: workout.id,
+    );
+
+    for (var i = 0; i < seeds.length; i++) {
+      final seed = seeds[i];
+      final result = results[i];
+      if (!result.usedAi) {
+        if (result.error != null) _lastAiErrors.add(result.error!);
+        continue;
+      }
+      await _rewritePlannedSets(seed.plannedExerciseId, result.values);
+    }
+  }
+
+  Future<void> _rewritePlannedSets(
+      int plannedExerciseId, List<PlannedSetValues> values) {
+    return transaction(() async {
+      await (delete(plannedSets)
+            ..where((ps) => ps.plannedExerciseId.equals(plannedExerciseId)))
+          .go();
+      for (final sv in values) {
+        await into(plannedSets).insert(PlannedSetsCompanion(
+          plannedExerciseId: Value(plannedExerciseId),
+          reps: Value(sv.reps),
+          weight: Value(sv.weight),
+          time: Value(sv.time),
+        ));
+      }
+    });
   }
 
   /// Walks backward through prior weeks to find the most recent completed set
@@ -427,7 +501,10 @@ class AppDatabase extends _$AppDatabase {
       final priorEx = await (select(completedExercises)
             ..where((ce) =>
                 ce.completedWorkoutId.equals(priorCompleted.id) &
-                ce.movementId.equals(movementId)))
+                ce.movementId.equals(movementId) &
+                ce.persistence.equals(Persistence.dropped.index).not())
+            ..orderBy([(ce) => OrderingTerm.desc(ce.id)])
+            ..limit(1))
           .getSingleOrNull();
       if (priorEx == null || priorEx.skipReason != null) continue;
 
@@ -442,50 +519,12 @@ class AppDatabase extends _$AppDatabase {
     return null;
   }
 
-  /// Resolves planned sets for an exercise using prior history.
-  /// Falls back to cold start (2 null sets) if no history found.
-  Future<List<PlannedSetValues>> _resolvePlannedSets(
-    int movementId,
-    int workoutOrderIndex,
-    Week currentWeek,
-    List<Week> allWeeks,
-    Movement movement, {
-    bool autoProgress = false,
-    String workoutName = '',
-    int? workoutId,
-  }) async {
-    final prior = await _findPriorSets(
-        movementId, workoutOrderIndex, currentWeek, allWeeks);
-    if (prior == null) {
-      return [const PlannedSetValues(), const PlannedSetValues()];
-    }
-
-    if (autoProgress) {
-      final result = await computeAiRecommendation(
-        priorSets: prior.nonSkipped,
-        weekGoal: currentWeek.goal,
-        movement: movement,
-        targetCount: prior.totalCount,
-        mesocycleId: currentWeek.mesocycleId,
-        weekNumber: currentWeek.weekNumber,
-        workoutName: workoutName,
-        workoutId: workoutId,
-        autoProgress: autoProgress,
-      );
-      if (!result.usedAi && result.error != null) {
-        _lastAiErrors.add(result.error!);
-      }
-      return result.values;
-    }
-
-    return computeHeuristic(prior.nonSkipped, currentWeek.goal, movement,
-        prior.totalCount, autoProgress: autoProgress);
-  }
-
-  /// Re-runs AI recommendations for all exercises in a planned workout.
-  /// Only updates planned sets; completed sets are not touched.
+  /// Re-runs AI recommendations for all autoProgress exercises in a planned
+  /// workout using a single batched AI call. Only updates planned sets.
   /// Returns the number of exercises that were successfully re-planned with AI.
   Future<int> retryAiForPlannedWorkout(int workoutId) async {
+    _lastAiErrors.clear();
+
     final pw = await (select(plannedWorkouts)
           ..where((p) => p.workoutId.equals(workoutId)))
         .getSingleOrNull();
@@ -506,48 +545,121 @@ class AppDatabase extends _$AppDatabase {
           ..where((pe) => pe.plannedWorkoutId.equals(pw.id)))
         .get();
 
-    var successCount = 0;
+    final seeds = <_PlanSeed>[];
     for (final pe in pes) {
       if (!pe.autoProgress) continue;
 
       final movement = await (select(movements)
             ..where((m) => m.id.equals(pe.movementId)))
           .getSingle();
-
       final prior = await _findPriorSets(
           pe.movementId, workout.orderIndex, week, allWeeksList);
       if (prior == null) continue;
 
-      final result = await computeAiRecommendation(
-        priorSets: prior.nonSkipped,
-        weekGoal: week.goal,
+      seeds.add(_PlanSeed(
+        plannedExerciseId: pe.id,
         movement: movement,
+        priorSets: prior.nonSkipped,
         targetCount: prior.totalCount,
-        mesocycleId: week.mesocycleId,
-        weekNumber: week.weekNumber,
-        workoutName: workout.name,
-        workoutId: workoutId,
-        autoProgress: true,
-      );
+      ));
+    }
 
-      if (!result.usedAi) continue;
+    if (seeds.isEmpty) return 0;
 
-      // Delete old planned sets and insert new ones.
-      await (delete(plannedSets)
-            ..where((ps) => ps.plannedExerciseId.equals(pe.id)))
-          .go();
-      for (final sv in result.values) {
-        await into(plannedSets).insert(PlannedSetsCompanion(
-          plannedExerciseId: Value(pe.id),
-          reps: Value(sv.reps),
-          weight: Value(sv.weight),
-          time: Value(sv.time),
-        ));
+    final results = await computeBatchRecommendation(
+      exercises: [
+        for (final s in seeds)
+          BatchExerciseInput(
+            movement: s.movement,
+            priorSets: s.priorSets,
+            targetCount: s.targetCount,
+          ),
+      ],
+      weekGoal: week.goal,
+      mesocycleId: week.mesocycleId,
+      weekNumber: week.weekNumber,
+      workoutName: workout.name,
+      workoutId: workoutId,
+    );
+
+    var successCount = 0;
+    for (var i = 0; i < seeds.length; i++) {
+      final result = results[i];
+      if (!result.usedAi) {
+        if (result.error != null) _lastAiErrors.add(result.error!);
+        continue;
       }
+      await _rewritePlannedSets(seeds[i].plannedExerciseId, result.values);
       successCount++;
     }
     return successCount;
   }
+
+  /// Runs a single AI call to refine planned sets for one newly-added
+  /// exercise. Uses prior-mesocycle history if available. No-op if AI is
+  /// disabled, the exercise doesn't opt into autoProgress, or no history
+  /// exists. Safe to call after [addExerciseAfter] — the caller should
+  /// refresh its view when this resolves.
+  Future<void> refineAiForAddedExercise(
+      int completedWorkoutId, int movementId) async {
+    final cw = await (select(completedWorkouts)
+          ..where((w) => w.id.equals(completedWorkoutId)))
+        .getSingle();
+    final pw = await (select(plannedWorkouts)
+          ..where((p) => p.workoutId.equals(cw.workoutId)))
+        .getSingleOrNull();
+    if (pw == null) return;
+
+    final pe = await (select(plannedExercises)
+          ..where((p) =>
+              p.plannedWorkoutId.equals(pw.id) &
+              p.movementId.equals(movementId))
+          ..orderBy([(p) => OrderingTerm.desc(p.id)])
+          ..limit(1))
+        .getSingleOrNull();
+    if (pe == null || !pe.autoProgress) return;
+
+    final workout = await (select(workouts)
+          ..where((w) => w.id.equals(cw.workoutId)))
+        .getSingle();
+    final week = await (select(weeks)
+          ..where((w) => w.id.equals(workout.weekId)))
+        .getSingle();
+    final movement = await (select(movements)
+          ..where((m) => m.id.equals(movementId)))
+        .getSingle();
+
+    final priorSets =
+        await _findHistoricalCompletedSets(movementId, week.mesocycleId);
+    if (priorSets == null || priorSets.isEmpty) return;
+
+    final result = await computeAiRecommendation(
+      priorSets: priorSets,
+      weekGoal: week.goal,
+      movement: movement,
+      targetCount: priorSets.length,
+      mesocycleId: week.mesocycleId,
+      weekNumber: week.weekNumber,
+      workoutName: workout.name,
+      workoutId: workout.id,
+      autoProgress: true,
+    );
+
+    if (!result.usedAi) {
+      if (result.error != null) _lastAiErrors.add(result.error!);
+      return;
+    }
+    await _rewritePlannedSets(pe.id, result.values);
+  }
+
+  /// Public wrapper for [_resolveHistoricalSets] — returns sensible default
+  /// set values for a movement based on prior-meso history.
+  Future<List<PlannedSetValues>> getHistoricalSetDefaults(
+    int movementId,
+    int currentMesocycleId,
+    Movement movement,
+  ) =>
+      _resolveHistoricalSets(movementId, currentMesocycleId, movement);
 
   /// Searches completed prior mesos for historical set data for [movementId].
   /// Uses the 2nd hard-week occurrence (or 1st if only one) from the most
@@ -558,16 +670,30 @@ class AppDatabase extends _$AppDatabase {
     int currentMesocycleId,
     Movement movement,
   ) async {
-    // Find all prior mesos, most recent first.
+    final sets =
+        await _findHistoricalCompletedSets(movementId, currentMesocycleId);
+    if (sets == null) {
+      return [const PlannedSetValues(), const PlannedSetValues()];
+    }
+    return sets
+        .map((s) => PlannedSetValues(
+              reps: s.reps,
+              weight: s.weight,
+              time: s.time,
+            ))
+        .toList();
+  }
+
+  /// Raw-CompletedSet version of [_resolveHistoricalSets]. Returns null if no
+  /// usable prior-meso history for [movementId] exists.
+  Future<List<CompletedSet>?> _findHistoricalCompletedSets(
+      int movementId, int currentMesocycleId) async {
     final priorMesos = await (select(mesocycles)
           ..where((m) => m.id.isNotValue(currentMesocycleId))
           ..orderBy([(m) => OrderingTerm.desc(m.createdAt)]))
         .get();
 
     for (final meso in priorMesos) {
-      // Find all hard-week occurrences of this movement in this meso.
-      // A movement can appear on multiple days within a week, so we read the
-      // weekNumber alongside each row and group by distinct week.
       final rows = await (select(completedExercises).join([
         innerJoin(completedWorkouts, completedWorkouts.id
             .equalsExp(completedExercises.completedWorkoutId)),
@@ -583,17 +709,16 @@ class AppDatabase extends _$AppDatabase {
 
       if (rows.isEmpty) continue;
 
-      // Group by distinct week number, pick the 2nd week (or 1st if only one).
       final byWeek = <int, CompletedExercise>{};
       for (final row in rows) {
         final wn = row.readTable(weeks).weekNumber;
         byWeek.putIfAbsent(wn, () => row.readTable(completedExercises));
       }
       final sortedWeeks = byWeek.keys.toList()..sort();
-      final targetWeek = sortedWeeks.length >= 2 ? sortedWeeks[1] : sortedWeeks[0];
+      final targetWeek =
+          sortedWeeks.length >= 2 ? sortedWeeks[1] : sortedWeeks[0];
       final refExercise = byWeek[targetWeek]!;
 
-      // Fetch non-skipped sets for the chosen exercise.
       final sets = await (select(completedSets)
             ..where((s) =>
                 s.completedExerciseId.equals(refExercise.id) &
@@ -602,22 +727,21 @@ class AppDatabase extends _$AppDatabase {
           .get();
 
       if (sets.isEmpty) continue;
-
-      return sets
-          .map((s) => PlannedSetValues(
-                reps: s.reps,
-                weight: s.weight,
-                time: s.time,
-              ))
-          .toList();
+      return sets;
     }
-
-    // No history found — cold start.
-    return [const PlannedSetValues(), const PlannedSetValues()];
+    return null;
   }
 
+  /// Idempotent — if a CompletedWorkout already exists for this workoutId
+  /// (e.g. a prior call seeded exercises/sets before the caller crashed or
+  /// navigated away), returns the existing id and skips re-seeding.
   Future<int> initializeWorkout(int workoutId) async {
     return await transaction(() async {
+      final existing = await (select(completedWorkouts)
+            ..where((w) => w.workoutId.equals(workoutId)))
+          .getSingleOrNull();
+      if (existing != null) return existing.id;
+
       final completedWorkoutId =
           await into(completedWorkouts).insert(CompletedWorkoutsCompanion.insert(
         workoutId: workoutId,
@@ -659,9 +783,12 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
+  /// Idempotent — `workout_id` has a UNIQUE constraint, so a retry after a
+  /// partial start-workout failure overwrites the prior checkin rather than
+  /// raising a UNIQUE violation that would wedge the start flow.
   Future<void> savePreWorkoutCheckin(
           PreWorkoutCheckinsCompanion checkin) =>
-      into(preWorkoutCheckins).insert(checkin);
+      into(preWorkoutCheckins).insert(checkin, mode: InsertMode.replace);
 
   Future<PreWorkoutCheckin?> getPreWorkoutCheckin(int workoutId) =>
       (select(preWorkoutCheckins)
@@ -1076,7 +1203,7 @@ class AppDatabase extends _$AppDatabase {
             .getSingleOrNull();
 
         if (completed != null) {
-          // Only persistent exercises — same filter as _generateFromPriorWeeks.
+          // Only persistent exercises — same filter as _seedFromPriorWeeks.
           final cExercises = await (select(completedExercises)
                 ..where((ce) =>
                     ce.completedWorkoutId.equals(completed.id) &
@@ -1173,7 +1300,7 @@ class AppDatabase extends _$AppDatabase {
           ..where((e) => e.id.equals(completedExerciseId)))
         .write(CompletedExercisesCompanion(autoProgress: Value(autoProgress)));
 
-    // 2. Update the matching PlannedExercise (for _generateFromPriorWeeks).
+    // 2. Update the matching PlannedExercise (for _seedFromPriorWeeks).
     final cw = await (select(completedWorkouts)
           ..where((w) => w.id.equals(ex.completedWorkoutId)))
         .getSingle();
@@ -1221,8 +1348,12 @@ class AppDatabase extends _$AppDatabase {
   Future<void> addExerciseAfter(
     int completedWorkoutId,
     int afterOrderIndex,
-    int movementId,
-  ) =>
+    int movementId, {
+    List<PlannedSetValues> defaults = const [
+      PlannedSetValues(),
+      PlannedSetValues(),
+    ],
+  }) =>
       transaction(() async {
         await customUpdate(
           'UPDATE completed_exercises '
@@ -1241,9 +1372,39 @@ class AppDatabase extends _$AppDatabase {
             orderIndex: afterOrderIndex + 1,
           ),
         );
-        await into(completedSets).insert(
-          CompletedSetsCompanion.insert(completedExerciseId: newExId),
-        );
+
+        // Create empty completed sets (user fills them in).
+        for (final _ in defaults) {
+          await into(completedSets).insert(
+            CompletedSetsCompanion.insert(completedExerciseId: newExId),
+          );
+        }
+
+        // Create planned sets so the UI shows suggestions.
+        final cw = await (select(completedWorkouts)
+              ..where((w) => w.id.equals(completedWorkoutId)))
+            .getSingle();
+        final pw = await (select(plannedWorkouts)
+              ..where((p) => p.workoutId.equals(cw.workoutId)))
+            .getSingleOrNull();
+        if (pw != null) {
+          final plannedExId = await into(plannedExercises).insert(
+            PlannedExercisesCompanion.insert(
+              plannedWorkoutId: pw.id,
+              movementId: movementId,
+            ),
+          );
+          for (final sv in defaults) {
+            await into(plannedSets).insert(
+              PlannedSetsCompanion(
+                plannedExerciseId: Value(plannedExId),
+                reps: Value(sv.reps),
+                weight: Value(sv.weight),
+                time: Value(sv.time),
+              ),
+            );
+          }
+        }
       });
 
   Future<void> swapExerciseOrder(
@@ -1727,6 +1888,22 @@ class AppDatabase extends _$AppDatabase {
 
     });
   }
+}
+
+/// One exercise seeded with heuristic values inside the plan-generation
+/// transaction, held for AI refinement after the transaction commits.
+class _PlanSeed {
+  const _PlanSeed({
+    required this.plannedExerciseId,
+    required this.movement,
+    required this.priorSets,
+    required this.targetCount,
+  });
+
+  final int plannedExerciseId;
+  final Movement movement;
+  final List<CompletedSet> priorSets;
+  final int targetCount;
 }
 
 /// Lightweight slot descriptor used internally during lazy materialization.

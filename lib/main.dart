@@ -1,10 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 import 'app_preferences.dart';
 import 'screens/home_screen.dart';
 import 'scroll_behavior.dart';
-import 'services/backup_scheduler.dart';
+import 'services/saf_service.dart';
 import 'services/workout_foreground_service.dart';
 import 'theme.dart';
 
@@ -14,12 +16,8 @@ void main() async {
   WorkoutForegroundService.init();
   WorkoutForegroundService.initReceiver();
   await AppPreferences.init();
-  if (AppPreferences.getBackupEnabled() && AppPreferences.getAutoBackupEnabled()) {
-    await BackupScheduler.schedule(
-      AppPreferences.getBackupHour(),
-      AppPreferences.getBackupMinute(),
-    );
-  }
+  // Clean up any lingering WorkManager job from prior scheduled-backup versions.
+  unawaited(SafService.cancelBackup());
   runApp(const MyApp());
 }
 

@@ -3,7 +3,6 @@ import 'dart:io' show exit;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../app_preferences.dart';
-import '../../services/backup_scheduler.dart';
 import '../../services/backup_service.dart';
 import '../../services/saf_service.dart';
 
@@ -17,23 +16,17 @@ class BackupSettingsScreen extends StatefulWidget {
 class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
   bool _backupEnabled = false;
   bool _autoBackupEnabled = false;
-  int _backupHour = 2;
-  int _backupMinute = 0;
   String? _backupDirPath;
   DateTime? _lastBackupTimestamp;
   bool _isBusy = false;
 
   late bool _initBackupEnabled;
   late bool _initAutoBackupEnabled;
-  late int _initBackupHour;
-  late int _initBackupMinute;
   String? _initBackupDirPath;
 
   bool get _hasUnsavedChanges =>
       _backupEnabled != _initBackupEnabled ||
       _autoBackupEnabled != _initAutoBackupEnabled ||
-      _backupHour != _initBackupHour ||
-      _backupMinute != _initBackupMinute ||
       _backupDirPath != _initBackupDirPath;
 
   @override
@@ -41,15 +34,11 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
     super.initState();
     _backupEnabled = AppPreferences.getBackupEnabled();
     _autoBackupEnabled = AppPreferences.getAutoBackupEnabled();
-    _backupHour = AppPreferences.getBackupHour();
-    _backupMinute = AppPreferences.getBackupMinute();
     _backupDirPath = AppPreferences.getBackupDirectoryPath();
     _lastBackupTimestamp = AppPreferences.getLastBackupTimestamp();
 
     _initBackupEnabled = _backupEnabled;
     _initAutoBackupEnabled = _autoBackupEnabled;
-    _initBackupHour = _backupHour;
-    _initBackupMinute = _backupMinute;
     _initBackupDirPath = _backupDirPath;
   }
 
@@ -59,18 +48,9 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
       await AppPreferences.setBackupDirectoryPath(_backupDirPath!);
     }
     await AppPreferences.setAutoBackupEnabled(_autoBackupEnabled);
-    await AppPreferences.setBackupHour(_backupHour);
-    await AppPreferences.setBackupMinute(_backupMinute);
-    if (_backupEnabled && _autoBackupEnabled) {
-      await BackupScheduler.schedule(_backupHour, _backupMinute);
-    } else {
-      await BackupScheduler.cancel();
-    }
 
     _initBackupEnabled = _backupEnabled;
     _initAutoBackupEnabled = _autoBackupEnabled;
-    _initBackupHour = _backupHour;
-    _initBackupMinute = _backupMinute;
     _initBackupDirPath = _backupDirPath;
   }
 
@@ -263,36 +243,13 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
                     ),
                     const Divider(height: 1),
                     SwitchListTile(
-                      title: const Text('Automatic Backups'),
+                      title: const Text('Backup on workout finish'),
                       subtitle: const Text(
-                          'Run a backup daily at the scheduled time.'),
+                          'Run a backup automatically each time you finish a workout.'),
                       value: _autoBackupEnabled,
                       onChanged: _isBusy
                           ? null
                           : (v) => setState(() => _autoBackupEnabled = v),
-                    ),
-                    ListTile(
-                      title: Text(
-                        'Backup time: ${TimeOfDay(hour: _backupHour, minute: _backupMinute).format(context)}',
-                      ),
-                      trailing: TextButton(
-                        onPressed: _isBusy
-                            ? null
-                            : () async {
-                                final picked = await showTimePicker(
-                                  context: context,
-                                  initialTime: TimeOfDay(
-                                      hour: _backupHour,
-                                      minute: _backupMinute),
-                                );
-                                if (picked == null || !mounted) return;
-                                setState(() {
-                                  _backupHour = picked.hour;
-                                  _backupMinute = picked.minute;
-                                });
-                              },
-                        child: const Text('Change'),
-                      ),
                     ),
                     const Divider(height: 1),
                     Padding(

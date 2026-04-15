@@ -33,40 +33,52 @@ class _PreWorkoutCheckinScreenState extends State<PreWorkoutCheckinScreen> {
   CurrentState _vimVigor = CurrentState.good;
   CurrentState _mentalState = CurrentState.good;
 
+  bool _submitting = false;
+
   Future<void> _submit() async {
-    await db.savePreWorkoutCheckin(PreWorkoutCheckinsCompanion.insert(
-      workoutId: widget.workoutId,
-      quads: Value(_soreness[MuscleGroup.quads]!),
-      hamstrings: Value(_soreness[MuscleGroup.hamstrings]!),
-      abs: Value(_soreness[MuscleGroup.abs]!),
-      chest: Value(_soreness[MuscleGroup.chest]!),
-      back: Value(_soreness[MuscleGroup.back]!),
-      biceps: Value(_soreness[MuscleGroup.biceps]!),
-      triceps: Value(_soreness[MuscleGroup.triceps]!),
-      traps: Value(_soreness[MuscleGroup.traps]!),
-      forearms: Value(_soreness[MuscleGroup.forearms]!),
-      glutes: Value(_soreness[MuscleGroup.glutes]!),
-      calves: Value(_soreness[MuscleGroup.calves]!),
-      shoulders: Value(_soreness[MuscleGroup.shoulders]!),
-      tibialis: Value(_soreness[MuscleGroup.tibialis]!),
-      sleepQuality: Value(_sleepQuality),
-      vimVigor: Value(_vimVigor),
-      mentalState: Value(_mentalState),
-    ));
-    await db.generatePlannedWorkout(widget.workoutId);
-    final completedWorkoutId = await db.initializeWorkout(widget.workoutId);
-    await AppPreferences.setCurrentCompletedWorkoutId(completedWorkoutId);
-    if (!mounted) return;
-    await Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => WorkoutScreen(
-          completedWorkoutId: completedWorkoutId,
-          workoutName: widget.workoutName,
-          mesocycleId: AppPreferences.getCurrentMesocycleId()!,
+    if (_submitting) return;
+    setState(() => _submitting = true);
+    try {
+      await db.savePreWorkoutCheckin(PreWorkoutCheckinsCompanion.insert(
+        workoutId: widget.workoutId,
+        quads: Value(_soreness[MuscleGroup.quads]!),
+        hamstrings: Value(_soreness[MuscleGroup.hamstrings]!),
+        abs: Value(_soreness[MuscleGroup.abs]!),
+        chest: Value(_soreness[MuscleGroup.chest]!),
+        back: Value(_soreness[MuscleGroup.back]!),
+        biceps: Value(_soreness[MuscleGroup.biceps]!),
+        triceps: Value(_soreness[MuscleGroup.triceps]!),
+        traps: Value(_soreness[MuscleGroup.traps]!),
+        forearms: Value(_soreness[MuscleGroup.forearms]!),
+        glutes: Value(_soreness[MuscleGroup.glutes]!),
+        calves: Value(_soreness[MuscleGroup.calves]!),
+        shoulders: Value(_soreness[MuscleGroup.shoulders]!),
+        tibialis: Value(_soreness[MuscleGroup.tibialis]!),
+        sleepQuality: Value(_sleepQuality),
+        vimVigor: Value(_vimVigor),
+        mentalState: Value(_mentalState),
+      ));
+      await db.generatePlannedWorkout(widget.workoutId);
+      final completedWorkoutId = await db.initializeWorkout(widget.workoutId);
+      await AppPreferences.setCurrentCompletedWorkoutId(completedWorkoutId);
+      if (!mounted) return;
+      await Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => WorkoutScreen(
+            completedWorkoutId: completedWorkoutId,
+            workoutName: widget.workoutName,
+            mesocycleId: AppPreferences.getCurrentMesocycleId()!,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to start workout: $e')),
+      );
+    }
   }
 
   @override
@@ -147,8 +159,15 @@ class _PreWorkoutCheckinScreenState extends State<PreWorkoutCheckinScreen> {
         child: SizedBox(
           width: double.infinity,
           child: FilledButton(
-            onPressed: _submit,
-            child: const Text('Submit'),
+            onPressed: _submitting ? null : _submit,
+            child: _submitting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : const Text('Submit'),
           ),
         ),
       ),
