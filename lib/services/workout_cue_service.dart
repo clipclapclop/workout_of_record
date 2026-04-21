@@ -18,15 +18,27 @@ class WorkoutCueService {
 
   /// Best-effort init. Returns true if TTS is usable, false if no engine is
   /// available (common on GrapheneOS / de-Googled devices) or any other error.
+  ///
+  /// Re-applies language/rate/volume every time to guard against the engine
+  /// becoming unavailable between calls (system reclaiming resources, engine
+  /// crash, etc.).  One-time config (audio attributes, await mode) is only
+  /// set on first successful init.
   static Future<bool> _init() async {
-    if (_initialized) return true;
     try {
       await _tts.setLanguage('en-US');
       await _tts.setSpeechRate(0.9);
       await _tts.setVolume(1.0);
+      if (!_initialized) {
+        // Route TTS through navigation-guidance audio attributes — Android
+        // treats this as high-priority speech that plays over other audio and
+        // isn't silenced by low media/ring volume.
+        await _tts.setAudioAttributesForNavigation();
+        await _tts.awaitSpeakCompletion(false);
+      }
       _initialized = true;
       return true;
     } catch (_) {
+      _initialized = false;
       return false;
     }
   }
@@ -70,12 +82,12 @@ class WorkoutCueService {
     if (!ok) return;
 
     try {
-      if (sound == TimerSound.tts && cueText != null) {
-        await _tts.speak(cueText);
-      } else {
-        // Chime mode, or TTS mode with no cue text: say "ready".
-        await _tts.speak('ready');
-      }
+      final text = (sound == TimerSound.tts && cueText != null)
+          ? cueText
+          : 'ready';
+      // focus: true requests audio focus before speaking, ensuring TTS is
+      // audible even when another app holds focus or the device is idle.
+      await _tts.speak(text, focus: true);
     } catch (_) {
       // No engine, language unsupported, or platform error — silently degrade.
     }

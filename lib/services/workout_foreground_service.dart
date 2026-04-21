@@ -37,11 +37,11 @@ class WorkoutForegroundService {
   static void init() {
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
-        channelId: 'workout_timer',
+        channelId: 'workout_timer_v2',
         channelName: 'Workout Timer',
         channelDescription: 'Shows exercise and rest-timer progress',
-        channelImportance: NotificationChannelImportance.LOW,
-        priority: NotificationPriority.LOW,
+        channelImportance: NotificationChannelImportance.DEFAULT,
+        priority: NotificationPriority.DEFAULT,
       ),
       iosNotificationOptions: const IOSNotificationOptions(
         showNotification: false,

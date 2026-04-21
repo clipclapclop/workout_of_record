@@ -32,7 +32,8 @@ class MyApp extends StatelessWidget {
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.dark,
       scrollBehavior: const AppScrollBehavior(),
-      home: const ScrollGuardListener(child: HomeScreen()),
+      builder: (context, child) => ScrollGuardListener(child: child!),
+      home: const HomeScreen(),
     );
   }
 }

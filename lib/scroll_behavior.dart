@@ -2,15 +2,38 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-/// Static flag checked by [GuardedScrollPhysics] to suppress scrolling
-/// when the touch originated in the bottom 5% of the screen.
+/// Tracks whether a recent touch originated in the bottom gesture zone.
+/// Uses a timestamp instead of a simple bool so the block survives the
+/// pointer-cancel → fling-creation timing gap.
 class ScrollGuard {
   ScrollGuard._();
-  static bool blockScroll = false;
+
+  /// When the last bottom-zone pointer went down.  Null = no active block.
+  static DateTime? _blockedAt;
+
+  /// How long to keep the block after the pointer ends.  Covers the gap
+  /// between onPointerCancel (system steals gesture) and
+  /// createBallisticSimulation (Flutter tries to fling).
+  static const _blockDuration = Duration(milliseconds: 400);
+
+  static void block() => _blockedAt = DateTime.now();
+
+  static void unblock() => _blockedAt = null;
+
+  static bool get isBlocked {
+    if (_blockedAt == null) return false;
+    if (DateTime.now().difference(_blockedAt!) < _blockDuration) return true;
+    // Expired — clean up.
+    _blockedAt = null;
+    return false;
+  }
 }
 
-/// Wraps its [child] in a [Listener] that sets [ScrollGuard.blockScroll]
-/// when a pointer goes down in the bottom 5% of the screen.
+/// Wraps its [child] in a [Listener] that activates [ScrollGuard]
+/// when a pointer goes down in the bottom 10% of the screen.
+///
+/// Must be placed above the [Navigator] (e.g. via [MaterialApp.builder])
+/// so it covers ALL routes, not just the initial one.
 ///
 /// [Listener] is passive — it does not participate in the gesture arena,
 /// so taps on buttons in the bottom zone still work normally.
@@ -27,19 +50,20 @@ class ScrollGuardListener extends StatelessWidget {
         final screenHeight =
             PlatformDispatcher.instance.views.first.physicalSize.height /
                 PlatformDispatcher.instance.views.first.devicePixelRatio;
-        if (event.position.dy > screenHeight * 0.95) {
-          ScrollGuard.blockScroll = true;
+        if (event.position.dy > screenHeight * 0.90) {
+          ScrollGuard.block();
         }
       },
-      onPointerUp: (_) => ScrollGuard.blockScroll = false,
-      onPointerCancel: (_) => ScrollGuard.blockScroll = false,
+      // Only clear on a natural lift — NOT on cancel (system stealing the
+      // gesture).  The timestamp expiry handles cleanup for cancelled pointers.
+      onPointerUp: (_) => ScrollGuard.unblock(),
       child: child,
     );
   }
 }
 
 /// Scroll physics that suppresses all scroll movement and fling when
-/// [ScrollGuard.blockScroll] is true.  Falls back to normal
+/// [ScrollGuard.isBlocked] is true.  Falls back to normal
 /// [ClampingScrollPhysics] otherwise, with a secondary drag-start
 /// threshold as an extra buffer.
 class GuardedScrollPhysics extends ClampingScrollPhysics {
@@ -55,14 +79,14 @@ class GuardedScrollPhysics extends ClampingScrollPhysics {
 
   @override
   double applyPhysicsToUserOffset(ScrollMetrics position, double offset) {
-    if (ScrollGuard.blockScroll) return 0.0;
+    if (ScrollGuard.isBlocked) return 0.0;
     return super.applyPhysicsToUserOffset(position, offset);
   }
 
   @override
   Simulation? createBallisticSimulation(
       ScrollMetrics position, double velocity) {
-    if (ScrollGuard.blockScroll) return null;
+    if (ScrollGuard.isBlocked) return null;
     return super.createBallisticSimulation(position, velocity);
   }
 }
