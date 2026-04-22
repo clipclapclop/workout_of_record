@@ -8,6 +8,12 @@ class SafService {
   static Future<String?> pickFolder() =>
       _channel.invokeMethod<String>('pickFolder');
 
+  /// Returns true if the SAF folder at [folderUri] is still accessible and
+  /// writable. Returns false if permission was revoked or the folder was deleted.
+  static Future<bool> checkFolder(String folderUri) async =>
+      await _channel.invokeMethod<bool>('checkFolder', {'uri': folderUri}) ??
+      false;
+
   /// Writes [bytes] as workout_of_record.zip into the SAF folder at [folderUri].
   static Future<void> writeFile(String folderUri, Uint8List bytes) =>
       _channel.invokeMethod('writeFile', {'uri': folderUri, 'bytes': bytes});

@@ -1119,12 +1119,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     final dir = AppPreferences.getBackupDirectoryPath();
     if (dir == null) return;
 
-    final messenger = ScaffoldMessenger.maybeOf(context);
     unawaited(
-      BackupService.backup(dir).catchError((Object e) {
-        messenger?.showSnackBar(
-          SnackBar(content: Text('Backup failed: $e')),
-        );
+      BackupService.backup(dir).then((_) {
+        AppPreferences.setLastBackupError(null);
+      }).catchError((Object e) {
+        AppPreferences.setLastBackupError(e.toString());
       }),
     );
   }

@@ -193,6 +193,11 @@ Keep answers focused and practical. When suggesting changes, be specific about e
       ? _prefs.remove(_kLastBackupTimestamp)
       : _prefs.setString(_kLastBackupTimestamp, v.toIso8601String());
 
+  static String? getLastBackupError() => _prefs.getString(_kLastBackupError);
+  static Future<void> setLastBackupError(String? v) => v == null
+      ? _prefs.remove(_kLastBackupError)
+      : _prefs.setString(_kLastBackupError, v);
+
   // ── Keys ───────────────────────────────────────────────────────────────────
 
   static const _kCurrentMesocycleId = 'current_mesocycle_id';
@@ -223,5 +228,6 @@ Keep answers focused and practical. When suggesting changes, be specific about e
   static const _kAutoBackupEnabled = 'auto_backup_enabled';
   static const _kBackupDirectoryPath = 'backup_directory_path';
   static const _kLastBackupTimestamp = 'backup_last_timestamp';
+  static const _kLastBackupError = 'backup_last_error';
   static const _kNotes = 'notes';
 }

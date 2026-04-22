@@ -25,6 +25,10 @@ class SafChannel(private val activity: MainActivity) {
     fun handleMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "pickFolder" -> pickFolder(result)
+            "checkFolder" -> {
+                val uri = call.argument<String>("uri")!!
+                checkFolder(uri, result)
+            }
             "writeFile" -> {
                 val uri = call.argument<String>("uri")!!
                 val bytes = call.argument<ByteArray>("bytes")!!
@@ -43,6 +47,25 @@ class SafChannel(private val activity: MainActivity) {
             }
             "cancelBackup" -> cancelBackup(result)
             else -> result.notImplemented()
+        }
+    }
+
+    private fun checkFolder(uriString: String, result: MethodChannel.Result) {
+        try {
+            val treeUri = Uri.parse(uriString)
+            // Verify we still hold a persistable permission for this URI.
+            val hasPermission = activity.contentResolver.persistedUriPermissions.any {
+                it.uri == treeUri && it.isWritePermission
+            }
+            if (!hasPermission) {
+                result.success(false)
+                return
+            }
+            // Verify the folder itself is still accessible.
+            val tree = DocumentFile.fromTreeUri(activity, treeUri)
+            result.success(tree != null && tree.exists() && tree.canWrite())
+        } catch (_: Exception) {
+            result.success(false)
         }
     }
 

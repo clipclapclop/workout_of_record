@@ -19,6 +19,8 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
   String? _backupDirPath;
   DateTime? _lastBackupTimestamp;
   bool _isBusy = false;
+  String? _lastBackupError;
+  bool _folderStale = false;
 
   late bool _initBackupEnabled;
   late bool _initAutoBackupEnabled;
@@ -36,10 +38,20 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
     _autoBackupEnabled = AppPreferences.getAutoBackupEnabled();
     _backupDirPath = AppPreferences.getBackupDirectoryPath();
     _lastBackupTimestamp = AppPreferences.getLastBackupTimestamp();
+    _lastBackupError = AppPreferences.getLastBackupError();
 
     _initBackupEnabled = _backupEnabled;
     _initAutoBackupEnabled = _autoBackupEnabled;
     _initBackupDirPath = _backupDirPath;
+
+    _validateFolder();
+  }
+
+  Future<void> _validateFolder() async {
+    final dir = _backupDirPath;
+    if (dir == null || !_backupEnabled) return;
+    final ok = await SafService.checkFolder(dir);
+    if (!ok && mounted) setState(() => _folderStale = true);
   }
 
   Future<void> _save() async {
@@ -58,22 +70,35 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
     final uri = await SafService.pickFolder();
     if (uri == null) return;
     await AppPreferences.setBackupDirectoryPath(uri);
-    if (mounted) setState(() => _backupDirPath = uri);
+    await AppPreferences.setLastBackupError(null);
+    if (mounted) {
+      setState(() {
+        _backupDirPath = uri;
+        _folderStale = false;
+        _lastBackupError = null;
+      });
+    }
   }
 
   Future<void> _backupNow() async {
     setState(() => _isBusy = true);
     try {
       await BackupService.backup(_backupDirPath!);
+      await AppPreferences.setLastBackupError(null);
       final ts = AppPreferences.getLastBackupTimestamp();
       if (mounted) {
-        setState(() => _lastBackupTimestamp = ts);
+        setState(() {
+          _lastBackupTimestamp = ts;
+          _lastBackupError = null;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Backup complete.')),
         );
       }
     } catch (e) {
+      await AppPreferences.setLastBackupError(e.toString());
       if (mounted) {
+        setState(() => _lastBackupError = e.toString());
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Backup failed: $e')),
         );
@@ -213,6 +238,54 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
         body: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
+            if (_folderStale)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Card(
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  child: ListTile(
+                    leading: Icon(Icons.warning_amber_rounded,
+                        color: Theme.of(context).colorScheme.error),
+                    title: Text(
+                      'Backup folder is no longer accessible',
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.onErrorContainer),
+                    ),
+                    subtitle: Text(
+                      'Please choose a new folder.',
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.onErrorContainer),
+                    ),
+                    trailing: TextButton(
+                      onPressed: _pickBackupLocation,
+                      child: const Text('Choose'),
+                    ),
+                  ),
+                ),
+              ),
+            if (_lastBackupError != null && !_folderStale)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Card(
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  child: ListTile(
+                    leading: Icon(Icons.error_outline,
+                        color: Theme.of(context).colorScheme.error),
+                    title: Text(
+                      'Last backup failed',
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.onErrorContainer),
+                    ),
+                    subtitle: Text(
+                      _lastBackupError!,
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.onErrorContainer),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ),
             Card.outlined(
               child: Column(
                 children: [
