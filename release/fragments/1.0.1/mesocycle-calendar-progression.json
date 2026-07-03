@@ -1,0 +1,18 @@
+{
+  "id": "mesocycle-calendar-progression",
+  "summary": "Expose mesocycle duration controls, consolidate calendar presentation, and add alternating automatic set-count progression.",
+  "audience": "user",
+  "releaseNote": "Added eligible hard-week duration changes and automatic extra-set progression with inherited weight.",
+  "docs": {
+    "impact": "updated",
+    "paths": [
+      "docs/guides/mesocycles.md",
+      "docs/guides/movements-history.md"
+    ],
+    "reason": ""
+  },
+  "screenshots": [
+    "mesocycle-calendar",
+    "workout-history"
+  ]
+}

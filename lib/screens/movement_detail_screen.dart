@@ -110,12 +110,23 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
       isRequiredDistance: Value(_isRequiredDistance),
       restSeconds: Value(_parseRestSeconds()),
     );
-    if (widget.movement != null) {
-      await db.updateMovement(companion.copyWith(id: Value(widget.movement!.id)));
-      if (mounted) Navigator.pop(context);
-    } else {
-      final created = await db.createMovement(companion);
-      if (mounted) Navigator.pop(context, created);
+    try {
+      if (widget.movement != null) {
+        await db.updateMovement(companion.copyWith(id: Value(widget.movement!.id)));
+        if (mounted) Navigator.pop(context);
+      } else {
+        final created = await db.createMovement(companion);
+        if (mounted) Navigator.pop(context, created);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      final isUniqueConflict = e.toString().contains('UNIQUE');
+      final muscleLabel =
+          _muscleGroup.name[0].toUpperCase() + _muscleGroup.name.substring(1);
+      final msg = isUniqueConflict
+          ? 'An exercise named "${_nameCtrl.text.trim()}" already exists for $muscleLabel.'
+          : 'Could not save exercise: $e';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 

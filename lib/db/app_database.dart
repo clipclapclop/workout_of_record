@@ -153,6 +153,205 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  Future<void> endMesocycleEarly(int mesocycleId) =>
+      (update(mesocycles)..where((m) => m.id.equals(mesocycleId)))
+          .write(MesocyclesCompanion(completedAt: Value(DateTime.now())));
+
+  /// Returns cycle progress info for the start-workout screen, plus the
+  /// gating flags for the add/remove-week affordances.
+  Future<MesoProgressInfo> getMesoProgress(
+      int mesocycleId, int workoutId) async {
+    final meso = await (select(mesocycles)
+          ..where((m) => m.id.equals(mesocycleId)))
+        .getSingle();
+    final workout =
+        await (select(workouts)..where((w) => w.id.equals(workoutId)))
+            .getSingle();
+    final allWeeks = await (select(weeks)
+          ..where((w) => w.mesocycleId.equals(mesocycleId))
+          ..orderBy([(w) => OrderingTerm.asc(w.weekNumber)]))
+        .get();
+    final currentWeek = allWeeks.firstWhere((w) => w.id == workout.weekId);
+    final slots = await _getWeekTemplateSlots(currentWeek, allWeeks);
+    final trainingSlots = slots.where((s) => !s.isRestDay).toList()
+      ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+    final trainingDayIndex =
+        trainingSlots.indexWhere((s) => s.orderIndex == workout.orderIndex) +
+            1;
+
+    return MesoProgressInfo(
+      weekNumber: currentWeek.weekNumber,
+      totalWeekCount: meso.totalWeekCount,
+      trainingDayIndex: trainingDayIndex,
+      totalTrainingDaysThisWeek: trainingSlots.length,
+      isDeloadWeek: currentWeek.goal == WeekGoal.deload,
+      canAddHardWeek: await canAddHardWeek(mesocycleId),
+      canRemoveWeek: await canRemoveWeek(mesocycleId),
+    );
+  }
+
+  /// True iff the user can extend this meso by one hard week right now.
+  /// Allowed unless the meso is completed or any non-rest deload workout
+  /// has already been started.
+  Future<bool> canAddHardWeek(int mesocycleId) async {
+    final meso = await (select(mesocycles)
+          ..where((m) => m.id.equals(mesocycleId)))
+        .getSingleOrNull();
+    if (meso == null || meso.completedAt != null) return false;
+
+    final row = await (select(completedWorkouts).join([
+      innerJoin(workouts, workouts.id.equalsExp(completedWorkouts.workoutId)),
+      innerJoin(weeks, weeks.id.equalsExp(workouts.weekId)),
+    ])
+          ..where(weeks.mesocycleId.equals(mesocycleId) &
+              weeks.goal.equals(WeekGoal.deload.name) &
+              workouts.isRestDay.equals(false))
+          ..limit(1))
+        .getSingleOrNull();
+    return row == null;
+  }
+
+  /// True iff the user can shrink this meso by one week right now.
+  /// Floor is `max(lastOccupiedWeek, 0) + 1` — never below the last week
+  /// that already contains real (non-rest) completed work.
+  Future<bool> canRemoveWeek(int mesocycleId) async {
+    final meso = await (select(mesocycles)
+          ..where((m) => m.id.equals(mesocycleId)))
+        .getSingleOrNull();
+    if (meso == null || meso.completedAt != null) return false;
+    final occupied = await _lastOccupiedWeekNumber(mesocycleId);
+    final floor = occupied > 0 ? occupied + 1 : 1;
+    return meso.totalWeekCount > floor;
+  }
+
+  /// Extends the meso by one hard week. If the deload week is already
+  /// materialized, flips its goal to hard and wipes its planned data so it
+  /// regenerates as a hard week the next time it's opened. The new deload
+  /// week is materialized lazily later by [getOrCreateNextWorkout].
+  Future<void> addHardWeek(int mesocycleId) async {
+    await transaction(() async {
+      if (!await canAddHardWeek(mesocycleId)) {
+        throw StateError('Cannot add hard week: deload already started '
+            'or mesocycle completed.');
+      }
+      final meso = await (select(mesocycles)
+            ..where((m) => m.id.equals(mesocycleId)))
+          .getSingle();
+
+      final deload = await (select(weeks)
+            ..where((w) =>
+                w.mesocycleId.equals(mesocycleId) &
+                w.goal.equals(WeekGoal.deload.name)))
+          .getSingleOrNull();
+      if (deload != null) {
+        await (update(weeks)..where((w) => w.id.equals(deload.id)))
+            .write(const WeeksCompanion(goal: Value(WeekGoal.hard)));
+        await _clearPlannedDataForWeek(deload.id);
+      }
+
+      await (update(mesocycles)..where((m) => m.id.equals(mesocycleId)))
+          .write(MesocyclesCompanion(
+              totalWeekCount: Value(meso.totalWeekCount + 1)));
+    });
+  }
+
+  /// Shrinks the meso by one week. Deletes any materialized weeks past the
+  /// new count (planned data and workouts go with them). If the new last
+  /// week is already materialized as hard, flips it to deload and wipes its
+  /// planned data so it regenerates as a deload week.
+  Future<void> removeWeek(int mesocycleId) async {
+    await transaction(() async {
+      if (!await canRemoveWeek(mesocycleId)) {
+        throw StateError('Cannot remove week: at floor or mesocycle '
+            'completed.');
+      }
+      final meso = await (select(mesocycles)
+            ..where((m) => m.id.equals(mesocycleId)))
+          .getSingle();
+      final newCount = meso.totalWeekCount - 1;
+
+      final toRemove = await (select(weeks)
+            ..where((w) =>
+                w.mesocycleId.equals(mesocycleId) &
+                w.weekNumber.isBiggerThanValue(newCount)))
+          .get();
+      for (final w in toRemove) {
+        await _deleteWeekAndContents(w.id);
+      }
+
+      final newLast = await (select(weeks)
+            ..where((w) =>
+                w.mesocycleId.equals(mesocycleId) &
+                w.weekNumber.equals(newCount)))
+          .getSingleOrNull();
+      if (newLast != null && newLast.goal != WeekGoal.deload) {
+        await (update(weeks)..where((w) => w.id.equals(newLast.id)))
+            .write(const WeeksCompanion(goal: Value(WeekGoal.deload)));
+        await _clearPlannedDataForWeek(newLast.id);
+      }
+
+      await (update(mesocycles)..where((m) => m.id.equals(mesocycleId)))
+          .write(MesocyclesCompanion(totalWeekCount: Value(newCount)));
+    });
+  }
+
+  /// Highest weekNumber for which any non-rest workout in the meso has a
+  /// `completed_workouts` row. Returns 0 if none.
+  Future<int> _lastOccupiedWeekNumber(int mesocycleId) async {
+    final result = await (select(weeks).join([
+      innerJoin(workouts, workouts.weekId.equalsExp(weeks.id)),
+      innerJoin(
+          completedWorkouts, completedWorkouts.workoutId.equalsExp(workouts.id)),
+    ])
+          ..where(weeks.mesocycleId.equals(mesocycleId) &
+              workouts.isRestDay.equals(false))
+          ..orderBy([OrderingTerm.desc(weeks.weekNumber)])
+          ..limit(1))
+        .getSingleOrNull();
+    if (result == null) return 0;
+    return result.readTable(weeks).weekNumber;
+  }
+
+  Future<void> _deleteWeekAndContents(int weekId) async {
+    final wkts =
+        await (select(workouts)..where((w) => w.weekId.equals(weekId))).get();
+    for (final w in wkts) {
+      await _deletePlannedForWorkout(w.id);
+      await (delete(workouts)..where((row) => row.id.equals(w.id))).go();
+    }
+    await (delete(weeks)..where((w) => w.id.equals(weekId))).go();
+  }
+
+  Future<void> _clearPlannedDataForWeek(int weekId) async {
+    final wkts =
+        await (select(workouts)..where((w) => w.weekId.equals(weekId))).get();
+    for (final w in wkts) {
+      await _deletePlannedForWorkout(w.id);
+    }
+  }
+
+  Future<void> _deletePlannedForWorkout(int workoutId) async {
+    final pws = await (select(plannedWorkouts)
+          ..where((pw) => pw.workoutId.equals(workoutId)))
+        .get();
+    for (final pw in pws) {
+      final pes = await (select(plannedExercises)
+            ..where((pe) => pe.plannedWorkoutId.equals(pw.id)))
+          .get();
+      for (final pe in pes) {
+        await (delete(plannedSets)
+              ..where((ps) => ps.plannedExerciseId.equals(pe.id)))
+            .go();
+      }
+      await (delete(plannedExercises)
+            ..where((pe) => pe.plannedWorkoutId.equals(pw.id)))
+          .go();
+    }
+    await (delete(plannedWorkouts)
+          ..where((pw) => pw.workoutId.equals(workoutId)))
+        .go();
+  }
+
   /// Returns the next workout to perform, creating week/workout rows as needed.
   ///
   /// This is the single entry point for all lazy materialization:
@@ -379,11 +578,29 @@ class AppDatabase extends _$AppDatabase {
           ..orderBy([(ce) => OrderingTerm.asc(ce.orderIndex)]))
         .get();
 
-    final seeds = <_PlanSeed>[];
+    // Pre-pass: load movements once, then assign each exercise a 1-based
+    // position M within its muscle group (in orderIndex order).
+    final movementById = <int, Movement>{};
     for (final priorEx in priorExercises) {
-      final movement = await (select(movements)
+      movementById[priorEx.movementId] ??= await (select(movements)
             ..where((m) => m.id.equals(priorEx.movementId)))
           .getSingle();
+    }
+    final groupPositionByExId = <int, int>{};
+    final perGroupCounter = <MuscleGroup, int>{};
+    for (final priorEx in priorExercises) {
+      final mg = movementById[priorEx.movementId]!.muscleGroup;
+      final next = (perGroupCounter[mg] ?? 0) + 1;
+      perGroupCounter[mg] = next;
+      groupPositionByExId[priorEx.id] = next;
+    }
+    final w = week.weekNumber;
+    bool addSetFor(int m) =>
+        w >= 2 && ((w.isEven && m.isOdd) || (w.isOdd && m.isEven));
+
+    final seeds = <_PlanSeed>[];
+    for (final priorEx in priorExercises) {
+      final movement = movementById[priorEx.movementId]!;
 
       final peId = await into(plannedExercises).insert(
         PlannedExercisesCompanion.insert(
@@ -395,11 +612,13 @@ class AppDatabase extends _$AppDatabase {
 
       final prior = await _findPriorSets(
           priorEx.movementId, workout.orderIndex, week, allWeeks);
+      final m = groupPositionByExId[priorEx.id]!;
       final seedValues = prior == null
           ? const [PlannedSetValues(), PlannedSetValues()]
           : computeHeuristic(
               prior.nonSkipped, week.goal, movement, prior.totalCount,
-              autoProgress: priorEx.autoProgress);
+              autoProgress: priorEx.autoProgress,
+              addExtraSet: addSetFor(m));
 
       for (final sv in seedValues) {
         await into(plannedSets).insert(PlannedSetsCompanion(
@@ -1904,6 +2123,28 @@ class _PlanSeed {
   final Movement movement;
   final List<CompletedSet> priorSets;
   final int targetCount;
+}
+
+/// Cycle progress info for the start-workout screen — current position
+/// plus gating flags for the add/remove-week affordances.
+class MesoProgressInfo {
+  const MesoProgressInfo({
+    required this.weekNumber,
+    required this.totalWeekCount,
+    required this.trainingDayIndex,
+    required this.totalTrainingDaysThisWeek,
+    required this.isDeloadWeek,
+    required this.canAddHardWeek,
+    required this.canRemoveWeek,
+  });
+
+  final int weekNumber;
+  final int totalWeekCount;
+  final int trainingDayIndex;
+  final int totalTrainingDaysThisWeek;
+  final bool isDeloadWeek;
+  final bool canAddHardWeek;
+  final bool canRemoveWeek;
 }
 
 /// Lightweight slot descriptor used internally during lazy materialization.

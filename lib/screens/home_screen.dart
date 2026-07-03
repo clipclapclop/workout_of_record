@@ -24,7 +24,8 @@ class _MesoComplete extends _HomeResult {}
 class _WorkoutReady extends _HomeResult {
   final Workout workout;
   final DateTime? expectedDate;
-  _WorkoutReady(this.workout, this.expectedDate);
+  final MesoProgressInfo progress;
+  _WorkoutReady(this.workout, this.expectedDate, this.progress);
 }
 
 // ── Screen ───────────────────────────────────────────────────────────────────
@@ -64,7 +65,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final row = await (db.select(db.mesocycles)
             ..where((m) => m.id.equals(mesocycleId)))
           .getSingleOrNull();
-      if (row == null) await AppPreferences.setCurrentMesocycleId(null);
+      if (row == null || row.completedAt != null) {
+        await AppPreferences.setCurrentMesocycleId(null);
+      }
     }
   }
 
@@ -107,7 +110,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (workout == null) return _MesoComplete();
 
     final date = await db.getExpectedWorkoutDate(mesocycleId);
-    return _WorkoutReady(workout, date);
+    final progress = await db.getMesoProgress(mesocycleId, workout.id);
+    return _WorkoutReady(workout, date, progress);
   }
 
   /// On fresh install (no mesocycle), optionally prompt to set up profile first.
@@ -207,6 +211,12 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _resultFuture = _init());
   }
 
+  String _formatProgress(MesoProgressInfo p) {
+    final base = 'Week ${p.weekNumber} of ${p.totalWeekCount} · '
+        'Day ${p.trainingDayIndex} of ${p.totalTrainingDaysThisWeek}';
+    return p.isDeloadWeek ? '$base · Deload' : base;
+  }
+
   String _formatExpectedDate(DateTime date) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -227,6 +237,64 @@ class _HomeScreenState extends State<HomeScreen> {
         WorkoutSkipReason.illness => 'Illness',
         WorkoutSkipReason.other => 'Other',
       };
+
+  Future<void> _changeMesoLength(BuildContext context,
+      {required bool add}) async {
+    final mesoId = AppPreferences.getCurrentMesocycleId();
+    if (mesoId == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      if (add) {
+        await db.addHardWeek(mesoId);
+      } else {
+        await db.removeWeek(mesoId);
+      }
+    } on StateError {
+      // Lost a race against state change — just refresh.
+      if (mounted) setState(() => _resultFuture = _init());
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _resultFuture = _init());
+
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(
+      content: Text(add ? 'Hard week added.' : 'Week removed.'),
+      action: SnackBarAction(
+        label: 'UNDO',
+        onPressed: () => _changeMesoLength(context, add: !add),
+      ),
+    ));
+  }
+
+  Future<void> _endMesocycleEarly() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('End Mesocycle Early?'),
+        content: const Text(
+          'Your completed workouts will be preserved, but remaining '
+          'workouts will not be created.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('End Mesocycle'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final mesoId = AppPreferences.getCurrentMesocycleId();
+    if (mesoId != null) await db.endMesocycleEarly(mesoId);
+    await _startNewMesocycle();
+  }
 
   Future<void> _startNewMesocycle() async {
     await AppPreferences.setCurrentMesocycleId(null);
@@ -295,7 +363,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-            _WorkoutReady(:final workout, :final expectedDate) => Padding(
+            _WorkoutReady(
+              :final workout,
+              :final expectedDate,
+              :final progress,
+            ) =>
+              Padding(
                 padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -327,8 +400,18 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
                     ],
+                    Text(
+                      _formatProgress(progress),
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
+                          ),
+                    ),
+                    const SizedBox(height: 16),
                     Text(
                       workout.name,
                       textAlign: TextAlign.center,
@@ -346,6 +429,28 @@ class _HomeScreenState extends State<HomeScreen> {
                     OutlinedButton(
                       onPressed: () => _skipWorkout(workout),
                       child: const Text('Skip Workout'),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        TextButton(
+                          onPressed: progress.canAddHardWeek
+                              ? () => _changeMesoLength(context, add: true)
+                              : null,
+                          child: const Text('Add Hard Week'),
+                        ),
+                        TextButton(
+                          onPressed: progress.canRemoveWeek
+                              ? () => _changeMesoLength(context, add: false)
+                              : null,
+                          child: const Text('Remove a Week'),
+                        ),
+                      ],
+                    ),
+                    TextButton(
+                      onPressed: _endMesocycleEarly,
+                      child: const Text('End Mesocycle Early'),
                     ),
                   ],
                 ),

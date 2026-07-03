@@ -22,6 +22,10 @@ class PlannedSetValues {
 /// When true + hard week: +1 rep per set (only when reps are present).
 /// When false: copy last week's values exactly (user-controlled).
 ///
+/// [addExtraSet] (hard week + autoProgress only): when true, appends one extra
+/// planned set with null values. Caller decides which exercises qualify based
+/// on the week/muscle-group alternation rule.
+///
 /// Deload week: ceil(2/3 * targetCount) sets at 65% weight, same reps (no progression).
 List<PlannedSetValues> computeHeuristic(
   List<CompletedSet> priorSets,
@@ -29,6 +33,7 @@ List<PlannedSetValues> computeHeuristic(
   Movement movement,
   int targetCount, {
   bool autoProgress = false,
+  bool addExtraSet = false,
 }) {
   if (targetCount == 0) {
     return [const PlannedSetValues(), const PlannedSetValues()];
@@ -36,18 +41,26 @@ List<PlannedSetValues> computeHeuristic(
 
   switch (goal) {
     case WeekGoal.hard:
-      return List.generate(
-        targetCount,
-        (i) => i < priorSets.length
-            ? PlannedSetValues(
-                reps: autoProgress && priorSets[i].reps != null
-                    ? priorSets[i].reps! + 1
-                    : priorSets[i].reps,
-                weight: priorSets[i].weight,
-                time: priorSets[i].time,
-              )
-            : const PlannedSetValues(),
-      );
+      final extra = autoProgress && addExtraSet;
+      final count = extra ? targetCount + 1 : targetCount;
+      return List.generate(count, (i) {
+        if (i < priorSets.length) {
+          return PlannedSetValues(
+            reps: autoProgress && priorSets[i].reps != null
+                ? priorSets[i].reps! + 1
+                : priorSets[i].reps,
+            weight: priorSets[i].weight,
+            time: priorSets[i].time,
+          );
+        }
+        // The extra set appended by progression mirrors the manual dropdown
+        // "Add Set": carry the last set's weight forward and leave reps blank
+        // for the user to record.
+        if (extra && i == count - 1 && priorSets.isNotEmpty) {
+          return PlannedSetValues(weight: priorSets.last.weight);
+        }
+        return const PlannedSetValues();
+      });
 
     case WeekGoal.deload:
       final count = (targetCount * 2 / 3).ceil();

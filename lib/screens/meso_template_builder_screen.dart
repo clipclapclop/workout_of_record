@@ -163,7 +163,6 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
   void _reorderExercises(int dayIndex, int oldIndex, int newIndex) {
     setState(() {
       final day = _days[dayIndex];
-      if (newIndex > oldIndex) newIndex--;
       final item = day.exercises.removeAt(oldIndex);
       day.exercises.insert(newIndex, item);
     });
@@ -352,7 +351,7 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
               : ReorderableListView.builder(
                   padding: const EdgeInsets.only(bottom: 8),
                   itemCount: day.exercises.length,
-                  onReorder: (old, newIdx) =>
+                  onReorderItem: (old, newIdx) =>
                       _reorderExercises(dayIndex, old, newIdx),
                   itemBuilder: (context, i) {
                     final ex = day.exercises[i];

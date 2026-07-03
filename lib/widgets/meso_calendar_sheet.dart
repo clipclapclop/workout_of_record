@@ -6,6 +6,7 @@ import '../db/calendar_data.dart';
 import '../db/db.dart';
 import '../db/tables/enums.dart';
 import '../db/workout_data.dart';
+import 'calendar_cell_widget.dart';
 
 void showMesoCalendarSheet(
     BuildContext context, int mesocycleId, int currentCompletedWorkoutId) {
@@ -78,115 +79,26 @@ class _MesoCalendarSheet extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   for (final week in cal.weeks)
-                    _buildWeekColumn(
-                        context, week, maxRows, cellW, cellH, headerH),
+                    CalendarWeekColumn(
+                      week: week,
+                      maxRows: maxRows,
+                      cellWidth: cellW,
+                      cellHeight: cellH,
+                      headerHeight: headerH,
+                      cellBuilder: (cell, w, h) => CalendarCellWidget(
+                        cell: cell,
+                        width: w,
+                        height: h,
+                        highlightId: currentCompletedWorkoutId,
+                        onTap: () => _onCellTap(context, cell),
+                      ),
+                    ),
                 ],
               ),
             ),
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildWeekColumn(BuildContext context, CalendarWeek week, int maxRows,
-      double cellW, double cellH, double headerH) {
-    final label =
-        week.goal == WeekGoal.deload ? 'DL' : 'Wk ${week.weekNumber}';
-
-    return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: Column(
-        children: [
-          SizedBox(
-            width: cellW,
-            height: headerH,
-            child: Center(
-              child: Text(label,
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelMedium
-                      ?.copyWith(fontWeight: FontWeight.bold)),
-            ),
-          ),
-          for (var i = 0; i < maxRows; i++)
-            i < week.cells.length
-                ? _buildCell(context, week.cells[i], cellW, cellH)
-                : SizedBox(width: cellW, height: cellH + 6),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCell(
-      BuildContext context, CalendarCell cell, double cellW, double cellH) {
-    final cw = cell.completedWorkout;
-    final isCurrent = cw != null && cw.id == currentCompletedWorkoutId;
-    final isDone = cw != null &&
-        cw.completedAt != null &&
-        cw.status == WorkoutStatus.completed;
-    final isSkipped = cw != null && cw.status == WorkoutStatus.skipped;
-
-    final cs = Theme.of(context).colorScheme;
-    final Color bgColor;
-    final Color textColor;
-    final IconData? icon;
-    final Color? iconColor;
-
-    if (isCurrent) {
-      bgColor = cs.errorContainer;
-      textColor = cs.onErrorContainer;
-      icon = Icons.play_arrow;
-      iconColor = cs.error;
-    } else if (isDone) {
-      bgColor = Colors.green.withValues(alpha: 0.15);
-      textColor = Colors.green.shade800;
-      icon = Icons.check;
-      iconColor = Colors.green.shade700;
-    } else if (isSkipped) {
-      bgColor = cs.errorContainer.withValues(alpha: 0.5);
-      textColor = cs.onErrorContainer;
-      icon = Icons.skip_next;
-      iconColor = cs.error;
-    } else {
-      // Future (materialized not-yet-started, or template-only)
-      bgColor = cs.surfaceContainerHighest;
-      textColor = cs.onSurfaceVariant;
-      icon = null;
-      iconColor = null;
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: GestureDetector(
-        onTap: () => _onCellTap(context, cell),
-        child: Container(
-          width: cellW,
-          height: cellH,
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          padding: const EdgeInsets.all(6),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (icon != null) Icon(icon, size: 16, color: iconColor),
-              if (icon != null) const SizedBox(height: 2),
-              Text(
-                cell.workoutName,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: textColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 

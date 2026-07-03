@@ -1,0 +1,45 @@
+site_name: Workout of Record
+site_description: User and release documentation for Workout of Record
+site_url: https://clipclapclop.github.io/workout_of_record/
+repo_url: https://github.com/clipclapclop/workout_of_record
+repo_name: clipclapclop/workout_of_record
+
+theme:
+  name: material
+  palette:
+    scheme: default
+    primary: deep purple
+    accent: amber
+  features:
+    - navigation.sections
+    - navigation.expand
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - pymdownx.details
+  - pymdownx.superfences
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+
+nav:
+  - Welcome: index.md
+  - User guide:
+      - Installation and updates: guides/installation.md
+      - Workouts: guides/workouts.md
+      - Mesocycles and progression: guides/mesocycles.md
+      - Movements and history: guides/movements-history.md
+      - Settings, backups, and recovery: guides/settings-backups.md
+  - Releases:
+      - Release history: releases/index.md
+      - 1.0.1: releases/1.0.1.md
+  - Screenshot backlog: screenshot-backlog.md
+  - Maintainers:
+      - Releasing: maintainer/releasing.md
+      - Kotlin migration: maintainer/kotlin-migration.md

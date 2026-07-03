@@ -1,0 +1,16 @@
+{
+  "id": "release-automation",
+  "summary": "Add a deterministic local Android release pipeline, MkDocs publication, and durable change metadata so releases do not depend on conversation history.",
+  "audience": "maintainer",
+  "releaseNote": "Added verified local APK builds, GitHub Release publishing, versioned documentation, and cross-conversation change fragments.",
+  "docs": {
+    "impact": "updated",
+    "paths": [
+      "README.md",
+      "docs/guides/installation.md",
+      "docs/maintainer/releasing.md"
+    ],
+    "reason": ""
+  },
+  "screenshots": []
+}
