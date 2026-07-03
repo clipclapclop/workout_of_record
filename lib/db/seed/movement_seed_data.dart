@@ -9,6 +9,7 @@ class MovementSeedEntry {
   final bool isRequiredDistance;
   final double? minWeight;
   final double? weightDelta;
+  final double bodyweightLoadFraction;
 
   const MovementSeedEntry({
     required this.name,
@@ -19,22 +20,27 @@ class MovementSeedEntry {
     this.isRequiredDistance = false,
     this.minWeight,
     this.weightDelta,
+    this.bodyweightLoadFraction = 0,
   });
 }
 
 // ── Weight profile helpers ────────────────────────────────────────────────────
 
 /// Barbell / Smith Machine: min 45, step 5
-MovementSeedEntry _bb(String name, MuscleGroup mg) =>
-    MovementSeedEntry(name: name, muscleGroup: mg, minWeight: 45, weightDelta: 5);
+MovementSeedEntry _bb(String name, MuscleGroup mg,
+        {double bodyweightLoadFraction = 0}) =>
+    MovementSeedEntry(name: name, muscleGroup: mg, minWeight: 45,
+        weightDelta: 5, bodyweightLoadFraction: bodyweightLoadFraction);
 
 /// EZ Bar: min 25, step 5
 MovementSeedEntry _ez(String name, MuscleGroup mg) =>
     MovementSeedEntry(name: name, muscleGroup: mg, minWeight: 25, weightDelta: 5);
 
 /// Dumbbell: min 5, step 5
-MovementSeedEntry _db(String name, MuscleGroup mg) =>
-    MovementSeedEntry(name: name, muscleGroup: mg, minWeight: 5, weightDelta: 5);
+MovementSeedEntry _db(String name, MuscleGroup mg,
+        {double bodyweightLoadFraction = 0}) =>
+    MovementSeedEntry(name: name, muscleGroup: mg, minWeight: 5,
+        weightDelta: 5, bodyweightLoadFraction: bodyweightLoadFraction);
 
 /// Lat pulldown / assisted pullup machines: min 10, step 10
 MovementSeedEntry _pd(String name) =>
@@ -45,8 +51,10 @@ MovementSeedEntry _ca(String name, MuscleGroup mg) =>
     MovementSeedEntry(name: name, muscleGroup: mg, minWeight: 3.5, weightDelta: 3.5);
 
 /// Bodyweight: no weight required
-MovementSeedEntry _bw(String name, MuscleGroup mg) =>
-    MovementSeedEntry(name: name, muscleGroup: mg, isRequiredWeight: false);
+MovementSeedEntry _bw(String name, MuscleGroup mg,
+        {double bodyweightLoadFraction = 0}) =>
+    MovementSeedEntry(name: name, muscleGroup: mg, isRequiredWeight: false,
+        bodyweightLoadFraction: bodyweightLoadFraction);
 
 /// Stack machine: min 10, step 5
 MovementSeedEntry _mc(String name, MuscleGroup mg) =>
@@ -98,10 +106,10 @@ final kMovementSeeds = <MovementSeedEntry>[
   _bb('Barbell Front Raise', MuscleGroup.shoulders),
   _ez('Barbell Front Raise (EZ Bar, Underhand)', MuscleGroup.shoulders),
   _bb('Barbell Front Raise (Overhand)', MuscleGroup.shoulders),
-  _bb('Barbell Good Morning (Cambered Bar)', MuscleGroup.hamstrings),
-  _bb('Barbell Good Morning (High Bar)', MuscleGroup.hamstrings),
-  _bb('Barbell Good Morning (Low Bar)', MuscleGroup.hamstrings),
-  _bb('Barbell Good Morning (Safety Bar)', MuscleGroup.hamstrings),
+  _bb('Barbell Good Morning (Cambered Bar)', MuscleGroup.hamstrings, bodyweightLoadFraction: 0.6),
+  _bb('Barbell Good Morning (High Bar)', MuscleGroup.hamstrings, bodyweightLoadFraction: 0.6),
+  _bb('Barbell Good Morning (Low Bar)', MuscleGroup.hamstrings, bodyweightLoadFraction: 0.6),
+  _bb('Barbell Good Morning (Safety Bar)', MuscleGroup.hamstrings, bodyweightLoadFraction: 0.6),
   _bb('Barbell Hip Thrust', MuscleGroup.glutes),
   _bb('Barbell Overhead Triceps Extension', MuscleGroup.triceps),
   _bb('Barbell Overhead Triceps Extension (Seated)', MuscleGroup.triceps),
@@ -111,13 +119,13 @@ final kMovementSeeds = <MovementSeedEntry>[
   _bb('Barbell Shoulder Press (Standing)', MuscleGroup.shoulders),
   _bb('Barbell Shrug', MuscleGroup.traps),
   _bb('Barbell Skullcrusher', MuscleGroup.triceps),
-  _bb('Barbell Split Squat', MuscleGroup.quads),
-  _bb('Barbell Squat (Cambered Bar)', MuscleGroup.quads),
-  _bb('Barbell Squat (Cross Stance, Feet Forward)', MuscleGroup.quads),
-  _bb('Barbell Squat (High Bar)', MuscleGroup.quads),
-  _bb('Barbell Squat (Narrow Stance)', MuscleGroup.quads),
-  _bb('Barbell Squat (Safety Bar)', MuscleGroup.quads),
-  _bb('Barbell Squat (Sumo Stance)', MuscleGroup.quads),
+  _bb('Barbell Split Squat', MuscleGroup.quads, bodyweightLoadFraction: 0.65),
+  _bb('Barbell Squat (Cambered Bar)', MuscleGroup.quads, bodyweightLoadFraction: 0.85),
+  _bb('Barbell Squat (Cross Stance, Feet Forward)', MuscleGroup.quads, bodyweightLoadFraction: 0.85),
+  _bb('Barbell Squat (High Bar)', MuscleGroup.quads, bodyweightLoadFraction: 0.85),
+  _bb('Barbell Squat (Narrow Stance)', MuscleGroup.quads, bodyweightLoadFraction: 0.85),
+  _bb('Barbell Squat (Safety Bar)', MuscleGroup.quads, bodyweightLoadFraction: 0.85),
+  _bb('Barbell Squat (Sumo Stance)', MuscleGroup.quads, bodyweightLoadFraction: 0.85),
   _bb('Barbell Standing Wrist Curl', MuscleGroup.forearms),
   _bb('Barbell Upright Row', MuscleGroup.shoulders),
   _ca('Bayesian Curl', MuscleGroup.biceps),
@@ -133,9 +141,9 @@ final kMovementSeeds = <MovementSeedEntry>[
   _bb('Bench Press (Medium Grip)', MuscleGroup.chest),
   _bb('Bench Press (Narrow Grip)', MuscleGroup.chest),
   _bb('Bench Press (Wide Grip)', MuscleGroup.chest),
-  _bw('Bodyweight Squat', MuscleGroup.quads),
-  _bw('Bulgarian Split Squat (Glute-Focused)', MuscleGroup.glutes),
-  _bw('Bulgarian Split Squat (Quad-Focused)', MuscleGroup.quads),
+  _bw('Bodyweight Squat', MuscleGroup.quads, bodyweightLoadFraction: 0.85),
+  _bw('Bulgarian Split Squat (Glute-Focused)', MuscleGroup.glutes, bodyweightLoadFraction: 0.65),
+  _bw('Bulgarian Split Squat (Quad-Focused)', MuscleGroup.quads, bodyweightLoadFraction: 0.65),
 
   // ── C ──────────────────────────────────────────────────────────────────────
   _ca('Cable Bent Over Shrug', MuscleGroup.traps),
@@ -192,10 +200,10 @@ final kMovementSeeds = <MovementSeedEntry>[
   _db('Decline Dumbbell Curl', MuscleGroup.biceps),
   _bw('Dip (Assisted, Chest-Focused)', MuscleGroup.chest),
   _bw('Dip (Assisted, Triceps-Focused)', MuscleGroup.triceps),
-  _bw('Dip (Chest-Focused)', MuscleGroup.chest),
-  _bw('Dip (Triceps-Focused)', MuscleGroup.triceps),
-  _db('Dip (Weighted, Chest-Focused)', MuscleGroup.chest),
-  _db('Dip (Weighted, Triceps-Focused)', MuscleGroup.triceps),
+  _bw('Dip (Chest-Focused)', MuscleGroup.chest, bodyweightLoadFraction: 1),
+  _bw('Dip (Triceps-Focused)', MuscleGroup.triceps, bodyweightLoadFraction: 1),
+  _db('Dip (Weighted, Chest-Focused)', MuscleGroup.chest, bodyweightLoadFraction: 1),
+  _db('Dip (Weighted, Triceps-Focused)', MuscleGroup.triceps, bodyweightLoadFraction: 1),
   _bw('Donkey Calf Raise', MuscleGroup.calves),
   _ca('Double Cable Pullover', MuscleGroup.back),
   _db('Dumbbell Bench Wrist Curl', MuscleGroup.forearms),
@@ -211,7 +219,7 @@ final kMovementSeeds = <MovementSeedEntry>[
   _db('Dumbbell Flye (Flat)', MuscleGroup.chest),
   _db('Dumbbell Flye (Incline)', MuscleGroup.chest),
   _db('Dumbbell Front Raise', MuscleGroup.shoulders),
-  _db('Dumbbell Front Squat', MuscleGroup.quads),
+  _db('Dumbbell Front Squat', MuscleGroup.quads, bodyweightLoadFraction: 0.85),
   _db('Dumbbell Hip Thrust (Single Leg)', MuscleGroup.glutes),
   _db('Dumbbell Lateral Raise', MuscleGroup.shoulders),
   _db('Dumbbell Lateral Raise (Incline)', MuscleGroup.shoulders),
@@ -242,7 +250,7 @@ final kMovementSeeds = <MovementSeedEntry>[
   _db('Dumbbell Shrug (Seated)', MuscleGroup.traps),
   _db('Dumbbell Skullcrusher', MuscleGroup.triceps),
   _db('Dumbbell Spider Curl', MuscleGroup.biceps),
-  _db('Dumbbell Split Squat', MuscleGroup.quads),
+  _db('Dumbbell Split Squat', MuscleGroup.quads, bodyweightLoadFraction: 0.65),
   _db('Dumbbell Standing Wrist Curl', MuscleGroup.forearms),
   _db('Dumbbell Stiff Legged Deadlift', MuscleGroup.hamstrings),
   _db('Dumbbell Twist Curl', MuscleGroup.biceps),
@@ -267,12 +275,12 @@ final kMovementSeeds = <MovementSeedEntry>[
   _ca('Freemotion Rear Delt Flyes', MuscleGroup.shoulders),
   _ca('Freemotion Y-Raises', MuscleGroup.shoulders),
   _ca('Freemotion Y-Raises (Paused)', MuscleGroup.shoulders),
-  _bb('Front Foot Elevated Smith Lunge', MuscleGroup.quads),
-  _bb('Front Squat', MuscleGroup.quads),
-  _bb('Front Squat (Cross Grip)', MuscleGroup.quads),
+  _bb('Front Foot Elevated Smith Lunge', MuscleGroup.quads, bodyweightLoadFraction: 0.65),
+  _bb('Front Squat', MuscleGroup.quads, bodyweightLoadFraction: 0.85),
+  _bb('Front Squat (Cross Grip)', MuscleGroup.quads, bodyweightLoadFraction: 0.85),
 
   // ── G ──────────────────────────────────────────────────────────────────────
-  _db('Goblet Squat', MuscleGroup.quads),
+  _db('Goblet Squat', MuscleGroup.quads, bodyweightLoadFraction: 0.85),
   const MovementSeedEntry(
     name: 'Grip Roller',
     muscleGroup: MuscleGroup.forearms,
@@ -294,7 +302,7 @@ final kMovementSeeds = <MovementSeedEntry>[
   _mc('Hip Adduction', MuscleGroup.quads),
 
   // ── I ──────────────────────────────────────────────────────────────────────
-  _bw('Inverted Row', MuscleGroup.back),
+  _bw('Inverted Row', MuscleGroup.back, bodyweightLoadFraction: 0.65),
   _bw('Inverted Skullcrusher', MuscleGroup.triceps),
 
   // ── J ──────────────────────────────────────────────────────────────────────
@@ -340,29 +348,29 @@ final kMovementSeeds = <MovementSeedEntry>[
   _pd('Pulldown (Underhand Grip)'),
   _pd('Pulldown (Upright Torso to Abs)'),
   _pd('Pulldown (Wide Grip)'),
-  _bw('Pullup (Normal Grip)', MuscleGroup.back),
-  _bw('Pullup (Parallel Grip)', MuscleGroup.back),
-  _bw('Pullup (Underhand Grip)', MuscleGroup.back),
-  _db('Pullup (Weighted, Normal Grip)', MuscleGroup.back),
-  _db('Pullup (Weighted, Parallel Grip)', MuscleGroup.back),
-  _db('Pullup (Weighted, Underhand Grip)', MuscleGroup.back),
-  _db('Pullup (Weighted, Wide Grip)', MuscleGroup.back),
-  _bw('Pullup (Wide Grip)', MuscleGroup.back),
-  _bw('Pushup', MuscleGroup.chest),
-  _bw('Pushup (Deficit)', MuscleGroup.chest),
-  _bw('Pushup (Narrow Grip)', MuscleGroup.chest),
-  _db('Pushup (Weighted, Narrow Grip)', MuscleGroup.chest),
-  _db('Pushup (Weighted, Normal Grip)', MuscleGroup.chest),
+  _bw('Pullup (Normal Grip)', MuscleGroup.back, bodyweightLoadFraction: 1),
+  _bw('Pullup (Parallel Grip)', MuscleGroup.back, bodyweightLoadFraction: 1),
+  _bw('Pullup (Underhand Grip)', MuscleGroup.back, bodyweightLoadFraction: 1),
+  _db('Pullup (Weighted, Normal Grip)', MuscleGroup.back, bodyweightLoadFraction: 1),
+  _db('Pullup (Weighted, Parallel Grip)', MuscleGroup.back, bodyweightLoadFraction: 1),
+  _db('Pullup (Weighted, Underhand Grip)', MuscleGroup.back, bodyweightLoadFraction: 1),
+  _db('Pullup (Weighted, Wide Grip)', MuscleGroup.back, bodyweightLoadFraction: 1),
+  _bw('Pullup (Wide Grip)', MuscleGroup.back, bodyweightLoadFraction: 1),
+  _bw('Pushup', MuscleGroup.chest, bodyweightLoadFraction: 0.65),
+  _bw('Pushup (Deficit)', MuscleGroup.chest, bodyweightLoadFraction: 0.65),
+  _bw('Pushup (Narrow Grip)', MuscleGroup.chest, bodyweightLoadFraction: 0.65),
+  _db('Pushup (Weighted, Narrow Grip)', MuscleGroup.chest, bodyweightLoadFraction: 0.65),
+  _db('Pushup (Weighted, Normal Grip)', MuscleGroup.chest, bodyweightLoadFraction: 0.65),
 
   // ── R ──────────────────────────────────────────────────────────────────────
   _bw('Reaching Sit-Up', MuscleGroup.abs),
   _bb('Reverse Curl', MuscleGroup.forearms),
   _pm('Reverse Hyper', MuscleGroup.glutes),
-  _bb('Reverse Lunge (Barbell)', MuscleGroup.quads),
-  _db('Reverse Lunge (Dumbbell)', MuscleGroup.quads),
-  _bb('Rogers Good Morning', MuscleGroup.hamstrings),
-  _bb('Rogers Reverse Lunge', MuscleGroup.quads),
-  _bb('Rogers Squat', MuscleGroup.quads),
+  _bb('Reverse Lunge (Barbell)', MuscleGroup.quads, bodyweightLoadFraction: 0.65),
+  _db('Reverse Lunge (Dumbbell)', MuscleGroup.quads, bodyweightLoadFraction: 0.65),
+  _bb('Rogers Good Morning', MuscleGroup.hamstrings, bodyweightLoadFraction: 0.6),
+  _bb('Rogers Reverse Lunge', MuscleGroup.quads, bodyweightLoadFraction: 0.65),
+  _bb('Rogers Squat', MuscleGroup.quads, bodyweightLoadFraction: 0.85),
 
   // ── S ──────────────────────────────────────────────────────────────────────
   _bb('Seal Row', MuscleGroup.back),
@@ -380,7 +388,7 @@ final kMovementSeeds = <MovementSeedEntry>[
   _bb('Smith Machine Bench Press (Narrow Grip)', MuscleGroup.chest),
   _bb('Smith Machine Bench Press (Wide Grip)', MuscleGroup.chest),
   _bb('Smith Machine Calves', MuscleGroup.calves),
-  _bb('Smith Machine Good Morning', MuscleGroup.hamstrings),
+  _bb('Smith Machine Good Morning', MuscleGroup.hamstrings, bodyweightLoadFraction: 0.6),
   _bb('Smith Machine JM Press', MuscleGroup.triceps),
   _bb('Smith Machine Press (High Incline, Medium Grip)', MuscleGroup.chest),
   _bb('Smith Machine Press (High Incline, Narrow Grip)', MuscleGroup.chest),
@@ -395,8 +403,8 @@ final kMovementSeeds = <MovementSeedEntry>[
   _bb('Smith Machine Shoulder Press (Seated)', MuscleGroup.shoulders),
   _bb('Smith Machine Shrug', MuscleGroup.traps),
   _bb('Smith Machine Skullcrusher', MuscleGroup.triceps),
-  _bb('Smith Machine Split Squat', MuscleGroup.quads),
-  _bb('Smith Machine Squat (Feet Forward)', MuscleGroup.quads),
+  _bb('Smith Machine Split Squat', MuscleGroup.quads, bodyweightLoadFraction: 0.65),
+  _bb('Smith Machine Squat (Feet Forward)', MuscleGroup.quads, bodyweightLoadFraction: 0.85),
   _bb('Smith Machine Upright Row', MuscleGroup.shoulders),
   _bw('Stair Calves', MuscleGroup.calves),
   _bw('Stair Calves (Single Leg)', MuscleGroup.calves),
@@ -415,10 +423,10 @@ final kMovementSeeds = <MovementSeedEntry>[
   _cardio('Running/Jogging'),
 
   // ── W ──────────────────────────────────────────────────────────────────────
-  _bb('Walking Lunges (Glute-Focused, Barbell)', MuscleGroup.glutes),
+  _bb('Walking Lunges (Glute-Focused, Barbell)', MuscleGroup.glutes, bodyweightLoadFraction: 0.65),
   _bw('Walking Lunges (Glute-Focused, Bodyweight)', MuscleGroup.glutes),
-  _db('Walking Lunges (Glute-Focused, Dumbbell)', MuscleGroup.glutes),
-  _bb('Walking Lunges (Quad-Focused, Barbell)', MuscleGroup.quads),
+  _db('Walking Lunges (Glute-Focused, Dumbbell)', MuscleGroup.glutes, bodyweightLoadFraction: 0.65),
+  _bb('Walking Lunges (Quad-Focused, Barbell)', MuscleGroup.quads, bodyweightLoadFraction: 0.65),
   _bw('Walking Lunges (Quad-Focused, Bodyweight)', MuscleGroup.quads),
-  _db('Walking Lunges (Quad-Focused, Dumbbell)', MuscleGroup.quads),
+  _db('Walking Lunges (Quad-Focused, Dumbbell)', MuscleGroup.quads, bodyweightLoadFraction: 0.65),
 ];

@@ -1,0 +1,22 @@
+{
+  "version": "1.0.2",
+  "versionCode": 3,
+  "releaseNotes": "docs/releases/1.0.2.md",
+  "docsImpact": "updated",
+  "updatedGuidePaths": [
+    "docs/screenshot-backlog.md",
+    "docs/guides/mesocycles.md",
+    "docs/guides/movements-history.md",
+    "docs/guides/workouts.md"
+  ],
+  "noDocsReason": "",
+  "changeFragments": [
+    "release/fragments/1.0.2/20260703-deload-planning.json"
+  ],
+  "outstandingScreenshots": [
+    "workout-home",
+    "mesocycle-calendar",
+    "workout-history",
+    "backup-settings"
+  ]
+}

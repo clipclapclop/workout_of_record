@@ -11,6 +11,14 @@ class PlannedSetValues {
   const PlannedSetValues({this.reps, this.weight, this.time});
 }
 
+enum DeloadType { heavy, easy }
+
+/// Assigns the front-loaded deload type for a zero-based training-day index.
+DeloadType deloadTypeForWorkout(int workoutIndex, int workoutCount) {
+  final heavyCount = max(1, (workoutCount / 3).round());
+  return workoutIndex < heavyCount ? DeloadType.heavy : DeloadType.easy;
+}
+
 /// Returns one [PlannedSetValues] per planned set to create.
 ///
 /// [priorSets] must be pre-filtered to exclude skipped sets (skipReason == null).
@@ -26,7 +34,8 @@ class PlannedSetValues {
 /// planned set with null values. Caller decides which exercises qualify based
 /// on the week/muscle-group alternation rule.
 ///
-/// Deload week: ceil(2/3 * targetCount) sets at 65% weight, same reps (no progression).
+/// Exercises with progression disabled are copied unchanged in every week.
+/// Progressing deload exercises use the supplied front-loaded [deloadType].
 List<PlannedSetValues> computeHeuristic(
   List<CompletedSet> priorSets,
   WeekGoal goal,
@@ -34,6 +43,8 @@ List<PlannedSetValues> computeHeuristic(
   int targetCount, {
   bool autoProgress = false,
   bool addExtraSet = false,
+  DeloadType deloadType = DeloadType.easy,
+  double? bodyWeight,
 }) {
   if (targetCount == 0) {
     return [const PlannedSetValues(), const PlannedSetValues()];
@@ -63,14 +74,27 @@ List<PlannedSetValues> computeHeuristic(
       });
 
     case WeekGoal.deload:
-      final count = (targetCount * 2 / 3).ceil();
+      if (!autoProgress) {
+        return _copyPriorSets(priorSets, targetCount);
+      }
+      final setMultiplier = deloadType == DeloadType.heavy ? 0.40 : 0.30;
+      final repMultiplier = deloadType == DeloadType.heavy ? 0.50 : 0.65;
+      final loadMultiplier = deloadType == DeloadType.heavy ? 0.90 : 0.65;
+      final count = max(1, (targetCount * setMultiplier).round());
       return List.generate(
         count,
         (i) => i < priorSets.length
             ? PlannedSetValues(
-                reps: priorSets[i].reps,
+                reps: priorSets[i].reps == null
+                    ? null
+                    : max(1, (priorSets[i].reps! * repMultiplier).round()),
                 weight: _roundToMovementIncrement(
-                  priorSets[i].weight != null ? priorSets[i].weight! * 0.65 : null,
+                  _deloadExternalWeight(
+                    priorSets[i].weight,
+                    loadMultiplier,
+                    movement.bodyweightLoadFraction,
+                    bodyWeight,
+                  ),
                   movement,
                 ),
                 time: priorSets[i].time,
@@ -78,6 +102,35 @@ List<PlannedSetValues> computeHeuristic(
             : const PlannedSetValues(),
       );
   }
+}
+
+List<PlannedSetValues> _copyPriorSets(
+    List<CompletedSet> priorSets, int targetCount) {
+  return List.generate(
+    targetCount,
+    (i) => i < priorSets.length
+        ? PlannedSetValues(
+            reps: priorSets[i].reps,
+            weight: priorSets[i].weight,
+            time: priorSets[i].time,
+          )
+        : const PlannedSetValues(),
+  );
+}
+
+double? _deloadExternalWeight(
+  double? externalWeight,
+  double loadMultiplier,
+  double bodyweightLoadFraction,
+  double? bodyWeight,
+) {
+  if (externalWeight == null) return null;
+  if (bodyWeight == null || bodyweightLoadFraction == 0) {
+    return externalWeight * loadMultiplier;
+  }
+  final bodyweightLoad = bodyWeight * bodyweightLoadFraction;
+  final effectiveLoad = externalWeight + bodyweightLoad;
+  return effectiveLoad * loadMultiplier - bodyweightLoad;
 }
 
 double? _roundToMovementIncrement(double? rawWeight, Movement movement) {

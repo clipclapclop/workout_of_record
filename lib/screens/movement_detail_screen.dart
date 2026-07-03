@@ -33,6 +33,7 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
   late final TextEditingController _linkCtrl;
   late final TextEditingController _minWeightCtrl;
   late final TextEditingController _weightDeltaCtrl;
+  late final TextEditingController _bodyweightLoadFractionCtrl;
   late final TextEditingController _restSecondsCtrl;
 
   late MuscleGroup _muscleGroup;
@@ -55,6 +56,8 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
         text: m?.minWeight != null ? _fmt(m!.minWeight!) : '');
     _weightDeltaCtrl = TextEditingController(
         text: m?.weightDelta != null ? _fmt(m!.weightDelta!) : '');
+    _bodyweightLoadFractionCtrl = TextEditingController(
+        text: m != null ? _fmt(m.bodyweightLoadFraction) : '0');
     _restSecondsCtrl = TextEditingController(
         text: m?.restSeconds != null ? m!.restSeconds.toString() : '');
     _muscleGroup = m?.muscleGroup ?? MuscleGroup.values.first;
@@ -74,6 +77,7 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
     _linkCtrl.dispose();
     _minWeightCtrl.dispose();
     _weightDeltaCtrl.dispose();
+    _bodyweightLoadFractionCtrl.dispose();
     _restSecondsCtrl.dispose();
     super.dispose();
   }
@@ -104,6 +108,8 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
       link: Value(_linkCtrl.text.trim().isEmpty ? null : _linkCtrl.text.trim()),
       minWeight: Value(double.tryParse(_minWeightCtrl.text.trim())),
       weightDelta: Value(double.tryParse(_weightDeltaCtrl.text.trim())),
+      bodyweightLoadFraction:
+          Value(double.parse(_bodyweightLoadFractionCtrl.text.trim())),
       isRequiredReps: Value(_isRequiredReps),
       isRequiredWeight: Value(_isRequiredWeight),
       isRequiredTime: Value(_isRequiredTime),
@@ -239,7 +245,8 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
                     decoration:
                         const InputDecoration(labelText: 'Min Weight (optional)'),
                     keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                        const TextInputType.numberWithOptions(
+                            decimal: true, signed: true),
                     validator: (v) {
                       if (v != null && v.trim().isNotEmpty &&
                           double.tryParse(v.trim()) == null) {
@@ -267,6 +274,23 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _bodyweightLoadFractionCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Bodyweight load contribution',
+                helperText: '0–1 portion used for deload load calculations',
+              ),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              validator: (v) {
+                final n = double.tryParse(v?.trim() ?? '');
+                if (n == null || n < 0 || n > 1) {
+                  return 'Enter a number from 0 to 1';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 16),
             TextFormField(

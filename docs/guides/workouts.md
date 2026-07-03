@@ -13,6 +13,8 @@ You can skip the scheduled workout by selecting a skip reason. Workouts advance 
 
 Each set displays the fields required by its movement, such as reps, weight, or time. Planned values appear as defaults. Confirming a set saves its completed values immediately. Clearing a required value prevents confirmation, and unchecking a completed set removes its confirmed values from the completed workout while leaving the editable values on screen.
 
+Changing a set's weight carries that weight into its later unchecked sets. Repetition changes apply only to the edited set.
+
 Exercises and prescribed sets can be skipped when the app requests a reason. User-added sets can be removed. Required exercise and muscle-group feedback must be completed before the workout can advance or finish.
 
 ## Finish safely

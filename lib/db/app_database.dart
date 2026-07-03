@@ -5,6 +5,7 @@ import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../app_preferences.dart';
 import 'ai_planning.dart';
 import 'calendar_data.dart';
 import 'history_data.dart';
@@ -59,7 +60,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -132,6 +133,21 @@ class AppDatabase extends _$AppDatabase {
                   'ALTER TABLE pre_workout_checkins '
                   'ADD COLUMN tibialis TEXT',
                 );
+              case 12:
+                // 12 → 13: Existing custom movements remain at zero;
+                // recognized built-ins receive their seeded defaults.
+                await m.addColumn(movements, movements.bodyweightLoadFraction);
+                for (final seed in kMovementSeeds
+                    .where((seed) => seed.bodyweightLoadFraction != 0)) {
+                  await (update(movements)
+                        ..where((movement) =>
+                            movement.name.equals(seed.name) &
+                            movement.muscleGroup.equalsValue(seed.muscleGroup)))
+                      .write(MovementsCompanion(
+                    bodyweightLoadFraction:
+                        Value(seed.bodyweightLoadFraction),
+                  ));
+                }
             }
           }
         },
@@ -558,6 +574,22 @@ class AppDatabase extends _$AppDatabase {
 
     final priorWeek =
         allWeeks.firstWhere((w) => w.weekNumber == week.weekNumber - 1);
+    final trainingSlots = (await _getWeekTemplateSlots(week, allWeeks))
+        .where((slot) => !slot.isRestDay)
+        .toList()
+      ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+    final workoutIndex = trainingSlots
+        .indexWhere((slot) => slot.orderIndex == workout.orderIndex);
+    final deloadType = deloadTypeForWorkout(
+      workoutIndex < 0 ? 0 : workoutIndex,
+      trainingSlots.length,
+    );
+    double? bodyWeight;
+    try {
+      bodyWeight = AppPreferences.getWeight();
+    } catch (_) {
+      // Preferences are intentionally absent in database-only tests.
+    }
     final priorWorkout = await (select(workouts)
           ..where((w) =>
               w.weekId.equals(priorWeek.id) &
@@ -618,7 +650,10 @@ class AppDatabase extends _$AppDatabase {
           : computeHeuristic(
               prior.nonSkipped, week.goal, movement, prior.totalCount,
               autoProgress: priorEx.autoProgress,
-              addExtraSet: addSetFor(m));
+              addExtraSet: addSetFor(m),
+              deloadType: deloadType,
+              bodyWeight: bodyWeight,
+            );
 
       for (final sv in seedValues) {
         await into(plannedSets).insert(PlannedSetsCompanion(
@@ -2062,6 +2097,7 @@ class AppDatabase extends _$AppDatabase {
           isRequiredDistance: Value(s.isRequiredDistance),
           minWeight: Value(s.minWeight),
           weightDelta: Value(s.weightDelta),
+          bodyweightLoadFraction: Value(s.bodyweightLoadFraction),
         ));
       }
 

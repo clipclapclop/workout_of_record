@@ -80,7 +80,8 @@ class _SetWidgetState extends State<SetWidget> {
         enabled: enabled,
         keyboardType: isInt
             ? TextInputType.number
-            : const TextInputType.numberWithOptions(decimal: true),
+            : const TextInputType.numberWithOptions(
+                decimal: true, signed: true),
         textAlign: TextAlign.center,
         decoration: InputDecoration(
           labelText: label,

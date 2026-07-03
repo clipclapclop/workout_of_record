@@ -22,6 +22,9 @@ class Movements extends Table {
   BoolColumn get isRequiredTime => boolean()();
   BoolColumn get isRequiredDistance => boolean().withDefault(const Constant(false))();
   TextColumn get category => textEnum<MovementCategory>()();
+  /// Portion of body weight included when calculating deload effective load.
+  RealColumn get bodyweightLoadFraction =>
+      real().withDefault(const Constant(0.0))();
   /// Null = use global default (60 s). 0 = timer disabled for this movement.
   IntColumn get restSeconds => integer().nullable()();
 }

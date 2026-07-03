@@ -31,7 +31,7 @@ class SetUiState {
     }
     if (m.isRequiredWeight) {
       final v = double.tryParse(weightCtrl.text.trim());
-      if (v == null || v <= 0) return false;
+      if (v == null) return false;
     }
     if (m.isRequiredDistance) {
       final v = double.tryParse(distanceCtrl.text.trim());

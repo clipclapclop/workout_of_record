@@ -1,0 +1,16 @@
+{
+  "id": "deload-planning",
+  "summary": "Improved deterministic deload prescriptions with front-loaded heavy days, lower-volume easy days, and bodyweight-aware effective load calculations.",
+  "audience": "user",
+  "releaseNote": "Deload weeks now use front-loaded heavy and easy prescriptions, respect per-exercise progression settings, and account for body weight on relevant movements.",
+  "docs": {
+    "impact": "updated",
+    "paths": [
+      "docs/guides/mesocycles.md",
+      "docs/guides/movements-history.md",
+      "docs/guides/workouts.md"
+    ],
+    "reason": ""
+  },
+  "screenshots": []
+}

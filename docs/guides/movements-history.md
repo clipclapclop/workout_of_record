@@ -6,6 +6,10 @@ The movements screen lists known movements and supports filtering and grouping. 
 
 Take care when changing an existing movement's required fields: the change affects how future sets are displayed and validated.
 
+The bodyweight load contribution is a number from 0 to 1 used only by built-in deload calculations. Use 0 when body weight is not an appreciable part of the load and 1 when the full body is moved. Built-in movements include conservative defaults, while newly created movements default to 0.
+
+Assistance can be represented as a negative external weight. For example, enter 50 lb of pull-up assistance as `-50`, set the bodyweight contribution to `1`, and configure a sufficiently negative minimum weight so rounding can select the machine's assistance settings.
+
 ## Workout history
 
 The history screen provides calendar-based access to completed and skipped workouts. Open a workout to inspect exercises and sets, or open a movement from relevant screens to review its history.

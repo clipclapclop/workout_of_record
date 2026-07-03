@@ -2,6 +2,8 @@
 
 Screenshots are curated rather than generated automatically. Placeholder IDs are stable so release manifests and change fragments can refer to them.
 
+Release 1.0.2 adds no new screenshot requirements; the existing placeholders remain outstanding.
+
 | ID | Page | Required app state | Intended caption |
 | --- | --- | --- | --- |
 | `workout-home` | Workouts | Active mesocycle with the next workout ready | Starting or skipping the scheduled workout |

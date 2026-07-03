@@ -828,8 +828,8 @@ void main() {
       await finishWithSetValues(db, cwId, 8, 100.0);
     }
 
-    // W=2 (deload) Monday: every exercise stays at deload's reduced count
-    // (ceil(2/3 * 2) = 2), never gets a heuristic-added extra set.
+    // W=2 (deload) Monday is the first heavy deload workout. Every progressing
+    // exercise uses round(40% * 2), never a heuristic-added extra set.
     final w2Monday = await db.getOrCreateNextWorkout(mesoId);
     await db.generatePlannedWorkout(w2Monday!.id);
     final pw = await (db.select(db.plannedWorkouts)
@@ -843,8 +843,8 @@ void main() {
       final sets = await (db.select(db.plannedSets)
             ..where((s) => s.plannedExerciseId.equals(pe.id)))
           .get();
-      expect(sets.length, 2,
-          reason: 'Deload uses 2/3 of prior count, never +1 from heuristic');
+      expect(sets.length, 1,
+          reason: 'Heavy deload uses 40% of prior count, never +1');
     }
   });
 
