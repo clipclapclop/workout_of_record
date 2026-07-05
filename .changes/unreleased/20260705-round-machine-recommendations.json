@@ -1,0 +1,12 @@
+{
+  "id": "round-machine-recommendations",
+  "summary": "Round copied deload weights to each movement's configured minimum and increment so recommendations remain loadable when automatic progression is disabled.",
+  "audience": "user",
+  "releaseNote": "Weight recommendations now respect each machine's minimum weight and increment, including during deload weeks.",
+  "docs": {
+    "impact": "none",
+    "paths": [],
+    "reason": "This fixes recommendation behavior without changing the documented workflow."
+  },
+  "screenshots": []
+}

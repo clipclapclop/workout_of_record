@@ -93,6 +93,19 @@ void main() {
     expect(result.every((s) => s.weight == 50), isTrue);
   });
 
+  test('progression-off deload snaps copied weight to machine increment', () {
+    final result = computeHeuristic(
+      [_set(1, weight: 66.5)],
+      WeekGoal.deload,
+      _movement(minWeight: 10, weightDelta: 10),
+      1,
+      autoProgress: false,
+    );
+
+    // This machine can only be loaded to 10, 20, ... lb.
+    expect(result.single.weight, 70);
+  });
+
   test('nearest increment may keep a light heavy-deload weight unchanged', () {
     final result = computeHeuristic(
       [_set(1, weight: 15)],

@@ -28,13 +28,15 @@ DeloadType deloadTypeForWorkout(int workoutIndex, int workoutCount) {
 ///
 /// [autoProgress] controls whether the built-in progression algorithm is applied.
 /// When true + hard week: +1 rep per set (only when reps are present).
-/// When false: copy last week's values exactly (user-controlled).
+/// When false: retain last week's values (user-controlled), while ensuring a
+/// deload weight is valid for the movement's configured equipment.
 ///
 /// [addExtraSet] (hard week + autoProgress only): when true, appends one extra
 /// planned set with null values. Caller decides which exercises qualify based
 /// on the week/muscle-group alternation rule.
 ///
-/// Exercises with progression disabled are copied unchanged in every week.
+/// Exercises with progression disabled retain their prior prescription, with
+/// deload weights snapped to the movement's available equipment increments.
 /// Progressing deload exercises use the supplied front-loaded [deloadType].
 List<PlannedSetValues> computeHeuristic(
   List<CompletedSet> priorSets,
@@ -75,7 +77,7 @@ List<PlannedSetValues> computeHeuristic(
 
     case WeekGoal.deload:
       if (!autoProgress) {
-        return _copyPriorSets(priorSets, targetCount);
+        return _copyPriorSets(priorSets, targetCount, movement);
       }
       final setMultiplier = deloadType == DeloadType.heavy ? 0.40 : 0.30;
       final repMultiplier = deloadType == DeloadType.heavy ? 0.50 : 0.65;
@@ -105,13 +107,13 @@ List<PlannedSetValues> computeHeuristic(
 }
 
 List<PlannedSetValues> _copyPriorSets(
-    List<CompletedSet> priorSets, int targetCount) {
+    List<CompletedSet> priorSets, int targetCount, Movement movement) {
   return List.generate(
     targetCount,
     (i) => i < priorSets.length
         ? PlannedSetValues(
             reps: priorSets[i].reps,
-            weight: priorSets[i].weight,
+            weight: _roundToMovementIncrement(priorSets[i].weight, movement),
             time: priorSets[i].time,
           )
         : const PlannedSetValues(),
