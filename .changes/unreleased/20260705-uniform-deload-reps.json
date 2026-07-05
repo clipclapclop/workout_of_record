@@ -1,0 +1,12 @@
+{
+  "id": "uniform-deload-reps",
+  "summary": "Calculate deload reps from the first prior-week set and use that target for every set in the exercise.",
+  "audience": "user",
+  "releaseNote": "Deload exercises now use one consistent rep target across all planned sets.",
+  "docs": {
+    "impact": "updated",
+    "paths": ["docs/guides/mesocycles.md"],
+    "reason": ""
+  },
+  "screenshots": []
+}

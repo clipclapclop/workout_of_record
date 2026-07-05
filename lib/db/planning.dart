@@ -83,13 +83,15 @@ List<PlannedSetValues> computeHeuristic(
       final repMultiplier = deloadType == DeloadType.heavy ? 0.50 : 0.65;
       final loadMultiplier = deloadType == DeloadType.heavy ? 0.90 : 0.65;
       final count = max(1, (targetCount * setMultiplier).round());
+      final firstPriorReps = priorSets.firstOrNull?.reps;
+      final deloadReps = firstPriorReps == null
+          ? null
+          : max(1, (firstPriorReps * repMultiplier).round());
       return List.generate(
         count,
         (i) => i < priorSets.length
             ? PlannedSetValues(
-                reps: priorSets[i].reps == null
-                    ? null
-                    : max(1, (priorSets[i].reps! * repMultiplier).round()),
+                reps: deloadReps,
                 weight: _roundToMovementIncrement(
                   _deloadExternalWeight(
                     priorSets[i].weight,
@@ -101,13 +103,16 @@ List<PlannedSetValues> computeHeuristic(
                 ),
                 time: priorSets[i].time,
               )
-            : const PlannedSetValues(),
+            : PlannedSetValues(reps: deloadReps),
       );
   }
 }
 
 List<PlannedSetValues> _copyPriorSets(
-    List<CompletedSet> priorSets, int targetCount, Movement movement) {
+  List<CompletedSet> priorSets,
+  int targetCount,
+  Movement movement,
+) {
   return List.generate(
     targetCount,
     (i) => i < priorSets.length

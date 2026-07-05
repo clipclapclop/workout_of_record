@@ -63,7 +63,13 @@ void main() {
 
   test('heavy deload reduces sets, reps, and effective load', () {
     final result = computeHeuristic(
-      List.generate(5, (i) => _set(i)),
+      [
+        _set(1, reps: 10),
+        _set(2, reps: 8),
+        _set(3, reps: 6),
+        _set(4, reps: 4),
+        _set(5, reps: 2),
+      ],
       WeekGoal.deload,
       _movement(bodyweightLoadFraction: 0.85),
       5,
@@ -79,7 +85,13 @@ void main() {
 
   test('easy deload rounds reps and load to available increments', () {
     final result = computeHeuristic(
-      List.generate(5, (i) => _set(i)),
+      [
+        _set(1, reps: 11),
+        _set(2, reps: 8),
+        _set(3, reps: 6),
+        _set(4, reps: 4),
+        _set(5, reps: 2),
+      ],
       WeekGoal.deload,
       _movement(bodyweightLoadFraction: 0.5),
       5,
@@ -91,6 +103,20 @@ void main() {
     expect(result.length, 2); // round(5 * .30)
     expect(result.every((s) => s.reps == 7), isTrue);
     expect(result.every((s) => s.weight == 50), isTrue);
+  });
+
+  test('deload cascades the first calculated rep target to every set', () {
+    final result = computeHeuristic(
+      [_set(1, reps: 12), _set(2, reps: 5)],
+      WeekGoal.deload,
+      _movement(),
+      5,
+      autoProgress: true,
+      deloadType: DeloadType.heavy,
+    );
+
+    expect(result.length, 2);
+    expect(result.map((s) => s.reps), [6, 6]);
   });
 
   test('progression-off deload snaps copied weight to machine increment', () {
