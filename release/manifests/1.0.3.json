@@ -1,0 +1,22 @@
+{
+  "version": "1.0.3",
+  "versionCode": 4,
+  "releaseNotes": "docs/releases/1.0.3.md",
+  "docsImpact": "updated",
+  "updatedGuidePaths": [
+    "docs/guides/mesocycles.md",
+    "docs/screenshot-backlog.md"
+  ],
+  "noDocsReason": "",
+  "changeFragments": [
+    "release/fragments/1.0.3/20260705-mesocycle-template-selection.json",
+    "release/fragments/1.0.3/20260705-round-machine-recommendations.json",
+    "release/fragments/1.0.3/20260705-uniform-deload-reps.json"
+  ],
+  "outstandingScreenshots": [
+    "workout-home",
+    "mesocycle-calendar",
+    "workout-history",
+    "backup-settings"
+  ]
+}

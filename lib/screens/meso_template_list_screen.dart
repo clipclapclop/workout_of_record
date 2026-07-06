@@ -4,7 +4,7 @@ import '../db/app_database.dart';
 import '../db/db.dart';
 import '../db/template_data.dart';
 import '../widgets/app_nav_menu.dart';
-import '../widgets/past_meso_picker_sheet.dart';
+import '../widgets/meso_template_card.dart';
 import 'meso_template_builder_screen.dart';
 
 class MesoTemplateListScreen extends StatefulWidget {
@@ -22,17 +22,18 @@ class MesoTemplateListScreen extends StatefulWidget {
 }
 
 class _MesoTemplateListScreenState extends State<MesoTemplateListScreen> {
-  late Future<List<MesoTemplate>> _templatesFuture;
+  late Future<List<MesoTemplateWithHistory>> _templatesFuture;
+  MesoTemplateSort _sort = MesoTemplateSort.lastUsed;
 
   @override
   void initState() {
     super.initState();
-    _templatesFuture = db.getMesoTemplates();
+    _templatesFuture = db.getMesoTemplatesWithHistory();
   }
 
   void _reload() {
     setState(() {
-      _templatesFuture = db.getMesoTemplates();
+      _templatesFuture = db.getMesoTemplatesWithHistory();
     });
   }
 
@@ -68,12 +69,6 @@ class _MesoTemplateListScreenState extends State<MesoTemplateListScreen> {
       ),
       isNew: true,
     );
-  }
-
-  Future<void> _onCopyFromPastMeso() async {
-    final data = await showPastMesoPickerSheet(context);
-    if (data == null || !mounted) return;
-    await _openBuilder(existing: data, isNew: true);
   }
 
   Future<void> _onDelete(MesoTemplate t) async {
@@ -116,10 +111,9 @@ class _MesoTemplateListScreenState extends State<MesoTemplateListScreen> {
         title: const Text('Meso Templates'),
         automaticallyImplyLeading: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: 'From past mesocycle',
-            onPressed: _onCopyFromPastMeso,
+          MesoTemplateSortButton(
+            value: _sort,
+            onChanged: (value) => setState(() => _sort = value),
           ),
           AppNavMenu(
             current: AppScreen.mesoTemplates,
@@ -133,7 +127,7 @@ class _MesoTemplateListScreenState extends State<MesoTemplateListScreen> {
         tooltip: 'New template',
         child: const Icon(Icons.add),
       ),
-      body: FutureBuilder<List<MesoTemplate>>(
+      body: FutureBuilder<List<MesoTemplateWithHistory>>(
         future: _templatesFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
@@ -142,7 +136,7 @@ class _MesoTemplateListScreenState extends State<MesoTemplateListScreen> {
           if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
-          final templates = snapshot.data!;
+          final templates = sortMesoTemplates(snapshot.data!, _sort);
           if (templates.isEmpty) {
             return Center(
               child: Column(
@@ -163,39 +157,18 @@ class _MesoTemplateListScreenState extends State<MesoTemplateListScreen> {
             );
           }
           return ListView.builder(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+            padding: EdgeInsets.fromLTRB(
+                16, 16, 16, 16 + MediaQuery.of(context).padding.bottom),
             itemCount: templates.length,
             itemBuilder: (context, i) {
-              final t = templates[i];
-              return ListTile(
-                title: Text(t.name),
-                onTap: () => _onEdit(t),
-                trailing: PopupMenuButton<_TemplateAction>(
-                  onSelected: (action) {
-                    switch (action) {
-                      case _TemplateAction.edit:
-                        _onEdit(t);
-                      case _TemplateAction.copy:
-                        _onCopy(t);
-                      case _TemplateAction.delete:
-                        _onDelete(t);
-                    }
-                  },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(
-                      value: _TemplateAction.edit,
-                      child: Text('Edit'),
-                    ),
-                    PopupMenuItem(
-                      value: _TemplateAction.copy,
-                      child: Text('Copy'),
-                    ),
-                    PopupMenuItem(
-                      value: _TemplateAction.delete,
-                      child: Text('Delete'),
-                    ),
-                  ],
-                ),
+              final history = templates[i];
+              final template = history.template;
+              return MesoTemplateCard(
+                history: history,
+                onTap: () => _onEdit(template),
+                onEdit: () => _onEdit(template),
+                onCopy: () => _onCopy(template),
+                onDelete: () => _onDelete(template),
               );
             },
           );
@@ -204,5 +177,3 @@ class _MesoTemplateListScreenState extends State<MesoTemplateListScreen> {
     );
   }
 }
-
-enum _TemplateAction { edit, copy, delete }

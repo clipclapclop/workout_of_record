@@ -437,6 +437,7 @@ class AppDatabase extends _$AppDatabase {
 
       // ── All training done for this week ─────────────────────────────────────
       if (currentWeek.weekNumber >= meso.totalWeekCount) {
+        await _markMesocycleCompleteIfFinished(mesocycleId);
         return null; // Mesocycle complete.
       }
 
@@ -1384,16 +1385,15 @@ class AppDatabase extends _$AppDatabase {
 
   // ── Past-mesocycle → template methods ─────────────────────────────────────
 
-  /// Returns all mesocycles that have at least one week with a completed
-  /// workout, along with per-week completion counts.  Used by the
-  /// "Copy from Past Mesocycle" picker.
+  /// Returns completed mesocycles and their fully completed weeks. Naturally
+  /// completed legacy rows with a missing completedAt value are repaired.
   Future<List<MesocycleWeekSummary>> getMesocyclesWithCompletedWeeks() async {
     final allMesos = await (select(mesocycles)
           ..orderBy([(m) => OrderingTerm.desc(m.createdAt)]))
         .get();
 
     final result = <MesocycleWeekSummary>[];
-    for (final meso in allMesos) {
+    for (var meso in allMesos) {
       final mesoWeeks = await (select(weeks)
             ..where((w) => w.mesocycleId.equals(meso.id))
             ..orderBy([(w) => OrderingTerm.asc(w.weekNumber)]))
@@ -1401,28 +1401,21 @@ class AppDatabase extends _$AppDatabase {
 
       final weekSummaries = <WeekSummary>[];
       for (final week in mesoWeeks) {
-        final weekWorkouts = await (select(workouts)
-              ..where((w) => w.weekId.equals(week.id) & w.isRestDay.equals(false)))
-            .get();
-
-        var completedCount = 0;
-        for (final w in weekWorkouts) {
-          final cw = await (select(completedWorkouts)
-                ..where((c) => c.workoutId.equals(w.id)))
-              .getSingleOrNull();
-          if (cw != null) completedCount++;
-        }
-
-        if (completedCount > 0) {
-          weekSummaries.add(WeekSummary(
-            week: week,
-            completedWorkoutCount: completedCount,
-            totalWorkoutCount: weekWorkouts.length,
-          ));
-        }
+        final summary = await _completedWeekSummary(week, mesoWeeks);
+        if (summary != null) weekSummaries.add(summary);
       }
 
-      if (weekSummaries.isNotEmpty) {
+      final naturallyComplete = mesoWeeks.isNotEmpty &&
+          mesoWeeks.last.weekNumber >= meso.totalWeekCount &&
+          weekSummaries.any((s) => s.week.id == mesoWeeks.last.id);
+      if (meso.completedAt == null && naturallyComplete) {
+        final completedAt = await _lastCompletedDate(meso.id) ?? DateTime.now();
+        await (update(mesocycles)..where((m) => m.id.equals(meso.id)))
+            .write(MesocyclesCompanion(completedAt: Value(completedAt)));
+        meso = meso.copyWith(completedAt: Value(completedAt));
+      }
+
+      if (meso.completedAt != null && weekSummaries.isNotEmpty) {
         result.add(MesocycleWeekSummary(
           mesocycle: meso,
           weeks: weekSummaries,
@@ -1432,26 +1425,78 @@ class AppDatabase extends _$AppDatabase {
     return result;
   }
 
-  /// Extracts the exercise lineup from a specific week of a mesocycle and
-  /// returns it as a [MesoTemplateData] suitable for pre-populating the
-  /// template builder.
-  Future<MesoTemplateData> getMesoTemplateDataFromWeek(int weekId) async {
+  Future<WeekSummary?> _completedWeekSummary(
+      Week week, List<Week> mesoWeeks) async {
+    final expectedCount = (await _getWeekTemplateSlots(week, mesoWeeks))
+        .where((slot) => !slot.isRestDay)
+        .length;
+    final weekWorkouts = await (select(workouts)
+          ..where((w) => w.weekId.equals(week.id) & w.isRestDay.equals(false)))
+        .get();
+    var completedCount = 0;
+    for (final workout in weekWorkouts) {
+      final completed = await (select(completedWorkouts)
+            ..where((row) =>
+                row.workoutId.equals(workout.id) & row.completedAt.isNotNull()))
+          .getSingleOrNull();
+      if (completed != null) completedCount++;
+    }
+    if (expectedCount == 0 || completedCount != expectedCount) return null;
+    return WeekSummary(
+      week: week,
+      completedWorkoutCount: completedCount,
+      totalWorkoutCount: expectedCount,
+    );
+  }
+
+  Future<void> _markMesocycleCompleteIfFinished(int mesocycleId) async {
+    final meso = await (select(mesocycles)
+          ..where((row) => row.id.equals(mesocycleId)))
+        .getSingle();
+    if (meso.completedAt != null) return;
+    final mesoWeeks = await (select(weeks)
+          ..where((row) => row.mesocycleId.equals(mesocycleId))
+          ..orderBy([(row) => OrderingTerm.asc(row.weekNumber)]))
+        .get();
+    if (mesoWeeks.isEmpty ||
+        mesoWeeks.last.weekNumber < meso.totalWeekCount ||
+        await _completedWeekSummary(mesoWeeks.last, mesoWeeks) == null) {
+      return;
+    }
+    final completedAt = await _lastCompletedDate(mesocycleId) ?? DateTime.now();
+    await (update(mesocycles)..where((row) => row.id.equals(mesocycleId)))
+        .write(MesocyclesCompanion(completedAt: Value(completedAt)));
+  }
+
+  /// Extracts a completed week's exercise lineup and returns it together with
+  /// the currently stored template associated with its mesocycle.
+  Future<PastWeekTemplateData> getMesoTemplateDataFromWeek(int weekId) async {
     final week =
         await (select(weeks)..where((w) => w.id.equals(weekId))).getSingle();
     final meso = await (select(mesocycles)
           ..where((m) => m.id.equals(week.mesocycleId)))
         .getSingle();
 
+    final mesoWeeks = await (select(weeks)
+          ..where((row) => row.mesocycleId.equals(meso.id))
+          ..orderBy([(row) => OrderingTerm.asc(row.weekNumber)]))
+        .get();
+    final weekSlots = await _getWeekTemplateSlots(week, mesoWeeks);
+
     final weekWorkouts = await (select(workouts)
           ..where((w) => w.weekId.equals(weekId))
           ..orderBy([(w) => OrderingTerm.asc(w.orderIndex)]))
         .get();
+    final workoutByOrder = {
+      for (final workout in weekWorkouts) workout.orderIndex: workout,
+    };
 
     final days = <WorkoutDayData>[];
-    for (final workout in weekWorkouts) {
+    for (final slot in weekSlots) {
+      final workout = workoutByOrder[slot.orderIndex];
       final exercises = <ExerciseDayEntry>[];
 
-      if (!workout.isRestDay) {
+      if (!slot.isRestDay && workout != null) {
         final completed = await (select(completedWorkouts)
               ..where((cw) => cw.workoutId.equals(workout.id)))
             .getSingleOrNull();
@@ -1481,15 +1526,15 @@ class AppDatabase extends _$AppDatabase {
         template: WorkoutTemplate(
           id: -1,
           weekTemplateId: -1,
-          name: workout.name,
-          isRestDay: workout.isRestDay,
-          dayIndex: workout.orderIndex,
+          name: slot.name,
+          isRestDay: slot.isRestDay,
+          dayIndex: slot.orderIndex,
         ),
         exercises: exercises,
       ));
     }
 
-    return MesoTemplateData(
+    final extracted = MesoTemplateData(
       template: MesoTemplate(
         id: -1,
         name: 'From ${meso.name} W${week.weekNumber}',
@@ -1497,6 +1542,51 @@ class AppDatabase extends _$AppDatabase {
       ),
       days: days,
     );
+
+    return PastWeekTemplateData(
+      mesocycle: meso,
+      week: week,
+      weekData: extracted,
+      associatedTemplate: await getMesoTemplateData(meso.mesoTemplateId),
+    );
+  }
+
+  Future<bool> mesoTemplateMatches(
+    int templateId,
+    List<WorkoutDaySpec> days, {
+    String? name,
+  }) async {
+    final source = await getMesoTemplateData(templateId);
+    if (name != null && source.template.name != name) return false;
+    final sourceDays = workoutDaySpecsFromData(source);
+    if (sourceDays.length != days.length) return false;
+    for (var dayIndex = 0; dayIndex < sourceDays.length; dayIndex++) {
+      final sourceDay = sourceDays[dayIndex];
+      final candidateDay = days[dayIndex];
+      if (sourceDay.name != candidateDay.name ||
+          sourceDay.isRestDay != candidateDay.isRestDay ||
+          sourceDay.exercises.length != candidateDay.exercises.length) {
+        return false;
+      }
+      for (var exerciseIndex = 0;
+          exerciseIndex < sourceDay.exercises.length;
+          exerciseIndex++) {
+        final sourceExercise = sourceDay.exercises[exerciseIndex];
+        final candidateExercise = candidateDay.exercises[exerciseIndex];
+        if (sourceExercise.movementId != candidateExercise.movementId ||
+            sourceExercise.autoProgress != candidateExercise.autoProgress) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  Future<bool> mesoTemplateNameExists(String name, {int? excludingId}) async {
+    final normalized = name.toLowerCase();
+    final templates = await select(mesoTemplates).get();
+    return templates.any((template) =>
+        template.id != excludingId && template.name.toLowerCase() == normalized);
   }
 
   Future<List<Movement>> getMovements() =>
@@ -1516,12 +1606,24 @@ class AppDatabase extends _$AppDatabase {
 
   /// Marks the workout complete in the DB.
   /// Caller is responsible for clearing AppPreferences.currentCompletedWorkoutId.
-  Future<void> finishWorkout(int completedWorkoutId) =>
-      (update(completedWorkouts)..where((w) => w.id.equals(completedWorkoutId)))
-          .write(CompletedWorkoutsCompanion(
+  Future<void> finishWorkout(int completedWorkoutId) async {
+    await (update(completedWorkouts)
+          ..where((w) => w.id.equals(completedWorkoutId)))
+        .write(CompletedWorkoutsCompanion(
         completedAt: Value(DateTime.now()),
         status: const Value(WorkoutStatus.completed),
       ));
+    final completed = await (select(completedWorkouts)
+          ..where((row) => row.id.equals(completedWorkoutId)))
+        .getSingle();
+    final workout = await (select(workouts)
+          ..where((row) => row.id.equals(completed.workoutId)))
+        .getSingle();
+    final week = await (select(weeks)
+          ..where((row) => row.id.equals(workout.weekId)))
+        .getSingle();
+    await _markMesocycleCompleteIfFinished(week.mesocycleId);
+  }
 
   Future<void> skipWorkout(int workoutId, WorkoutSkipReason reason) async {
     final now = DateTime.now();
@@ -1532,6 +1634,13 @@ class AppDatabase extends _$AppDatabase {
       status: WorkoutStatus.skipped,
       skipReason: Value(reason),
     ));
+    final workout = await (select(workouts)
+          ..where((row) => row.id.equals(workoutId)))
+        .getSingle();
+    final week = await (select(weeks)
+          ..where((row) => row.id.equals(workout.weekId)))
+        .getSingle();
+    await _markMesocycleCompleteIfFinished(week.mesocycleId);
   }
 
   Future<void> setPersistence(

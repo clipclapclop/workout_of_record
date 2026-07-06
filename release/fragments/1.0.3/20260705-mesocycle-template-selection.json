@@ -1,0 +1,12 @@
+{
+  "id": "mesocycle-template-selection",
+  "summary": "Clarified saved-template management and added a review-first workflow for starting from completed mesocycle weeks.",
+  "audience": "user",
+  "releaseNote": "Mesocycle templates now show creation and last-used dates, support sorting, and let you review, use, edit, update, or copy a completed week when starting a new mesocycle.",
+  "docs": {
+    "impact": "updated",
+    "paths": ["docs/guides/mesocycles.md"],
+    "reason": ""
+  },
+  "screenshots": []
+}

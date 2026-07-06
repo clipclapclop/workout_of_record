@@ -4,11 +4,9 @@ import '../db/db.dart';
 import '../db/tables/enums.dart';
 import '../db/template_data.dart';
 
-/// Shows a bottom-sheet picker that lets the user choose a mesocycle and week
-/// to copy into the template builder.  Returns the extracted [MesoTemplateData]
-/// or `null` if the sheet was dismissed.
-Future<MesoTemplateData?> showPastMesoPickerSheet(BuildContext context) {
-  return showModalBottomSheet<MesoTemplateData>(
+/// Lets the user choose a fully completed week from a completed mesocycle.
+Future<PastWeekTemplateData?> showPastMesoPickerSheet(BuildContext context) {
+  return showModalBottomSheet<PastWeekTemplateData>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -75,9 +73,19 @@ class _PastMesoPickerSheetState extends State<_PastMesoPickerSheet> {
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text(
-                'Copy from Past Mesocycle',
-                style: Theme.of(context).textTheme.titleMedium,
+              child: Column(
+                children: [
+                  Text(
+                    'Use a Week from a Past Mesocycle',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Choose a completed week to review before deciding whether to use or edit it.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
               ),
             ),
             if (_loading) const LinearProgressIndicator(),
@@ -97,7 +105,7 @@ class _PastMesoPickerSheetState extends State<_PastMesoPickerSheet> {
                       child: Padding(
                         padding: EdgeInsets.all(32),
                         child: Text(
-                          'No past mesocycles with completed workouts.',
+                          'No completed mesocycles with completed weeks.',
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -132,33 +140,10 @@ class _MesoTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final meso = summary.mesocycle;
-    final inProgress = meso.completedAt == null;
-
     return ExpansionTile(
       title: Text(meso.name),
-      subtitle: Row(
-        children: [
-          Text(_formatDate(meso.createdAt),
-              style: Theme.of(context).textTheme.bodySmall),
-          if (inProgress) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                'In Progress',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color:
-                          Theme.of(context).colorScheme.onPrimaryContainer,
-                    ),
-              ),
-            ),
-          ],
-        ],
-      ),
+      subtitle: Text(_formatDate(meso.createdAt),
+          style: Theme.of(context).textTheme.bodySmall),
       children: summary.weeks.map((ws) {
         final goalLabel =
             ws.week.goal == WeekGoal.deload ? 'Deload' : 'Hard';

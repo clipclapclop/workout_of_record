@@ -48,6 +48,38 @@ class MesoTemplateData {
   final List<WorkoutDayData> days; // ordered by dayIndex
 }
 
+/// A completed historical week together with the saved template associated
+/// with the mesocycle it came from.
+class PastWeekTemplateData {
+  const PastWeekTemplateData({
+    required this.mesocycle,
+    required this.week,
+    required this.weekData,
+    required this.associatedTemplate,
+  });
+
+  final Mesocycle mesocycle;
+  final Week week;
+  final MesoTemplateData weekData;
+  final MesoTemplateData associatedTemplate;
+
+  String get suggestedName =>
+      'From ${mesocycle.name} W${week.weekNumber}';
+}
+
+List<WorkoutDaySpec> workoutDaySpecsFromData(MesoTemplateData data) => data.days
+    .map((day) => WorkoutDaySpec(
+          name: day.template.name,
+          isRestDay: day.template.isRestDay,
+          exercises: day.exercises
+              .map((exercise) => ExerciseSpec(
+                    movementId: exercise.movement.id,
+                    autoProgress: exercise.autoProgress,
+                  ))
+              .toList(),
+        ))
+    .toList();
+
 /// Summary of a single week within a mesocycle — used by the past-meso picker.
 class WeekSummary {
   const WeekSummary({

@@ -32,12 +32,16 @@ class MesoTemplateBuilderScreen extends StatefulWidget {
     /// true  → Save calls createMesoTemplate (new row).
     /// false → Save calls updateMesoTemplate (existing row).
     required this.isNew,
+    this.pastWeekSourceTemplateId,
+    this.pastWeekSourceTemplateName,
     this.activeWorkoutId,
     this.activeWorkoutName,
   });
 
   final MesoTemplateData? existing;
   final bool isNew;
+  final int? pastWeekSourceTemplateId;
+  final String? pastWeekSourceTemplateName;
   final int? activeWorkoutId;
   final String? activeWorkoutName;
 
@@ -206,13 +210,41 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
               ))
           .toList();
 
-      if (widget.isNew) {
-        await db.createMesoTemplate(name, specs);
+      late final int templateId;
+      final sourceTemplateId = widget.pastWeekSourceTemplateId;
+      if (sourceTemplateId != null) {
+        final matches = await db.mesoTemplateMatches(
+          sourceTemplateId,
+          specs,
+          name: name,
+        );
+        if (matches) {
+          templateId = sourceTemplateId;
+        } else {
+          if (name == widget.pastWeekSourceTemplateName ||
+              await db.mesoTemplateNameExists(name)) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Choose a distinct name for the new template.',
+                  ),
+                ),
+              );
+              setState(() => _saving = false);
+            }
+            return;
+          }
+          templateId = await db.createMesoTemplate(name, specs);
+        }
+      } else if (widget.isNew) {
+        templateId = await db.createMesoTemplate(name, specs);
       } else {
         await db.updateMesoTemplate(widget.existing!.template.id, name, specs);
+        templateId = widget.existing!.template.id;
       }
 
-      if (mounted) Navigator.pop(context);
+      if (mounted) Navigator.pop(context, templateId);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -307,13 +339,38 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
       ),
       body: _allMovements == null
           ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabCtrl,
-              // Last "tab" for the + button is never shown as a body.
+          : Column(
               children: [
-                for (var i = 0; i < _days.length; i++) _buildDayTab(i),
-                // Placeholder body for the + tab (never actually shown).
-                const SizedBox.shrink(),
+                if (widget.pastWeekSourceTemplateId != null)
+                  Container(
+                    width: double.infinity,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    padding: const EdgeInsets.all(12),
+                    child: const Text(
+                      'You are editing a completed week. If the final name, days, and exercises match its associated template, that template will be reused. Otherwise this must be saved with a distinct name.',
+                    ),
+                  ),
+                if (widget.pastWeekSourceTemplateId == null &&
+                    widget.isNew &&
+                    widget.existing != null)
+                  Container(
+                    width: double.infinity,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    padding: const EdgeInsets.all(12),
+                    child: const Text(
+                      'Saving creates a new template. Review the days and give this version a distinct name.',
+                    ),
+                  ),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabCtrl,
+                    children: [
+                      for (var i = 0; i < _days.length; i++) _buildDayTab(i),
+                      // The last tab is only an add button.
+                      const SizedBox.shrink(),
+                    ],
+                  ),
+                ),
               ],
             ),
     );

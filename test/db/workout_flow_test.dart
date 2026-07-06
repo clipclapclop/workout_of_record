@@ -3,6 +3,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_of_record/db/app_database.dart';
 import 'package:workout_of_record/db/tables/enums.dart';
+import 'package:workout_of_record/db/template_data.dart';
 
 AppDatabase _openDb() =>
     AppDatabase.withExecutor(NativeDatabase.memory());
@@ -212,6 +213,10 @@ void main() {
 
     final done = await db.getOrCreateNextWorkout(mesoId);
     expect(done, isNull);
+    final meso = await (db.select(db.mesocycles)
+          ..where((m) => m.id.equals(mesoId)))
+        .getSingle();
+    expect(meso.completedAt, isNotNull);
   });
 
   // ── Cross-meso seeding tests ─────────────────────────────────────────────
@@ -897,5 +902,113 @@ void main() {
       // Also no rep bump: prior reps preserved.
       expect(sets.every((s) => s.reps == 8), true);
     }
+  });
+
+  test('25. Past week retains both extracted data and associated template',
+      () async {
+    final db = _openDb();
+    addTearDown(db.close);
+
+    final template = (await db.getMesoTemplates()).first;
+    final mesoId = await db.createMesocycle(template.id, 'Reuse test', 2);
+    for (var i = 0; i < 5; i++) {
+      final workout = await db.getOrCreateNextWorkout(mesoId);
+      await _completeWorkoutFull(db, workout!.id);
+    }
+
+    final week = (await (db.select(db.weeks)
+          ..where((w) => w.mesocycleId.equals(mesoId)))
+        .get())
+        .first;
+    final unchanged = await db.getMesoTemplateDataFromWeek(week.id);
+    final unchangedSpecs = workoutDaySpecsFromData(unchanged.weekData);
+    expect(unchanged.associatedTemplate.template.id, template.id);
+    expect(await db.mesoTemplateMatches(template.id, unchangedSpecs), isTrue);
+    expect(
+      await db.mesoTemplateMatches(
+        template.id,
+        unchangedSpecs,
+        name: template.name,
+      ),
+      isTrue,
+    );
+
+    final completedExercise = (await db.select(db.completedExercises).get()).first;
+    final replacement = (await db.select(db.movements).get())
+        .firstWhere((m) => m.id != completedExercise.movementId);
+    await (db.update(db.completedExercises)
+          ..where((e) => e.id.equals(completedExercise.id)))
+        .write(CompletedExercisesCompanion(
+          movementId: Value(replacement.id),
+        ));
+
+    final changed = await db.getMesoTemplateDataFromWeek(week.id);
+    final changedSpecs = workoutDaySpecsFromData(changed.weekData);
+    expect(
+      await db.mesoTemplateMatches(
+        template.id,
+        changedSpecs,
+      ),
+      isFalse,
+    );
+    expect(changed.suggestedName, 'From Reuse test W1');
+
+    await db.updateMesoTemplate(template.id, template.name, changedSpecs);
+    expect(await db.mesoTemplateMatches(template.id, changedSpecs), isTrue);
+    expect(await db.mesoTemplateNameExists(template.name), isTrue);
+    expect(await db.mesoTemplateNameExists('Unused template name'), isFalse);
+  });
+
+  test('26. Past picker includes only completed mesos and completed weeks',
+      () async {
+    final db = _openDb();
+    addTearDown(db.close);
+
+    final mesoId = await _createMeso(db, totalWeeks: 2);
+    final firstWorkout = await db.getOrCreateNextWorkout(mesoId);
+    await _completeWorkoutFull(db, firstWorkout!.id);
+    await db.endMesocycleEarly(mesoId);
+
+    expect(await db.getMesocyclesWithCompletedWeeks(), isEmpty);
+
+    final secondMesoId = await _createMeso(db, totalWeeks: 2);
+    for (var i = 0; i < 5; i++) {
+      final workout = await db.getOrCreateNextWorkout(secondMesoId);
+      await _completeWorkoutFull(db, workout!.id);
+    }
+    await db.endMesocycleEarly(secondMesoId);
+
+    final summaries = await db.getMesocyclesWithCompletedWeeks();
+    expect(summaries, hasLength(1));
+    expect(summaries.single.mesocycle.id, secondMesoId);
+    expect(summaries.single.weeks, hasLength(1));
+    expect(summaries.single.weeks.single.completedWorkoutCount, 5);
+  });
+
+  test('27. Past picker repairs naturally completed legacy mesocycles',
+      () async {
+    final db = _openDb();
+    addTearDown(db.close);
+
+    final mesoId = await _createMeso(db, totalWeeks: 2);
+    for (var i = 0; i < 10; i++) {
+      final workout = await db.getOrCreateNextWorkout(mesoId);
+      await _completeWorkoutFull(db, workout!.id);
+    }
+    var meso = await (db.select(db.mesocycles)
+          ..where((m) => m.id.equals(mesoId)))
+        .getSingle();
+    expect(meso.completedAt, isNotNull);
+
+    // Simulate data created before natural completion was recorded.
+    await (db.update(db.mesocycles)..where((m) => m.id.equals(mesoId)))
+        .write(const MesocyclesCompanion(completedAt: Value(null)));
+
+    final summaries = await db.getMesocyclesWithCompletedWeeks();
+    expect(summaries.single.weeks, hasLength(2));
+    meso = await (db.select(db.mesocycles)
+          ..where((m) => m.id.equals(mesoId)))
+        .getSingle();
+    expect(meso.completedAt, isNotNull);
   });
 }

@@ -5,9 +5,11 @@ import '../db/app_database.dart';
 import '../db/db.dart';
 import '../db/template_data.dart';
 import '../widgets/app_nav_menu.dart';
+import '../widgets/meso_template_card.dart';
 import 'home_screen.dart';
 import '../widgets/past_meso_picker_sheet.dart';
 import 'meso_template_builder_screen.dart';
+import 'past_week_review_screen.dart';
 
 class MesocycleSetupScreen extends StatefulWidget {
   const MesocycleSetupScreen({super.key});
@@ -18,15 +20,20 @@ class MesocycleSetupScreen extends StatefulWidget {
 
 class _MesocycleSetupScreenState extends State<MesocycleSetupScreen> {
   late Future<List<MesoTemplateWithHistory>> _templatesFuture;
+  late Future<bool> _hasPastWeeksFuture;
   MesoTemplate? _selected;
   final _nameController = TextEditingController();
   int _totalWeeks = 4;
   bool _saving = false;
+  MesoTemplateSort _sort = MesoTemplateSort.lastUsed;
 
   @override
   void initState() {
     super.initState();
     _templatesFuture = db.getMesoTemplatesWithHistory();
+    _hasPastWeeksFuture = db
+        .getMesocyclesWithCompletedWeeks()
+        .then((summaries) => summaries.isNotEmpty);
   }
 
   @override
@@ -35,38 +42,55 @@ class _MesocycleSetupScreenState extends State<MesocycleSetupScreen> {
     super.dispose();
   }
 
-  void _reload() {
+  Future<void> _reload({int? selectTemplateId}) async {
     setState(() {
       _templatesFuture = db.getMesoTemplatesWithHistory();
       _selected = null;
       _nameController.clear();
     });
+    if (selectTemplateId == null) return;
+    final selected = (await db.getMesoTemplateData(selectTemplateId)).template;
+    if (!mounted) return;
+    setState(() {
+      _selected = selected;
+      _nameController.text = selected.name;
+    });
+  }
+
+  void _selectTemplate(MesoTemplate template) {
+    final previous = _selected;
+    final useTemplateName = _nameController.text.isEmpty ||
+        (previous != null && _nameController.text == previous.name);
+    setState(() {
+      _selected = template;
+      if (useTemplateName) _nameController.text = template.name;
+    });
   }
 
   Future<void> _createTemplate() async {
-    await Navigator.push(
+    final templateId = await Navigator.push<int>(
       context,
       MaterialPageRoute(builder: (_) => const MesoTemplateBuilderScreen(isNew: true)),
     );
-    _reload();
+    await _reload(selectTemplateId: templateId);
   }
 
   Future<void> _onEdit(MesoTemplate t) async {
     final data = await db.getMesoTemplateData(t.id);
     if (!mounted) return;
-    await Navigator.push(
+    await Navigator.push<int>(
       context,
       MaterialPageRoute(
         builder: (_) => MesoTemplateBuilderScreen(existing: data, isNew: false),
       ),
     );
-    _reload();
+    await _reload(selectTemplateId: _selected?.id);
   }
 
   Future<void> _onCopy(MesoTemplate t) async {
     final data = await db.getMesoTemplateData(t.id);
     if (!mounted) return;
-    await Navigator.push(
+    final templateId = await Navigator.push<int>(
       context,
       MaterialPageRoute(
         builder: (_) => MesoTemplateBuilderScreen(
@@ -81,19 +105,19 @@ class _MesocycleSetupScreenState extends State<MesocycleSetupScreen> {
         ),
       ),
     );
-    _reload();
+    await _reload(selectTemplateId: templateId);
   }
 
   Future<void> _onCopyFromPastMeso() async {
     final data = await showPastMesoPickerSheet(context);
     if (data == null || !mounted) return;
-    await Navigator.push(
+    final templateId = await Navigator.push<int>(
       context,
       MaterialPageRoute(
-        builder: (_) => MesoTemplateBuilderScreen(existing: data, isNew: true),
+        builder: (_) => PastWeekReviewScreen(data: data),
       ),
     );
-    _reload();
+    await _reload(selectTemplateId: templateId);
   }
 
   Future<void> _startMesocycle() async {
@@ -124,7 +148,13 @@ class _MesocycleSetupScreenState extends State<MesocycleSetupScreen> {
       appBar: AppBar(
         title: const Text('Mesocycle Setup'),
         automaticallyImplyLeading: false,
-        actions: [AppNavMenu(current: AppScreen.workout)],
+        actions: [
+          MesoTemplateSortButton(
+            value: _sort,
+            onChanged: (value) => setState(() => _sort = value),
+          ),
+          AppNavMenu(current: AppScreen.workout),
+        ],
       ),
       body: FutureBuilder<List<MesoTemplateWithHistory>>(
         future: _templatesFuture,
@@ -136,7 +166,7 @@ class _MesocycleSetupScreenState extends State<MesocycleSetupScreen> {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
 
-          final templates = snapshot.data!;
+          final templates = sortMesoTemplates(snapshot.data!, _sort);
           final selectedTemplate = _selected;
 
           return Column(
@@ -149,21 +179,22 @@ class _MesocycleSetupScreenState extends State<MesocycleSetupScreen> {
                   children: [
                     Text('Choose a Template',
                         style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Select a saved plan, create one, or review a completed week from a past mesocycle.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                     const SizedBox(height: 8),
                     if (templates.isEmpty)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 16),
                         child: Text('No templates yet. Create one below.'),
                       ),
-                    ...templates.map((th) => _TemplateCard(
+                    ...templates.map((th) => MesoTemplateCard(
                           history: th,
                           isSelected: _selected?.id == th.template.id,
-                          onTap: () => setState(() {
-                            _selected = th.template;
-                            if (_nameController.text.isEmpty) {
-                              _nameController.text = th.template.name;
-                            }
-                          }),
+                          showSelection: true,
+                          onTap: () => _selectTemplate(th.template),
                           onEdit: () => _onEdit(th.template),
                           onCopy: () => _onCopy(th.template),
                         )),
@@ -173,11 +204,20 @@ class _MesocycleSetupScreenState extends State<MesocycleSetupScreen> {
                       icon: const Icon(Icons.add),
                       label: const Text('New Template'),
                     ),
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: _onCopyFromPastMeso,
-                      icon: const Icon(Icons.history),
-                      label: const Text('From Past Mesocycle'),
+                    FutureBuilder<bool>(
+                      future: _hasPastWeeksFuture,
+                      builder: (context, snapshot) => snapshot.data == true
+                          ? Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: OutlinedButton.icon(
+                                onPressed: _onCopyFromPastMeso,
+                                icon: const Icon(Icons.history),
+                                label: const Text(
+                                  'Review Past Mesocycle Week',
+                                ),
+                              ),
+                            )
+                          : const SizedBox.shrink(),
                     ),
                     if (selectedTemplate != null) ...[
                       const SizedBox(height: 24),
@@ -189,7 +229,8 @@ class _MesocycleSetupScreenState extends State<MesocycleSetupScreen> {
                       TextField(
                         controller: _nameController,
                         decoration: const InputDecoration(
-                          labelText: 'Name',
+                          labelText: 'Mesocycle name',
+                          helperText: 'Names this run; the selected template is unchanged.',
                           border: OutlineInputBorder(),
                         ),
                         textCapitalization: TextCapitalization.words,
@@ -208,101 +249,6 @@ class _MesocycleSetupScreenState extends State<MesocycleSetupScreen> {
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-String _formatDate(DateTime d) {
-  const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-  ];
-  return '${months[d.month - 1]} ${d.day}, ${d.year}';
-}
-
-// ── Template card ─────────────────────────────────────────────────────────────
-
-enum _CardAction { edit, copy }
-
-class _TemplateCard extends StatelessWidget {
-  const _TemplateCard({
-    required this.history,
-    required this.isSelected,
-    required this.onTap,
-    required this.onEdit,
-    required this.onCopy,
-  });
-
-  final MesoTemplateWithHistory history;
-  final bool isSelected;
-  final VoidCallback onTap;
-  final VoidCallback onEdit;
-  final VoidCallback onCopy;
-
-  @override
-  Widget build(BuildContext context) {
-    final template = history.template;
-    final completed =
-        history.pastMesos.where((m) => m.completedAt != null).toList();
-    final lastCompleted =
-        completed.isNotEmpty ? completed.first.completedAt : null;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: isSelected
-            ? BorderSide(
-                color: Theme.of(context).colorScheme.primary, width: 2)
-            : BorderSide.none,
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(template.name,
-                        style: Theme.of(context).textTheme.titleSmall),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Created ${_formatDate(template.createdAt)}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    if (lastCompleted != null)
-                      Text(
-                        'Last completed ${_formatDate(lastCompleted)}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                  ],
-                ),
-              ),
-              if (isSelected)
-                Icon(Icons.check_circle,
-                    color: Theme.of(context).colorScheme.primary),
-              PopupMenuButton<_CardAction>(
-                onSelected: (action) {
-                  switch (action) {
-                    case _CardAction.edit:
-                      onEdit();
-                    case _CardAction.copy:
-                      onCopy();
-                  }
-                },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: _CardAction.edit, child: Text('Edit')),
-                  PopupMenuItem(value: _CardAction.copy, child: Text('Copy')),
-                ],
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

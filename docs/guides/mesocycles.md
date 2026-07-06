@@ -6,6 +6,12 @@ A mesocycle repeats an ordered cycle of workout and rest days. It contains hard 
 
 Choose or create a mesocycle template, set its duration, and review its ordered days and exercises. A template establishes the first week; later weeks build from what was actually completed.
 
+Template cards show when each template was created and last used. Sort them by name, newest creation date, or newest use date. Selecting a saved template for a new mesocycle reuses it directly; the mesocycle name identifies the new run and does not rename or copy the template. The separate template library manages saved templates but does not import workout history.
+
+To start from prior training, choose **Review Past Mesocycle Week** during mesocycle setup. Only completed mesocycles and fully completed weeks are available. Week 1 was generated from the mesocycle's saved template; every later week was generated from the previous week's persistent completed exercises.
+
+After selecting a week, the app shows its completed persistent exercises before making any template changes. **Use Week** compares that plan with the saved template associated with the mesocycle. An exact match reuses the saved template. If they differ, choose either **Update Existing** to replace the saved template's plan while keeping its name, or **Save as New** to create a distinctly named template. **Edit Week** unlocks the plan first; an exact final match reuses the associated template, while any different name, day, exercise, order, or automatic-progression setting is saved as a new template.
+
 Within a template, exercises can be reordered, added, or removed. Automatic progression can be configured per exercise.
 
 ## Change the duration
