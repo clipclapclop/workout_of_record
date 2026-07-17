@@ -1,0 +1,12 @@
+{
+  "id": "carry-forward-final-set-weight",
+  "summary": "Use an exercise's final performed set weight for every set in the following built-in-progression hard week, so in-workout load adjustments become the next week's prescription.",
+  "audience": "user",
+  "releaseNote": "Built-in hard-week progression now uses the final weight performed for an exercise across every set the following week.",
+  "docs": {
+    "impact": "updated",
+    "paths": ["docs/guides/mesocycles.md"],
+    "reason": ""
+  },
+  "screenshots": []
+}

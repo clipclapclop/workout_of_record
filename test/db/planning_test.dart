@@ -43,6 +43,38 @@ void main() {
     ]);
   });
 
+  test('hard progression uses the final performed weight for every set', () {
+    for (final finalWeight in [90.0, 80.0]) {
+      final result = computeHeuristic(
+        [_set(1, reps: 8, weight: 85), _set(2, reps: 9, weight: finalWeight)],
+        WeekGoal.hard,
+        _movement(),
+        2,
+        autoProgress: true,
+        addExtraSet: true,
+      );
+
+      expect(result.map((s) => s.weight), [
+        finalWeight,
+        finalWeight,
+        finalWeight,
+      ]);
+      expect(result.map((s) => s.reps), [9, 10, null]);
+    }
+  });
+
+  test('hard week with progression off preserves per-set weights', () {
+    final result = computeHeuristic(
+      [_set(1, weight: 85), _set(2, weight: 90)],
+      WeekGoal.hard,
+      _movement(),
+      2,
+      autoProgress: false,
+    );
+
+    expect(result.map((s) => s.weight), [85, 90]);
+  });
+
   test('progression-off deload copies the prior prescription', () {
     final prior = [_set(1, reps: 9, weight: 95), _set(2, reps: 8, weight: 90)];
 

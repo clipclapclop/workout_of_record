@@ -1,0 +1,20 @@
+{
+  "version": "1.0.4",
+  "versionCode": 5,
+  "releaseNotes": "docs/releases/1.0.4.md",
+  "docsImpact": "updated",
+  "updatedGuidePaths": [
+    "docs/guides/mesocycles.md",
+    "docs/screenshot-backlog.md"
+  ],
+  "noDocsReason": "",
+  "changeFragments": [
+    "release/fragments/1.0.4/20260716-carry-forward-final-set-weight.json"
+  ],
+  "outstandingScreenshots": [
+    "workout-home",
+    "mesocycle-calendar",
+    "workout-history",
+    "backup-settings"
+  ]
+}

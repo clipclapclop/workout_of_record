@@ -23,7 +23,7 @@ The mesocycle calendar shows materialized weeks and workouts. When the current w
 
 ## Automatic progression
 
-For exercises with automatic progression enabled, hard weeks can increase reps and periodically append a set according to the exercise's position within its muscle group. A newly appended set carries forward the prior set's weight while leaving reps empty for confirmation.
+For exercises with automatic progression enabled, hard weeks after the first use the final performed set's weight from the previous week for every set. This makes the weight you settle on during an exercise the starting prescription for that exercise the following week. Hard weeks can also increase reps and periodically append a set according to the exercise's position within its muscle group; a newly appended set uses the same carried-forward weight while leaving reps empty for confirmation. This built-in progression is used when AI recommendations are disabled or unavailable.
 
 The built-in deload planner front-loads approximately one-third of the week's training days as heavy deload workouts. Heavy days use 40% of the prior sets, 50% of the first prior set's reps, and 90% of the prior effective load. Later easy days use 30% of the prior sets, 65% of the first prior set's reps, and 65% of the prior effective load. The calculated rep target is used for every set of the exercise. Sets and reps round to the nearest whole number with a minimum of one; weights round to the movement's available increment. Exercises with automatic progression disabled are copied unchanged during deloads.
 

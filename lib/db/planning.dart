@@ -27,13 +27,14 @@ DeloadType deloadTypeForWorkout(int workoutIndex, int workoutCount) {
 /// Zero [targetCount] triggers cold start: 2 null sets.
 ///
 /// [autoProgress] controls whether the built-in progression algorithm is applied.
-/// When true + hard week: +1 rep per set (only when reps are present).
+/// When true + hard week: +1 rep per set (only when reps are present), and use
+/// the final performed set's weight for every set.
 /// When false: retain last week's values (user-controlled), while ensuring a
 /// deload weight is valid for the movement's configured equipment.
 ///
 /// [addExtraSet] (hard week + autoProgress only): when true, appends one extra
-/// planned set with null values. Caller decides which exercises qualify based
-/// on the week/muscle-group alternation rule.
+/// planned set with the carried-forward weight and null reps. Caller decides
+/// which exercises qualify based on the week/muscle-group alternation rule.
 ///
 /// Exercises with progression disabled retain their prior prescription, with
 /// deload weights snapped to the movement's available equipment increments.
@@ -56,23 +57,21 @@ List<PlannedSetValues> computeHeuristic(
     case WeekGoal.hard:
       final extra = autoProgress && addExtraSet;
       final count = extra ? targetCount + 1 : targetCount;
+      final progressionWeight = autoProgress
+          ? priorSets.lastOrNull?.weight
+          : null;
       return List.generate(count, (i) {
         if (i < priorSets.length) {
+          final priorSet = priorSets[i];
           return PlannedSetValues(
-            reps: autoProgress && priorSets[i].reps != null
-                ? priorSets[i].reps! + 1
-                : priorSets[i].reps,
-            weight: priorSets[i].weight,
-            time: priorSets[i].time,
+            reps: autoProgress && priorSet.reps != null
+                ? priorSet.reps! + 1
+                : priorSet.reps,
+            weight: autoProgress ? progressionWeight : priorSet.weight,
+            time: priorSet.time,
           );
         }
-        // The extra set appended by progression mirrors the manual dropdown
-        // "Add Set": carry the last set's weight forward and leave reps blank
-        // for the user to record.
-        if (extra && i == count - 1 && priorSets.isNotEmpty) {
-          return PlannedSetValues(weight: priorSets.last.weight);
-        }
-        return const PlannedSetValues();
+        return PlannedSetValues(weight: progressionWeight);
       });
 
     case WeekGoal.deload:
