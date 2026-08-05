@@ -1,6 +1,6 @@
 # Releasing
 
-Releases are built on the local Linux workstation and published to GitHub. The release tool never edits, stages, or commits tracked files.
+Releases are built on the local Linux workstation. Forgejo is the canonical source repository; GitHub remains the staged APK and documentation distribution destination. The release tool never edits, stages, or commits tracked files.
 
 ## One-time workstation setup
 
@@ -9,7 +9,8 @@ Required tools:
 - Flutter, Java 17, and the Android SDK;
 - the existing ignored `android/key.properties` and release keystore;
 - Python 3 with `venv` support;
-- Git and authenticated SSH access to `origin`; and
+- Git and authenticated SSH access to canonical Forgejo `origin`;
+- a `github` Git remote for `clipclapclop/workout_of_record`; and
 - GitHub CLI authenticated for `clipclapclop/workout_of_record`.
 
 Install GitHub CLI using the operating system package manager, then run:
@@ -45,7 +46,7 @@ Review and commit the preparation. The resulting working tree must be clean.
 ./tool/release --dry-run
 ```
 
-The dry run fetches remote state, validates metadata and fragments, runs Flutter analysis/tests, builds MkDocs strictly, builds an arm64-only release APK, and verifies package identity, version, architecture, signing certificate, and checksum. Flutter adds its arm64 split offset (`2000`) to the base build number from `pubspec.yaml`; the release tool verifies both values. It does not push or change GitHub.
+The dry run fetches canonical Forgejo state, validates metadata and fragments, runs Flutter analysis/tests, builds MkDocs strictly, builds an arm64-only release APK, and verifies package identity, version, architecture, signing certificate, and checksum. Flutter adds its arm64 split offset (`2000`) to the base build number from `pubspec.yaml`; the release tool verifies both values. It does not push or change Forgejo or GitHub.
 
 ## Publish
 
@@ -55,7 +56,7 @@ Ask Codex to **publish the prepared release**, or run:
 ./tool/release
 ```
 
-Publishing pushes `main` and the annotated version tag, creates a draft release, uploads the APK and checksum, deploys MkDocs, enables GitHub Pages if necessary, and finally makes the release public.
+Publishing pushes `main` and the annotated version tag to Forgejo and GitHub, creates a draft GitHub Release, uploads the APK and checksum, deploys MkDocs to GitHub Pages, mirrors `gh-pages` back to Forgejo, and finally makes the release public. Every GitHub CLI operation names `clipclapclop/workout_of_record` explicitly rather than inferring it from canonical `origin`.
 
 ## Recovery
 
@@ -64,7 +65,7 @@ The command is rerunnable:
 - An existing tag must point to `HEAD`.
 - Existing release assets are downloaded and compared before reuse.
 - A differing same-name asset is never overwritten.
-- Documentation failures leave the release as a draft, so Obtainium cannot discover an incomplete release.
+- Documentation or repository-mirroring failures leave the release as a draft, so Obtainium cannot discover an incomplete release.
 - A matching already-published release is treated as complete.
 
 ## Phone setup

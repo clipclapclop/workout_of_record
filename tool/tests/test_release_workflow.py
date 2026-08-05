@@ -20,8 +20,10 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         base = Path(self.temp.name)
         self.remote = base / "remote.git"
+        self.github_remote = base / "github.git"
         self.root = base / "repo"
         self._run(["git", "init", "--bare", self.remote], cwd=base)
+        self._run(["git", "init", "--bare", self.github_remote], cwd=base)
         self._run(["git", "init", "--initial-branch=main", self.root], cwd=base)
         self._run(["git", "config", "user.name", "Release Test"], cwd=self.root)
         self._run(["git", "config", "user.email", "release@example.invalid"], cwd=self.root)
@@ -38,7 +40,8 @@ class ReleaseWorkflowTest(unittest.TestCase):
                     "apkFilename": "fixture-arm64.apk",
                     "expectedCertificateSha256": "abc",
                     "mainBranch": "main",
-                    "remote": "origin",
+                    "canonicalRemote": "origin",
+                    "githubRemote": "github",
                     "documentationBranch": "gh-pages",
                     "monitoredCodePaths": ["lib/"],
                 }
@@ -78,6 +81,9 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self._run(["git", "add", "."], cwd=self.root)
         self._run(["git", "commit", "-m", "fixture"], cwd=self.root)
         self._run(["git", "remote", "add", "origin", self.remote], cwd=self.root)
+        self._run(
+            ["git", "remote", "add", "github", self.github_remote], cwd=self.root
+        )
         self._run(["git", "push", "-u", "origin", "main"], cwd=self.root)
 
     def _run(self, command: list[object], *, cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -99,6 +105,24 @@ class ReleaseWorkflowTest(unittest.TestCase):
         workflow = ReleaseWorkflow(self.root, dry_run=True)
         workflow._preflight_git()
         return workflow
+
+    def test_canonical_and_github_remotes_must_be_distinct(self) -> None:
+        config_path = self.root / "tool/release-config.json"
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+        config["githubRemote"] = config["canonicalRemote"]
+        config_path.write_text(json.dumps(config), encoding="utf-8")
+        self._run(["git", "add", "."], cwd=self.root)
+        self._run(["git", "commit", "-m", "invalid remotes"], cwd=self.root)
+        self._run(["git", "push"], cwd=self.root)
+
+        with self.assertRaisesRegex(ReleaseError, "must be different"):
+            ReleaseWorkflow(self.root, dry_run=True)._preflight_git()
+
+    def test_missing_github_remote_is_rejected(self) -> None:
+        self._run(["git", "remote", "remove", "github"], cwd=self.root)
+
+        with self.assertRaisesRegex(ReleaseError, "Configured Git remote does not exist"):
+            ReleaseWorkflow(self.root, dry_run=True)._preflight_git()
 
     def test_dirty_working_tree_is_rejected(self) -> None:
         self._write("untracked.txt", "dirty\n")

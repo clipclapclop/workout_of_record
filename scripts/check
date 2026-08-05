@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repository_root"
+
+if ! command -v flutter >/dev/null 2>&1; then
+  echo "flutter is required but was not found on PATH" >&2
+  exit 1
+fi
+
+echo "==> Resolving locked dependencies"
+flutter pub get --enforce-lockfile --offline
+
+echo "==> Analyzing"
+flutter analyze --no-pub --fatal-infos
+
+echo "==> Running Flutter tests"
+flutter test --no-pub
+
+echo "==> Running release workflow tests"
+python3 -m unittest discover -s tool/tests -p 'test_*.py'

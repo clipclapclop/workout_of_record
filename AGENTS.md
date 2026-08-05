@@ -46,7 +46,7 @@ When the user says **prepare a release**:
 
 ## Publishing a release
 
-When the user says **publish the prepared release**, that explicitly authorizes the release commit, tag, Git push, GitHub Release, asset upload, and documentation deployment. Ensure the working tree is committed and clean, then run `./tool/release`.
+When the user says **publish the prepared release**, that explicitly authorizes the release commit, Forgejo and GitHub pushes, tag, GitHub Release, asset upload, and documentation deployment. Ensure the working tree is committed and clean, then run `./tool/release`.
 
 When the user says **prepare and publish a release**, perform both workflows. Do not infer publication authority from an ordinary implementation request.
 

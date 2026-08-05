@@ -2,6 +2,10 @@
 
 A private, Android-first Flutter workout logger with persistent in-workout progress, mesocycle planning, history, backups, and optional AI recommendations.
 
+## Repository
+
+The canonical source and issue tracker are hosted on [Forgejo](https://git.oorangy.com/chad/workout_of_record). GitHub remains the staged distribution destination for releases, documentation, and Obtainium updates.
+
 ## Six months later: start here
 
 The intended workflow is:
@@ -9,7 +13,7 @@ The intended workflow is:
 1. Make one or more changes in separate Codex conversations.
 2. Each implementation records durable release context in `.changes/unreleased/`; you do not need to keep the conversations open.
 3. When the accumulated changes are ready, tell Codex **“Prepare a release.”** This updates the version, user documentation, release notes, and release manifest, then validates without publishing.
-4. Review the preparation. When satisfied, tell Codex **“Publish the prepared release.”** That explicitly authorizes the commit, tag, push, GitHub Release, documentation deployment, and APK publication.
+4. Review the preparation. When satisfied, tell Codex **“Publish the prepared release.”** That explicitly authorizes the commit, Forgejo and GitHub pushes, tag, GitHub Release, documentation deployment, and APK publication.
 5. Obtainium notices the GitHub Release on your Pixel. Approve Android's installation prompt.
 
 For a one-step release, say **“Prepare and publish a patch release.”** Use the two-step form when you want to inspect documentation and release notes first.
@@ -25,7 +29,7 @@ Confirm the important pieces:
 ```bash
 flutter --version
 test -f android/key.properties
-git remote -v
+git remote -v  # origin is Forgejo; github is the distribution remote
 gh --version
 gh auth status
 ```
@@ -42,12 +46,13 @@ Keep `android/key.properties` and its referenced keystore. They are intentionall
 
 Ask Codex to implement changes normally. Repository instructions in [`AGENTS.md`](AGENTS.md) require each substantive application change to create or update a small JSON change fragment. These fragments preserve the intent, release-note text, documentation impact, and screenshot work across unrelated conversations.
 
-Before considering a change complete, the normal checks are:
+Before considering a change complete, run the repository-owned aggregate check:
 
 ```bash
-flutter analyze --fatal-infos
-flutter test
+./scripts/check
 ```
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for its locked, offline dependency behavior.
 
 Commit changes in coherent units. If a code commit genuinely has no release or documentation impact, its commit message may use the exact trailer described in `AGENTS.md`:
 
@@ -93,11 +98,11 @@ From a clean `main` branch, run:
 
 The dry run performs the same local validation and signed arm64 APK build without pushing, tagging, publishing, or deploying documentation. The publish command then:
 
-1. pushes `main` and an annotated `v<version>` tag;
+1. pushes `main` and an annotated `v<version>` tag to canonical Forgejo and the GitHub distribution remote;
 2. creates or resumes a draft GitHub Release;
 3. uploads `workout-of-record-android-arm64.apk` and its SHA-256 checksum;
-4. deploys the MkDocs site to `gh-pages`; and
-5. publishes the release only after documentation succeeds.
+4. deploys the MkDocs site to GitHub's `gh-pages` and mirrors that branch to Forgejo; and
+5. publishes the release only after documentation and both repository destinations succeed.
 
 The command never edits, stages, or commits tracked files. It is safe to rerun after a partial failure when the existing tag and assets match.
 
@@ -118,7 +123,7 @@ Opening Obtainium forces an immediate check. Otherwise, wait for its configured 
 | Message or symptom | What to do |
 | --- | --- |
 | Working tree must be clean | Run `git status`; review and commit the intended release preparation. Do not blindly discard or stash unfamiliar work. |
-| Branch is outdated or diverged | Run `git fetch origin`, inspect `git log --oneline --graph --decorate --all`, and reconcile `main` before retrying. |
+| Branch is outdated or diverged | Run `git fetch origin`, inspect `git log --oneline --graph --decorate --all`, and reconcile canonical Forgejo `main` before retrying. |
 | Unreleased fragments remain | Ask Codex to prepare the release so deferred docs are resolved and fragments are archived. |
 | GitHub CLI is unauthenticated | Run `gh auth login`, then verify with `gh auth status`. |
 | APK certificate mismatch | Stop. Confirm the original release keystore and `android/key.properties`; do not publish with a new key. |

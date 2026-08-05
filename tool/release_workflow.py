@@ -131,7 +131,8 @@ class ReleaseWorkflow:
             "apkFilename",
             "expectedCertificateSha256",
             "mainBranch",
-            "remote",
+            "canonicalRemote",
+            "githubRemote",
             "documentationBranch",
         )
         for field in string_fields:
@@ -183,9 +184,18 @@ class ReleaseWorkflow:
                 + status
             )
 
-        remote = self.config["remote"]
-        self._git("fetch", remote, "--tags", "--prune")
-        remote_branch = f"{remote}/{expected_branch}"
+        canonical_remote = self.config["canonicalRemote"]
+        github_remote = self.config["githubRemote"]
+        if canonical_remote == github_remote:
+            raise ReleaseError(
+                "release-config.json: canonicalRemote and githubRemote must be different."
+            )
+        for remote in (canonical_remote, github_remote):
+            if self._git("remote", "get-url", remote, check=False).returncode != 0:
+                raise ReleaseError(f"Configured Git remote does not exist: {remote}")
+
+        self._git("fetch", canonical_remote, "--tags", "--prune")
+        remote_branch = f"{canonical_remote}/{expected_branch}"
         ancestor = self._git(
             "merge-base", "--is-ancestor", remote_branch, "HEAD", check=False
         )
@@ -534,9 +544,12 @@ class ReleaseWorkflow:
             raise ReleaseError("GitHub CLI is required for publishing. Install 'gh' and authenticate it.")
         self.runner.run(["gh", "auth", "status"], cwd=self.root)
 
-        remote = self.config["remote"]
+        canonical_remote = self.config["canonicalRemote"]
+        github_remote = self.config["githubRemote"]
+        github_repository = self.config["githubRepository"]
         branch = self.config["mainBranch"]
-        self.runner.run(["git", "push", remote, branch], cwd=self.root)
+        self.runner.run(["git", "push", canonical_remote, branch], cwd=self.root)
+        self.runner.run(["git", "push", github_remote, branch], cwd=self.root)
 
         tag_result = self._git("rev-parse", "--verify", self.version.tag, check=False)
         if tag_result.returncode != 0:
@@ -555,14 +568,18 @@ class ReleaseWorkflow:
             "rev-parse", "HEAD"
         ):
             raise ReleaseError(f"Existing {self.version.tag} does not point at HEAD.")
-        self.runner.run(["git", "push", remote, self.version.tag], cwd=self.root)
+        self.runner.run(
+            ["git", "push", canonical_remote, self.version.tag], cwd=self.root
+        )
+        self.runner.run(["git", "push", github_remote, self.version.tag], cwd=self.root)
 
         release = self._release_state()
         notes = self.root / self.manifest["releaseNotes"]
         if release is None:
             self.runner.run(
                 [
-                    "gh", "release", "create", self.version.tag, "--draft", "--verify-tag",
+                    "gh", "release", "create", self.version.tag,
+                    "--repo", github_repository, "--draft", "--verify-tag",
                     "--title", f"{self.config['displayName']} {self.version.name}",
                     "--notes-file", notes,
                 ],
@@ -583,19 +600,39 @@ class ReleaseWorkflow:
         mkdocs = self.root / ".venv-docs/bin/mkdocs"
         self.runner.run(
             [
-                mkdocs, "gh-deploy", "--force", "--clean", "--remote-name", remote,
+                mkdocs, "gh-deploy", "--force", "--clean",
+                "--remote-name", github_remote,
                 "--message", f"docs: {self.version.tag}",
             ],
             cwd=self.root,
         )
         self._ensure_github_pages()
+        documentation_branch = self.config["documentationBranch"]
         self.runner.run(
-            ["gh", "release", "edit", self.version.tag, "--draft=false"], cwd=self.root
+            ["git", "fetch", github_remote, documentation_branch], cwd=self.root
+        )
+        self.runner.run(
+            [
+                "git", "push", canonical_remote,
+                f"{github_remote}/{documentation_branch}:{documentation_branch}",
+            ],
+            cwd=self.root,
+        )
+        self.runner.run(
+            [
+                "gh", "release", "edit", self.version.tag,
+                "--repo", github_repository, "--draft=false",
+            ],
+            cwd=self.root,
         )
 
     def _release_state(self) -> dict[str, Any] | None:
         result = self.runner.run(
-            ["gh", "release", "view", self.version.tag, "--json", "isDraft,assets,url"],
+            [
+                "gh", "release", "view", self.version.tag,
+                "--repo", self.config["githubRepository"],
+                "--json", "isDraft,assets,url",
+            ],
             cwd=self.root,
             check=False,
             capture=True,
@@ -615,15 +652,20 @@ class ReleaseWorkflow:
         }
         if local.name not in names:
             self.runner.run(
-                ["gh", "release", "upload", self.version.tag, local], cwd=self.root
+                [
+                    "gh", "release", "upload", self.version.tag,
+                    "--repo", self.config["githubRepository"], local,
+                ],
+                cwd=self.root,
             )
             return
 
         with tempfile.TemporaryDirectory(prefix="release-asset-") as directory:
             self.runner.run(
                 [
-                    "gh", "release", "download", self.version.tag, "--pattern", local.name,
-                    "--dir", directory,
+                    "gh", "release", "download", self.version.tag,
+                    "--repo", self.config["githubRepository"],
+                    "--pattern", local.name, "--dir", directory,
                 ],
                 cwd=self.root,
             )
@@ -663,7 +705,7 @@ def parser() -> argparse.ArgumentParser:
     value.add_argument(
         "--dry-run",
         action="store_true",
-        help="Run all local checks and builds without changing GitHub.",
+        help="Run all local checks and builds without changing Forgejo or GitHub.",
     )
     return value
 

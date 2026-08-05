@@ -6,7 +6,8 @@
   "apkFilename": "workout-of-record-android-arm64.apk",
   "expectedCertificateSha256": "c6ea597a06ae86049cb28bfdaac8048ccfd592821fc71bb4ee5b4b63dd0b57cb",
   "mainBranch": "main",
-  "remote": "origin",
+  "canonicalRemote": "origin",
+  "githubRemote": "github",
   "documentationBranch": "gh-pages",
   "monitoredCodePaths": [
     "lib/",

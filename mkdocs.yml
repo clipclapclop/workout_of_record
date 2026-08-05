@@ -1,8 +1,8 @@
 site_name: Workout of Record
 site_description: User and release documentation for Workout of Record
 site_url: https://clipclapclop.github.io/workout_of_record/
-repo_url: https://github.com/clipclapclop/workout_of_record
-repo_name: clipclapclop/workout_of_record
+repo_url: https://git.oorangy.com/chad/workout_of_record
+repo_name: chad/workout_of_record
 
 theme:
   name: material
