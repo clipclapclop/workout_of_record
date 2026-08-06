@@ -760,14 +760,25 @@ class BackupRestoreService {
           recoveryErrors.add(recoveryError);
         }
       }
+      var settingsSafeToReopen = !settingsMayHaveChanged;
       if (settingsMayHaveChanged) {
         try {
           await settingsStore.write(originalSettings);
-        } catch (recoveryError) {
-          recoveryErrors.add(recoveryError);
+          settingsSafeToReopen = true;
+        } catch (firstSettingsError) {
+          // Preference writes are key-by-key. Retry the complete snapshot once
+          // so a transient failure cannot leave a mixed settings state.
+          try {
+            await settingsStore.write(originalSettings);
+            settingsSafeToReopen = true;
+          } catch (secondSettingsError) {
+            recoveryErrors
+              ..add(firstSettingsError)
+              ..add(secondSettingsError);
+          }
         }
       }
-      if (databaseSafeToReopen) {
+      if (databaseSafeToReopen && settingsSafeToReopen) {
         try {
           await databaseLifecycle.reopenAfterFailure();
         } catch (recoveryError) {

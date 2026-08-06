@@ -26,7 +26,7 @@ class _MemorySettingsStore implements BackupSettingsStore {
   _MemorySettingsStore(this.current);
 
   BackupSettings current;
-  bool failNextWriteAfterMutation = false;
+  int writesToFailAfterMutation = 0;
 
   @override
   BackupSettings read() => current;
@@ -34,8 +34,8 @@ class _MemorySettingsStore implements BackupSettingsStore {
   @override
   Future<void> write(BackupSettings settings) async {
     current = settings;
-    if (failNextWriteAfterMutation) {
-      failNextWriteAfterMutation = false;
+    if (writesToFailAfterMutation > 0) {
+      writesToFailAfterMutation--;
       throw StateError('injected settings write failure');
     }
   }
@@ -623,7 +623,7 @@ void main() {
     test(
       'restores database and settings when settings application fails',
       () async {
-        settingsStore.failNextWriteAfterMutation = true;
+        settingsStore.writesToFailAfterMutation = 1;
 
         await expectLater(
           service().restoreBytes(
@@ -643,9 +643,33 @@ void main() {
     );
 
     test(
+      'fails closed when the settings snapshot cannot be restored',
+      () async {
+        // Fail the candidate write and both attempts to restore the snapshot.
+        settingsStore.writesToFailAfterMutation = 3;
+
+        await expectLater(
+          service().restoreBytes(
+            _validArchive(restoredDatabaseBytes, restoredSettings),
+          ),
+          throwsA(
+            isA<BackupRestoreException>().having(
+              (error) => error.message,
+              'message',
+              contains('automatic recovery was incomplete'),
+            ),
+          ),
+        );
+
+        expect(lifecycle.reopenCount, 0);
+        expect(await File('$livePath.restore-original').exists(), true);
+      },
+    );
+
+    test(
       'falls back to renaming the original when rollback copy fails',
       () async {
-        settingsStore.failNextWriteAfterMutation = true;
+        settingsStore.writesToFailAfterMutation = 1;
         final files = _RecordingFileOperations(
           failRollbackCopyDestination: livePath,
         );
@@ -671,7 +695,7 @@ void main() {
     );
 
     test('fails closed when both rollback methods fail', () async {
-      settingsStore.failNextWriteAfterMutation = true;
+      settingsStore.writesToFailAfterMutation = 1;
       final files = _RecordingFileOperations(
         failRollbackCopyDestination: livePath,
         failRollbackRenameDestination: livePath,
