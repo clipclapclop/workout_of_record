@@ -657,6 +657,8 @@ void main() {
     () async {
       final files = _RecordingFileOperations();
       await lifecycle.database!.customStatement('PRAGMA journal_mode = WAL');
+      await File('$livePath.restore-stage-wal').writeAsBytes([1, 2, 3]);
+      await File('$livePath.restore-stage-shm').writeAsBytes([4, 5, 6]);
 
       await service(
         files: files,
@@ -688,8 +690,12 @@ void main() {
 
       expect(files.deletedPaths, contains('$livePath-wal'));
       expect(files.deletedPaths, contains('$livePath-shm'));
+      expect(files.deletedPaths, contains('$livePath.restore-stage-wal'));
+      expect(files.deletedPaths, contains('$livePath.restore-stage-shm'));
       expect(await File('$livePath-wal').exists(), false);
       expect(await File('$livePath-shm').exists(), false);
+      expect(await File('$livePath.restore-stage-wal').exists(), false);
+      expect(await File('$livePath.restore-stage-shm').exists(), false);
       expect(await File('$livePath.restore-original').exists(), false);
     },
   );

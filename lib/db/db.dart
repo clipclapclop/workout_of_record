@@ -16,8 +16,17 @@ Future<void> checkpointAndCloseDatabaseForRestore() async {
 
 Future<void> reopenDatabaseAfterFailedRestore() async {
   final reopened = AppDatabase();
-  // Force the lazy connection open here so a recovery failure is reported by
-  // the restore operation rather than by an unrelated screen later.
-  await reopened.customSelect('SELECT 1').get();
-  _db = reopened;
+  try {
+    // Force the lazy connection open here so a recovery failure is reported by
+    // the restore operation rather than by an unrelated screen later.
+    await reopened.customSelect('SELECT 1').get();
+    _db = reopened;
+  } catch (_) {
+    try {
+      await reopened.close();
+    } catch (_) {
+      // Preserve the open failure; cleanup is best effort on this error path.
+    }
+    rethrow;
+  }
 }

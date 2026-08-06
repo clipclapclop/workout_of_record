@@ -518,11 +518,15 @@ class BackupRestoreService {
       );
     }
     await fileOperations.delete(_stagedPath);
+    await fileOperations.delete('$_stagedPath-wal');
+    await fileOperations.delete('$_stagedPath-shm');
     try {
       await fileOperations.write(_stagedPath, databaseBytes);
       await _validateStagedDatabase(_stagedPath, settings);
+      await fileOperations.delete('$_stagedPath-wal');
+      await fileOperations.delete('$_stagedPath-shm');
     } catch (_) {
-      await _deleteBestEffort(_stagedPath);
+      await _deleteStagedFilesBestEffort();
       rethrow;
     }
   }
@@ -547,6 +551,9 @@ class BackupRestoreService {
       );
       try {
         await migrationDatabase.customSelect('SELECT 1').get();
+        await migrationDatabase.customStatement(
+          'PRAGMA wal_checkpoint(TRUNCATE)',
+        );
       } catch (_) {
         throw const BackupRestoreException(
           'Invalid backup database: migration to the current schema failed.',
@@ -749,7 +756,7 @@ class BackupRestoreService {
         }
       }
 
-      await _deleteBestEffort(_stagedPath);
+      await _deleteStagedFilesBestEffort();
       if (recoveryErrors.isEmpty) {
         await _deleteBestEffort(_rollbackPath);
         throw BackupRestoreException(
@@ -769,6 +776,12 @@ class BackupRestoreService {
   Future<void> _deleteSidecars() async {
     await fileOperations.delete('$databasePath-wal');
     await fileOperations.delete('$databasePath-shm');
+  }
+
+  Future<void> _deleteStagedFilesBestEffort() async {
+    await _deleteBestEffort(_stagedPath);
+    await _deleteBestEffort('$_stagedPath-wal');
+    await _deleteBestEffort('$_stagedPath-shm');
   }
 
   Future<void> _deleteBestEffort(String path) async {
