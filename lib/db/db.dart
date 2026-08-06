@@ -27,6 +27,10 @@ Future<void> reopenDatabaseAfterFailedRestore() async {
     } catch (_) {
       // Preserve the open failure; cleanup is best effort on this error path.
     }
+    // Do not leave callers holding the connection closed for restore. A fresh
+    // lazy connection lets a later operation retry after a transient open
+    // failure, while this restore still reports recovery as incomplete.
+    _db = AppDatabase();
     rethrow;
   }
 }
