@@ -733,13 +733,29 @@ class BackupRestoreService {
         try {
           await _deleteSidecars();
           if (originalSaved) {
-            await fileOperations.copy(_rollbackPath, databasePath);
+            try {
+              await fileOperations.copy(_rollbackPath, databasePath);
+              databaseSafeToReopen = true;
+            } catch (copyError) {
+              // Copy can fail even when an atomic same-filesystem rename is
+              // still available. Remove the untrusted candidate and use the
+              // preserved original as a final recovery attempt.
+              try {
+                await fileOperations.delete(databasePath);
+                await fileOperations.rename(_rollbackPath, databasePath);
+                databaseSafeToReopen = true;
+              } catch (renameError) {
+                recoveryErrors
+                  ..add(copyError)
+                  ..add(renameError);
+              }
+            }
           } else {
             // There was no database before this restore. Remove any partially
             // installed candidate so reopening recreates a clean initial DB.
             await fileOperations.delete(databasePath);
+            databaseSafeToReopen = true;
           }
-          databaseSafeToReopen = true;
         } catch (recoveryError) {
           recoveryErrors.add(recoveryError);
         }

@@ -90,10 +90,12 @@ class _RecordingFileOperations extends LocalRestoreFileOperations {
   _RecordingFileOperations({
     this.failLiveRenameDestination,
     this.failRollbackCopyDestination,
+    this.failRollbackRenameDestination,
   });
 
   final String? failLiveRenameDestination;
   final String? failRollbackCopyDestination;
+  final String? failRollbackRenameDestination;
   final List<String> deletedPaths = [];
   bool _renameFailed = false;
   bool _rollbackCopyFailed = false;
@@ -117,6 +119,13 @@ class _RecordingFileOperations extends LocalRestoreFileOperations {
 
   @override
   Future<void> rename(String source, String destination) async {
+    if (source.endsWith('.restore-original') &&
+        destination == failRollbackRenameDestination) {
+      throw FileSystemException(
+        'injected rollback rename failure',
+        destination,
+      );
+    }
     if (!_renameFailed && destination == failLiveRenameDestination) {
       _renameFailed = true;
       throw FileSystemException('injected rename failure', destination);
@@ -634,7 +643,7 @@ void main() {
     );
 
     test(
-      'does not reopen an unverified database when rollback copy fails',
+      'falls back to renaming the original when rollback copy fails',
       () async {
         settingsStore.failNextWriteAfterMutation = true;
         final files = _RecordingFileOperations(
@@ -649,16 +658,42 @@ void main() {
             isA<BackupRestoreException>().having(
               (error) => error.message,
               'message',
-              contains('automatic recovery was incomplete'),
+              contains('original database and settings were recovered'),
             ),
           ),
         );
 
-        expect(lifecycle.reopenCount, 0);
+        expect(lifecycle.reopenCount, 1);
         expect(settingsStore.current, originalSettings);
-        expect(await File('$livePath.restore-original').exists(), true);
+        expect(await _mesocycleNames(livePath), contains('Original history'));
+        expect(await File('$livePath.restore-original').exists(), false);
       },
     );
+
+    test('fails closed when both rollback methods fail', () async {
+      settingsStore.failNextWriteAfterMutation = true;
+      final files = _RecordingFileOperations(
+        failRollbackCopyDestination: livePath,
+        failRollbackRenameDestination: livePath,
+      );
+
+      await expectLater(
+        service(
+          files: files,
+        ).restoreBytes(_validArchive(restoredDatabaseBytes, restoredSettings)),
+        throwsA(
+          isA<BackupRestoreException>().having(
+            (error) => error.message,
+            'message',
+            contains('automatic recovery was incomplete'),
+          ),
+        ),
+      );
+
+      expect(lifecycle.reopenCount, 0);
+      expect(settingsStore.current, originalSettings);
+      expect(await File('$livePath.restore-original').exists(), true);
+    });
   });
 
   test('successful restore works when no live database file exists', () async {
