@@ -511,12 +511,6 @@ class BackupRestoreService {
     List<int> databaseBytes,
     BackupSettings settings,
   ) async {
-    if (await fileOperations.exists(_rollbackPath)) {
-      throw BackupRestoreException(
-        'Restore cannot start because recovery data already exists at '
-        '$_rollbackPath.',
-      );
-    }
     await fileOperations.delete(_stagedPath);
     await fileOperations.delete('$_stagedPath-wal');
     await fileOperations.delete('$_stagedPath-shm');
@@ -721,6 +715,11 @@ class BackupRestoreService {
       await databaseLifecycle.checkpointAndClose();
       databaseClosed = true;
 
+      // Reaching this screen proves the live database opened after any prior
+      // interruption. Replace a stale recovery copy only after the live file is
+      // safely checkpointed and closed; a crash before the new copy leaves the
+      // still-usable live file untouched.
+      await fileOperations.delete(_rollbackPath);
       await fileOperations.copy(databasePath, _rollbackPath);
       originalSaved = true;
       await _deleteSidecars();

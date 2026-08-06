@@ -356,10 +356,13 @@ void main() {
     test(
       'rejects malformed ZIP data before closing the live database',
       () async {
+        await File('$livePath.restore-original').writeAsBytes([1, 2, 3]);
+
         await expectRejectedWithoutMutation(
           utf8.encode('not a zip'),
           'malformed or corrupt',
         );
+        expect(await File('$livePath.restore-original').exists(), true);
       },
     );
 
@@ -659,6 +662,7 @@ void main() {
       await lifecycle.database!.customStatement('PRAGMA journal_mode = WAL');
       await File('$livePath.restore-stage-wal').writeAsBytes([1, 2, 3]);
       await File('$livePath.restore-stage-shm').writeAsBytes([4, 5, 6]);
+      await File('$livePath.restore-original').writeAsBytes([7, 8, 9]);
 
       await service(
         files: files,
