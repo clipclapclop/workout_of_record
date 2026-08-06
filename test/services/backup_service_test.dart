@@ -643,7 +643,7 @@ void main() {
     );
 
     test(
-      'fails closed when the settings snapshot cannot be restored',
+      'reopens the recovered database when settings recovery is incomplete',
       () async {
         // Fail the candidate write and both attempts to restore the snapshot.
         settingsStore.writesToFailAfterMutation = 3;
@@ -661,7 +661,8 @@ void main() {
           ),
         );
 
-        expect(lifecycle.reopenCount, 0);
+        expect(lifecycle.reopenCount, 1);
+        expect(await _mesocycleNames(livePath), contains('Original history'));
         expect(await File('$livePath.restore-original').exists(), true);
       },
     );
