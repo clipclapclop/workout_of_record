@@ -54,6 +54,12 @@ class _TestDatabaseLifecycle implements DatabaseRestoreLifecycle {
     await database!.customSelect('SELECT 1').get();
   }
 
+  Future<void> removeLiveDatabaseBeforeRestore() async {
+    await dispose();
+    await File(path).delete();
+    database = AppDatabase.withExecutor(NativeDatabase(File(path)));
+  }
+
   @override
   Map<String, List<String>> get expectedSchema => {
     for (final table in database!.allTables)
@@ -653,6 +659,18 @@ void main() {
         expect(await File('$livePath.restore-original').exists(), true);
       },
     );
+  });
+
+  test('successful restore works when no live database file exists', () async {
+    await lifecycle.removeLiveDatabaseBeforeRestore();
+
+    await service().restoreBytes(
+      _validArchive(restoredDatabaseBytes, restoredSettings),
+    );
+
+    expect(settingsStore.current, restoredSettings);
+    expect(await _mesocycleNames(livePath), contains('Restored history'));
+    expect(await File('$livePath.restore-original').exists(), false);
   });
 
   test(

@@ -701,17 +701,13 @@ class BackupRestoreService {
   Future<void> _replaceLiveState(BackupSettings restoredSettings) async {
     final originalSettings = settingsStore.read();
     var databaseClosed = false;
+    var hadLiveDatabase = false;
     var originalSaved = false;
     var replacementAttempted = false;
     var settingsMayHaveChanged = false;
 
     try {
-      if (!await fileOperations.exists(databasePath)) {
-        throw const BackupRestoreException(
-          'Restore failed: the current database file is missing.',
-        );
-      }
-
+      hadLiveDatabase = await fileOperations.exists(databasePath);
       await databaseLifecycle.checkpointAndClose();
       databaseClosed = true;
 
@@ -720,8 +716,10 @@ class BackupRestoreService {
       // safely checkpointed and closed; a crash before the new copy leaves the
       // still-usable live file untouched.
       await fileOperations.delete(_rollbackPath);
-      await fileOperations.copy(databasePath, _rollbackPath);
-      originalSaved = true;
+      if (hadLiveDatabase) {
+        await fileOperations.copy(databasePath, _rollbackPath);
+        originalSaved = true;
+      }
       await _deleteSidecars();
       replacementAttempted = true;
       await fileOperations.rename(_stagedPath, databasePath);
@@ -731,10 +729,16 @@ class BackupRestoreService {
     } catch (error) {
       final recoveryErrors = <Object>[];
       var databaseSafeToReopen = databaseClosed && !replacementAttempted;
-      if (originalSaved && replacementAttempted) {
+      if (replacementAttempted) {
         try {
           await _deleteSidecars();
-          await fileOperations.copy(_rollbackPath, databasePath);
+          if (originalSaved) {
+            await fileOperations.copy(_rollbackPath, databasePath);
+          } else {
+            // There was no database before this restore. Remove any partially
+            // installed candidate so reopening recreates a clean initial DB.
+            await fileOperations.delete(databasePath);
+          }
           databaseSafeToReopen = true;
         } catch (recoveryError) {
           recoveryErrors.add(recoveryError);
@@ -848,6 +852,11 @@ class BackupService {
     final settingsBytes = utf8.encode(
       jsonEncode(const AppPreferencesBackupSettingsStore().read().toJson()),
     );
+    if (settingsBytes.length > BackupRestoreService.maxSettingsBytes) {
+      throw const BackupRestoreException(
+        'Backup failed: settings are too large for the supported format.',
+      );
+    }
 
     final archive = Archive()
       ..addFile(
