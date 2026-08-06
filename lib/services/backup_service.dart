@@ -670,6 +670,7 @@ class BackupRestoreService {
     final originalSettings = settingsStore.read();
     var databaseClosed = false;
     var originalSaved = false;
+    var replacementAttempted = false;
     var settingsMayHaveChanged = false;
 
     try {
@@ -685,16 +686,19 @@ class BackupRestoreService {
       await fileOperations.copy(databasePath, _rollbackPath);
       originalSaved = true;
       await _deleteSidecars();
+      replacementAttempted = true;
       await fileOperations.rename(_stagedPath, databasePath);
 
       settingsMayHaveChanged = true;
       await settingsStore.write(restoredSettings);
     } catch (error) {
       final recoveryErrors = <Object>[];
-      if (originalSaved) {
+      var databaseSafeToReopen = databaseClosed && !replacementAttempted;
+      if (originalSaved && replacementAttempted) {
         try {
           await _deleteSidecars();
           await fileOperations.copy(_rollbackPath, databasePath);
+          databaseSafeToReopen = true;
         } catch (recoveryError) {
           recoveryErrors.add(recoveryError);
         }
@@ -706,7 +710,7 @@ class BackupRestoreService {
           recoveryErrors.add(recoveryError);
         }
       }
-      if (databaseClosed) {
+      if (databaseSafeToReopen) {
         try {
           await databaseLifecycle.reopenAfterFailure();
         } catch (recoveryError) {
@@ -771,6 +775,11 @@ class BackupService {
     if (!await dbFile.exists()) throw Exception('Database file not found');
 
     final dbBytes = await dbFile.readAsBytes();
+    if (dbBytes.length > BackupRestoreService.maxDatabaseBytes) {
+      throw const BackupRestoreException(
+        'Backup failed: the database is too large for the supported format.',
+      );
+    }
     final settingsBytes = utf8.encode(
       jsonEncode(const AppPreferencesBackupSettingsStore().read().toJson()),
     );
@@ -793,6 +802,11 @@ class BackupService {
 
     final zipBytes = ZipEncoder().encode(archive);
     if (zipBytes == null) throw Exception('Failed to create ZIP');
+    if (zipBytes.length > BackupRestoreService.maxArchiveBytes) {
+      throw const BackupRestoreException(
+        'Backup failed: the ZIP is too large for this app to restore.',
+      );
+    }
     return Uint8List.fromList(zipBytes);
   }
 

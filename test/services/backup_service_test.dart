@@ -80,11 +80,27 @@ class _TestDatabaseLifecycle implements DatabaseRestoreLifecycle {
 }
 
 class _RecordingFileOperations extends LocalRestoreFileOperations {
-  _RecordingFileOperations({this.failLiveRenameDestination});
+  _RecordingFileOperations({
+    this.failLiveRenameDestination,
+    this.failRollbackCopyDestination,
+  });
 
   final String? failLiveRenameDestination;
+  final String? failRollbackCopyDestination;
   final List<String> deletedPaths = [];
   bool _renameFailed = false;
+  bool _rollbackCopyFailed = false;
+
+  @override
+  Future<void> copy(String source, String destination) async {
+    if (!_rollbackCopyFailed &&
+        source.endsWith('.restore-original') &&
+        destination == failRollbackCopyDestination) {
+      _rollbackCopyFailed = true;
+      throw FileSystemException('injected rollback copy failure', destination);
+    }
+    await super.copy(source, destination);
+  }
 
   @override
   Future<void> delete(String path) async {
@@ -545,6 +561,33 @@ void main() {
           await _mesocycleNames(livePath),
           isNot(contains('Restored history')),
         );
+      },
+    );
+
+    test(
+      'does not reopen an unverified database when rollback copy fails',
+      () async {
+        settingsStore.failNextWriteAfterMutation = true;
+        final files = _RecordingFileOperations(
+          failRollbackCopyDestination: livePath,
+        );
+
+        await expectLater(
+          service(files: files).restoreBytes(
+            _validArchive(restoredDatabaseBytes, restoredSettings),
+          ),
+          throwsA(
+            isA<BackupRestoreException>().having(
+              (error) => error.message,
+              'message',
+              contains('automatic recovery was incomplete'),
+            ),
+          ),
+        );
+
+        expect(lifecycle.reopenCount, 0);
+        expect(settingsStore.current, originalSettings);
+        expect(await File('$livePath.restore-original').exists(), true);
       },
     );
   });
