@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
@@ -207,6 +208,42 @@ List<int> _archiveWithDuplicateDatabaseEntry(
   return bytes;
 }
 
+List<int> _forgeDeclaredDatabaseSize(List<int> archive, int declaredSize) {
+  final bytes = Uint8List.fromList(archive);
+  final data = ByteData.sublistView(bytes);
+  final requiredName = BackupRestoreService.databaseFileName;
+  var patchedHeaders = 0;
+
+  for (var offset = 0; offset <= bytes.length - 30; offset++) {
+    final signature = data.getUint32(offset, Endian.little);
+    int? nameOffset;
+    int? nameLength;
+    int? sizeOffset;
+    if (signature == 0x04034b50) {
+      nameLength = data.getUint16(offset + 26, Endian.little);
+      nameOffset = offset + 30;
+      sizeOffset = offset + 22;
+    } else if (signature == 0x02014b50 && offset <= bytes.length - 46) {
+      nameLength = data.getUint16(offset + 28, Endian.little);
+      nameOffset = offset + 46;
+      sizeOffset = offset + 24;
+    }
+    if (nameOffset == null || nameOffset + nameLength! > bytes.length) {
+      continue;
+    }
+    if (utf8.decode(bytes.sublist(nameOffset, nameOffset + nameLength)) ==
+        requiredName) {
+      data.setUint32(sizeOffset!, declaredSize, Endian.little);
+      patchedHeaders++;
+    }
+  }
+
+  if (patchedHeaders != 2) {
+    throw StateError('Expected to patch local and central database headers.');
+  }
+  return bytes;
+}
+
 Future<List<String>> _mesocycleNames(String path) async {
   final database = AppDatabase.withExecutor(
     NativeDatabase(File(path), enableMigrations: false),
@@ -285,13 +322,16 @@ void main() {
     await tempDirectory.delete(recursive: true);
   });
 
-  BackupRestoreService service({RestoreFileOperations? files}) =>
-      BackupRestoreService(
-        databasePath: livePath,
-        settingsStore: settingsStore,
-        databaseLifecycle: lifecycle,
-        fileOperations: files ?? const LocalRestoreFileOperations(),
-      );
+  BackupRestoreService service({
+    RestoreFileOperations? files,
+    int databaseSizeLimit = BackupRestoreService.maxDatabaseBytes,
+  }) => BackupRestoreService(
+    databasePath: livePath,
+    settingsStore: settingsStore,
+    databaseLifecycle: lifecycle,
+    fileOperations: files ?? const LocalRestoreFileOperations(),
+    databaseSizeLimit: databaseSizeLimit,
+  );
 
   Future<void> expectRejectedWithoutMutation(
     List<int> archive,
@@ -338,6 +378,26 @@ void main() {
         ),
         'must not be duplicated',
       );
+    });
+
+    test('rejects forged sizes without unbounded decompression', () async {
+      final archive = _forgeDeclaredDatabaseSize(
+        _validArchive(restoredDatabaseBytes, restoredSettings),
+        512,
+      );
+
+      await expectLater(
+        service(databaseSizeLimit: 1024).restoreBytes(archive),
+        throwsA(
+          isA<BackupRestoreException>().having(
+            (error) => error.message,
+            'message',
+            contains('extracted file is too large'),
+          ),
+        ),
+      );
+      expect(lifecycle.closeCount, 0);
+      expect(settingsStore.current, originalSettings);
     });
 
     test('rejects unexpected and nested entries', () async {

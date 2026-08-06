@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:archive/archive.dart';
+import 'package:archive/archive.dart' hide ZLibDecoder;
 import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -325,6 +325,8 @@ class BackupRestoreService {
     required this.settingsStore,
     required this.databaseLifecycle,
     this.fileOperations = const LocalRestoreFileOperations(),
+    this.databaseSizeLimit = maxDatabaseBytes,
+    this.settingsSizeLimit = maxSettingsBytes,
   });
 
   static const databaseFileName = 'workout_of_record.sqlite';
@@ -337,6 +339,8 @@ class BackupRestoreService {
   final BackupSettingsStore settingsStore;
   final DatabaseRestoreLifecycle databaseLifecycle;
   final RestoreFileOperations fileOperations;
+  final int databaseSizeLimit;
+  final int settingsSizeLimit;
 
   bool _isRestoring = false;
 
@@ -415,35 +419,26 @@ class BackupRestoreService {
         'Invalid backup: only the two required root-level files are supported.',
       );
     }
-    if (databaseEntry.size <= 0 || databaseEntry.size > maxDatabaseBytes) {
+    if (databaseEntry.size <= 0 || databaseEntry.size > databaseSizeLimit) {
       throw const BackupRestoreException(
         'Invalid backup: the database file is empty or too large.',
       );
     }
-    if (settingsEntry.size <= 0 || settingsEntry.size > maxSettingsBytes) {
+    if (settingsEntry.size <= 0 || settingsEntry.size > settingsSizeLimit) {
       throw const BackupRestoreException(
         'Invalid backup: the settings file is empty or too large.',
       );
     }
 
     try {
-      // Decode a second time with CRC verification only after checking declared
-      // sizes, so a forged ZIP cannot expand without a bound.
-      final verified = ZipDecoder().decodeBytes(zipBytes, verify: true);
-      final databaseBytes = List<int>.from(
-        verified.singleWhere((file) => file.name == databaseFileName).content
-            as List<int>,
+      final databaseBytes = _decodeEntryBounded(
+        databaseEntry,
+        databaseSizeLimit,
       );
-      final settingsBytes = List<int>.from(
-        verified.singleWhere((file) => file.name == settingsFileName).content
-            as List<int>,
+      final settingsBytes = _decodeEntryBounded(
+        settingsEntry,
+        settingsSizeLimit,
       );
-      if (databaseBytes.length > maxDatabaseBytes ||
-          settingsBytes.length > maxSettingsBytes) {
-        throw const BackupRestoreException(
-          'Invalid backup: an extracted file is too large.',
-        );
-      }
       return _PreparedBackup(databaseBytes, _decodeSettings(settingsBytes));
     } on BackupRestoreException {
       rethrow;
@@ -452,6 +447,42 @@ class BackupRestoreService {
         'Invalid backup: a required file is corrupt.',
       );
     }
+  }
+
+  List<int> _decodeEntryBounded(ArchiveFile entry, int limit) {
+    final rawBytes = entry.rawContent?.toUint8List();
+    if (rawBytes == null) {
+      throw const BackupRestoreException(
+        'Invalid backup: a required file has no content.',
+      );
+    }
+
+    late Uint8List decoded;
+    if (entry.compressionType == ArchiveFile.STORE) {
+      if (rawBytes.length > limit) {
+        throw const BackupRestoreException(
+          'Invalid backup: an extracted file is too large.',
+        );
+      }
+      decoded = Uint8List.fromList(rawBytes);
+    } else if (entry.compressionType == ArchiveFile.DEFLATE) {
+      final sink = _BoundedBytesSink(limit);
+      final decoder = ZLibDecoder(raw: true).startChunkedConversion(sink);
+      decoder.add(rawBytes);
+      decoder.close();
+      decoded = sink.bytes;
+    } else {
+      throw const BackupRestoreException(
+        'Invalid backup: a required file uses unsupported compression.',
+      );
+    }
+
+    if (decoded.length != entry.size || getCrc32(decoded) != entry.crc32) {
+      throw const BackupRestoreException(
+        'Invalid backup: a required file is corrupt.',
+      );
+    }
+    return decoded;
   }
 
   BackupSettings _decodeSettings(List<int> bytes) {
@@ -750,6 +781,28 @@ class BackupRestoreService {
 
   String _errorText(Object error) =>
       error is BackupRestoreException ? error.message : error.toString();
+}
+
+class _BoundedBytesSink implements Sink<List<int>> {
+  _BoundedBytesSink(this.limit);
+
+  final int limit;
+  final BytesBuilder _builder = BytesBuilder(copy: false);
+
+  Uint8List get bytes => _builder.toBytes();
+
+  @override
+  void add(List<int> data) {
+    if (_builder.length + data.length > limit) {
+      throw const BackupRestoreException(
+        'Invalid backup: an extracted file is too large.',
+      );
+    }
+    _builder.add(data);
+  }
+
+  @override
+  void close() {}
 }
 
 class _PreparedBackup {
