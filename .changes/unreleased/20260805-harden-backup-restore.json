@@ -1,0 +1,12 @@
+{
+  "id": "harden-backup-restore",
+  "summary": "Validate and stage backup restores before replacement, with rollback protection for the existing database and settings.",
+  "audience": "user",
+  "releaseNote": "Backup restore now rejects malformed or incompatible archives without changing current data and recovers the original state if replacement fails.",
+  "docs": {
+    "impact": "updated",
+    "paths": ["docs/guides/settings-backups.md"],
+    "reason": ""
+  },
+  "screenshots": []
+}

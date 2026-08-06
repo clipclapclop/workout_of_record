@@ -25,6 +25,13 @@ import 'tables/workouts.dart';
 
 part 'app_database.g.dart';
 
+/// Oldest database schema that the restore pipeline can safely migrate.
+///
+/// Increase support deliberately alongside migration regression coverage. Backups
+/// from released app versions currently use schema 13 or newer.
+const minimumRestorableSchemaVersion = 13;
+const currentDatabaseSchemaVersion = 13;
+
 @DriftDatabase(tables: [
   Movements,
   MesoTemplates,
@@ -60,7 +67,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => currentDatabaseSchemaVersion;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(

@@ -12,9 +12,34 @@ Open **Settings → Backup & Restore** to choose an Android document-tree locati
 
 The backup screen reports the last successful backup and any current error. If Android revokes access to the selected folder, choose the location again.
 
+### Supported backup format
+
+A supported backup is a ZIP containing exactly these two files at its root:
+
+- `workout_of_record.sqlite`, containing workout history and plans; and
+- `settings.json`, containing the active mesocycle and workout pointers, profile values, AI-enabled and unit choices, profile-prompt state, and notes.
+
+The ZIP may be at most 256 MiB, and `settings.json` may be at most 1 MiB. `settings.json` is a UTF-8 JSON object with these supported fields:
+
+- `currentMesocycleId` and `currentCompletedWorkoutId`: positive integers or `null`;
+- `dateOfBirth`: an ISO-8601 string or `null`;
+- `weight`: a finite non-negative number or `null`;
+- `trainingGoal`: `strength`, `hypertrophy`, `endurance`, `general`, or `null`;
+- `calorieState`: `surplus`, `maintenance`, `deficit`, or `null`;
+- `aiEnabled`, `unitsMetric`, and `hasSeenProfilePrompt`: booleans; and
+- `notes`: a string.
+
+Fields may be omitted for compatibility with earlier released backups, in which case the app default is restored. Unknown fields are rejected. API credentials, backup-folder access, and other device-specific values are not included.
+
+The database schema must be within the restore range supported by the installed app. The current app supports schema 13. A future app may support older backups by migrating a staged copy, but a backup from a newer, unsupported schema is rejected rather than being opened unsafely.
+
 ## Restore
 
-Use restore from the backup screen and select the intended archive. Restoring replaces application data, so make a current backup first and verify the selected file before confirming.
+Use restore from the backup screen and select the intended archive. Restoring replaces application data, so verify the selected file before confirming.
+
+Before replacing anything, the app verifies the ZIP and its checksums, settings value types and enum names, SQLite integrity and relationships, schema compatibility, and active pointers. Missing, duplicate, malformed, corrupt, or incompatible content is rejected with an error and does not change current data.
+
+After validation, the app checkpoints and closes the current database, preserves a recovery copy, removes old SQLite WAL/SHM files, and installs the staged database. If database replacement or settings restoration fails, it restores the original database and settings and reopens them. A successful restore still requires the app to restart.
 
 !!! note "Screenshot pending — backup-settings"
     Capture Backup & Restore after a folder is selected, with automatic backup enabled and the last-backup status visible.
