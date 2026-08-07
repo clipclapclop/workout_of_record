@@ -6,6 +6,7 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'app_preferences.dart';
 import 'screens/home_screen.dart';
 import 'scroll_behavior.dart';
+import 'services/backup_service.dart';
 import 'services/saf_service.dart';
 import 'services/workout_foreground_service.dart';
 import 'theme.dart';
@@ -16,6 +17,7 @@ void main() async {
   WorkoutForegroundService.init();
   WorkoutForegroundService.initReceiver();
   await AppPreferences.init();
+  await BackupService.recoverInterruptedRestore();
   // Clean up any lingering WorkManager job from prior scheduled-backup versions.
   unawaited(SafService.cancelBackup());
   runApp(const MyApp());

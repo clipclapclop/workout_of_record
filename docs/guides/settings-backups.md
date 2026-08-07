@@ -37,9 +37,9 @@ The database schema must be within the restore range supported by the installed 
 
 Use restore from the backup screen and select the intended archive. Restoring replaces application data, so verify the selected file before confirming.
 
-Before replacing anything, the app verifies the ZIP and its checksums, settings value types and enum names, SQLite integrity and relationships, schema compatibility, and active pointers. Missing, duplicate, malformed, corrupt, or incompatible content is rejected with an error and does not change current data.
+Before replacing anything, the app verifies the ZIP and its checksums, settings value types and enum names, SQLite integrity and relationships, schema compatibility, and active pointers. An active-workout pointer must identify an unfinished workout in the selected active mesocycle. Missing, duplicate, malformed, corrupt, incompatible, or mismatched content is rejected with an error and does not change current data.
 
-After validation, the app checkpoints and closes the current database, preserves a recovery copy, removes old SQLite WAL/SHM files, and installs the staged database. If database replacement or settings restoration fails, it restores the original database and settings and reopens them. A successful restore still requires the app to restart.
+After validation, the app checkpoints and closes the current database, preserves a recovery copy, removes old SQLite WAL/SHM files, and installs the staged database. A durable recovery record keeps the database and settings together: if replacement fails, the app restores both immediately, and if the app stops between those steps, it rolls both back before opening the database on the next launch. A successful restore still requires the app to restart.
 
 !!! note "Screenshot pending — backup-settings"
     Capture Backup & Restore after a folder is selected, with automatic backup enabled and the last-backup status visible.

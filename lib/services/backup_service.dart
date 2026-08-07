@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart' hide ZLibDecoder;
+import 'package:drift/drift.dart' show Variable;
 import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -286,6 +287,7 @@ class AppDatabaseRestoreLifecycle implements DatabaseRestoreLifecycle {
 
 abstract interface class RestoreFileOperations {
   Future<bool> exists(String path);
+  Future<List<int>> read(String path);
   Future<void> write(String path, List<int> bytes);
   Future<void> copy(String source, String destination);
   Future<void> rename(String source, String destination);
@@ -297,6 +299,9 @@ class LocalRestoreFileOperations implements RestoreFileOperations {
 
   @override
   Future<bool> exists(String path) => File(path).exists();
+
+  @override
+  Future<List<int>> read(String path) => File(path).readAsBytes();
 
   @override
   Future<void> write(String path, List<int> bytes) =>
@@ -346,6 +351,84 @@ class BackupRestoreService {
 
   String get _stagedPath => '$databasePath.restore-stage';
   String get _rollbackPath => '$databasePath.restore-original';
+  String get _rollbackTempPath => '$_rollbackPath.tmp';
+  String get _journalPath => '$databasePath.restore-transaction.json';
+  String get _journalTempPath => '$_journalPath.tmp';
+
+  static Future<void> recoverInterruptedRestore({
+    required String databasePath,
+    required BackupSettingsStore settingsStore,
+    RestoreFileOperations fileOperations = const LocalRestoreFileOperations(),
+  }) async {
+    final journalPath = '$databasePath.restore-transaction.json';
+    final journalTempPath = '$journalPath.tmp';
+    final rollbackPath = '$databasePath.restore-original';
+    final rollbackTempPath = '$rollbackPath.tmp';
+    if (!await fileOperations.exists(journalPath)) {
+      await _deleteStaticBestEffort(fileOperations, journalTempPath);
+      await _deleteStaticBestEffort(fileOperations, rollbackTempPath);
+      return;
+    }
+
+    late _RestoreJournal journal;
+    try {
+      journal = _RestoreJournal.fromBytes(
+        await fileOperations.read(journalPath),
+      );
+    } catch (error) {
+      throw BackupRestoreException(
+        'Interrupted restore recovery could not read its recovery record. '
+        'The preserved database is at $rollbackPath. ${_staticErrorText(error)}',
+      );
+    }
+
+    try {
+      await fileOperations.delete('$databasePath-wal');
+      await fileOperations.delete('$databasePath-shm');
+      if (journal.hadLiveDatabase) {
+        if (await fileOperations.exists(rollbackPath)) {
+          try {
+            await fileOperations.copy(rollbackPath, databasePath);
+          } catch (_) {
+            await fileOperations.delete(databasePath);
+            await fileOperations.rename(rollbackPath, databasePath);
+          }
+        } else if (!await fileOperations.exists(databasePath)) {
+          throw StateError(
+            'The original database and recovery copy are missing.',
+          );
+        }
+      } else {
+        await fileOperations.delete(databasePath);
+      }
+
+      await settingsStore.write(journal.originalSettings);
+      await fileOperations.delete(journalPath);
+      await _deleteStaticBestEffort(fileOperations, rollbackPath);
+      await _deleteStaticBestEffort(fileOperations, rollbackTempPath);
+      await _deleteStaticBestEffort(fileOperations, journalTempPath);
+    } catch (error) {
+      throw BackupRestoreException(
+        'Interrupted restore recovery was incomplete. The recovery record and '
+        'preserved database remain beside $databasePath. '
+        '${_staticErrorText(error)}',
+      );
+    }
+  }
+
+  static Future<void> _deleteStaticBestEffort(
+    RestoreFileOperations fileOperations,
+    String path,
+  ) async {
+    try {
+      await fileOperations.delete(path);
+    } catch (_) {
+      // A later startup or restore can retry cleanup.
+    }
+  }
+
+  static String _staticErrorText(Object error) =>
+      error is BackupRestoreException ? error.message : error.toString();
 
   Future<void> restoreBytes(List<int> zipBytes) async {
     if (_isRestoring) {
@@ -355,6 +438,13 @@ class BackupRestoreService {
     }
     _isRestoring = true;
     try {
+      if (await fileOperations.exists(_journalPath)) {
+        throw const BackupRestoreException(
+          'An interrupted restore still requires recovery. Close and reopen '
+          'the app before restoring another backup.',
+        );
+      }
+      await _deleteBestEffort(_journalTempPath);
       final prepared = _decodeAndValidateArchive(zipBytes);
       await _prepareStage(prepared.databaseBytes, prepared.settings);
       await _replaceLiveState(prepared.settings);
@@ -669,28 +759,48 @@ class BackupRestoreService {
     if (mesocycleId != null &&
         (await candidate
                 .customSelect(
-                  'SELECT 1 FROM mesocycles WHERE id = $mesocycleId LIMIT 1',
+                  'SELECT 1 FROM mesocycles '
+                  'WHERE id = ? AND completed_at IS NULL LIMIT 1',
+                  variables: [Variable.withInt(mesocycleId)],
                 )
                 .get())
             .isEmpty) {
       throw const BackupRestoreException(
-        'Invalid backup settings: currentMesocycleId does not exist in the '
-        'backup database.',
+        'Invalid backup settings: currentMesocycleId does not identify an '
+        'active mesocycle in the backup database.',
       );
     }
 
     final completedWorkoutId = settings.currentCompletedWorkoutId;
-    if (completedWorkoutId != null &&
-        (await candidate
-                .customSelect(
-                  'SELECT 1 FROM completed_workouts '
-                  'WHERE id = $completedWorkoutId LIMIT 1',
-                )
-                .get())
-            .isEmpty) {
+    if (completedWorkoutId == null) return;
+    if (mesocycleId == null) {
       throw const BackupRestoreException(
-        'Invalid backup settings: currentCompletedWorkoutId does not exist in '
-        'the backup database.',
+        'Invalid backup settings: currentCompletedWorkoutId requires an '
+        'active currentMesocycleId.',
+      );
+    }
+
+    final matchingWorkout = await candidate
+        .customSelect(
+          'SELECT 1 '
+          'FROM completed_workouts AS completed '
+          'JOIN workouts AS workout ON workout.id = completed.workout_id '
+          'JOIN weeks AS week ON week.id = workout.week_id '
+          'WHERE completed.id = ? '
+          "AND completed.status = 'active' "
+          'AND completed.completed_at IS NULL '
+          'AND week.mesocycle_id = ? '
+          'LIMIT 1',
+          variables: [
+            Variable.withInt(completedWorkoutId),
+            Variable.withInt(mesocycleId),
+          ],
+        )
+        .get();
+    if (matchingWorkout.isEmpty) {
+      throw const BackupRestoreException(
+        'Invalid backup settings: currentCompletedWorkoutId must identify an '
+        'active workout in the current mesocycle.',
       );
     }
   }
@@ -702,6 +812,7 @@ class BackupRestoreService {
     final originalSettings = settingsStore.read();
     var databaseClosed = false;
     var hadLiveDatabase = false;
+    var journalPersisted = false;
     var originalSaved = false;
     var replacementAttempted = false;
     var settingsMayHaveChanged = false;
@@ -712,12 +823,18 @@ class BackupRestoreService {
       databaseClosed = true;
 
       // Reaching this screen proves the live database opened after any prior
-      // interruption. Replace a stale recovery copy only after the live file is
-      // safely checkpointed and closed; a crash before the new copy leaves the
-      // still-usable live file untouched.
+      // interruption. Remove stale recovery artifacts before recording this
+      // transaction so startup recovery can never mistake them for this DB.
       await fileOperations.delete(_rollbackPath);
+      await fileOperations.delete(_rollbackTempPath);
+      await _writeRecoveryJournal(originalSettings, hadLiveDatabase);
+      journalPersisted = true;
+
       if (hadLiveDatabase) {
-        await fileOperations.copy(databasePath, _rollbackPath);
+        // Publish the recovery copy atomically. If copying is interrupted, the
+        // live database is still the original and startup ignores the temp copy.
+        await fileOperations.copy(databasePath, _rollbackTempPath);
+        await fileOperations.rename(_rollbackTempPath, _rollbackPath);
         originalSaved = true;
       }
       await _deleteSidecars();
@@ -726,6 +843,11 @@ class BackupRestoreService {
 
       settingsMayHaveChanged = true;
       await settingsStore.write(restoredSettings);
+
+      // This is the commit point. Before it, startup rolls both stores back;
+      // after it, the database and settings are known to match.
+      await fileOperations.delete(_journalPath);
+      journalPersisted = false;
     } catch (error) {
       final recoveryErrors = <Object>[];
       var databaseSafeToReopen = databaseClosed && !replacementAttempted;
@@ -784,6 +906,16 @@ class BackupRestoreService {
       }
 
       await _deleteStagedFilesBestEffort();
+      await _deleteBestEffort(_rollbackTempPath);
+      await _deleteBestEffort(_journalTempPath);
+      if (recoveryErrors.isEmpty && journalPersisted) {
+        try {
+          await fileOperations.delete(_journalPath);
+          journalPersisted = false;
+        } catch (recoveryError) {
+          recoveryErrors.add(recoveryError);
+        }
+      }
       if (recoveryErrors.isEmpty) {
         await _deleteBestEffort(_rollbackPath);
         throw BackupRestoreException(
@@ -798,6 +930,24 @@ class BackupRestoreService {
     }
 
     await _deleteBestEffort(_rollbackPath);
+    await _deleteBestEffort(_rollbackTempPath);
+    await _deleteBestEffort(_journalTempPath);
+  }
+
+  Future<void> _writeRecoveryJournal(
+    BackupSettings originalSettings,
+    bool hadLiveDatabase,
+  ) async {
+    final bytes = utf8.encode(
+      jsonEncode({
+        'version': 1,
+        'hadLiveDatabase': hadLiveDatabase,
+        'originalSettings': originalSettings.toJson(),
+      }),
+    );
+    await fileOperations.delete(_journalTempPath);
+    await fileOperations.write(_journalTempPath, bytes);
+    await fileOperations.rename(_journalTempPath, _journalPath);
   }
 
   Future<void> _deleteSidecars() async {
@@ -821,6 +971,35 @@ class BackupRestoreService {
 
   String _errorText(Object error) =>
       error is BackupRestoreException ? error.message : error.toString();
+}
+
+class _RestoreJournal {
+  const _RestoreJournal({
+    required this.hadLiveDatabase,
+    required this.originalSettings,
+  });
+
+  final bool hadLiveDatabase;
+  final BackupSettings originalSettings;
+
+  factory _RestoreJournal.fromBytes(List<int> bytes) {
+    final decoded = jsonDecode(utf8.decode(bytes, allowMalformed: false));
+    if (decoded is! Map<String, dynamic> ||
+        decoded.length != 3 ||
+        decoded['version'] != 1 ||
+        decoded['hadLiveDatabase'] is! bool ||
+        decoded['originalSettings'] is! Map<String, dynamic>) {
+      throw const BackupRestoreException(
+        'The restore recovery record is malformed or incompatible.',
+      );
+    }
+    return _RestoreJournal(
+      hadLiveDatabase: decoded['hadLiveDatabase'] as bool,
+      originalSettings: BackupSettings.fromJson(
+        decoded['originalSettings'] as Map<String, dynamic>,
+      ),
+    );
+  }
 }
 
 class _BoundedBytesSink implements Sink<List<int>> {
@@ -906,6 +1085,16 @@ class BackupService {
       );
     }
     return Uint8List.fromList(zipBytes);
+  }
+
+  /// Recovers both stores when the process stopped during a prior restore.
+  /// Call after preferences initialize and before the database is first opened.
+  static Future<void> recoverInterruptedRestore() async {
+    final docsDir = await getApplicationDocumentsDirectory();
+    await BackupRestoreService.recoverInterruptedRestore(
+      databasePath: p.join(docsDir.path, BackupRestoreService.databaseFileName),
+      settingsStore: const AppPreferencesBackupSettingsStore(),
+    );
   }
 
   /// Writes backup zip to the user-chosen SAF folder at [folderUri].

@@ -15,11 +15,13 @@ import 'package:workout_of_record/services/backup_service.dart';
 class _DatabaseFixture {
   const _DatabaseFixture({
     required this.mesocycleId,
-    required this.completedWorkoutId,
+    required this.activeWorkoutId,
+    required this.historicalWorkoutId,
   });
 
   final int mesocycleId;
-  final int completedWorkoutId;
+  final int activeWorkoutId;
+  final int historicalWorkoutId;
 }
 
 class _MemorySettingsStore implements BackupSettingsStore {
@@ -146,14 +148,23 @@ Future<_DatabaseFixture> _createRepresentativeDatabase(
       mesocycleName,
       2,
     );
-    final workout = await database.getOrCreateNextWorkout(mesocycleId);
-    await database.generatePlannedWorkout(workout!.id);
-    final completedWorkoutId = await database.initializeWorkout(workout.id);
-    await database.finishWorkout(completedWorkoutId);
+    final historicalWorkout = await database.getOrCreateNextWorkout(
+      mesocycleId,
+    );
+    await database.generatePlannedWorkout(historicalWorkout!.id);
+    final historicalWorkoutId = await database.initializeWorkout(
+      historicalWorkout.id,
+    );
+    await database.finishWorkout(historicalWorkoutId);
+
+    final activeWorkout = await database.getOrCreateNextWorkout(mesocycleId);
+    await database.generatePlannedWorkout(activeWorkout!.id);
+    final activeWorkoutId = await database.initializeWorkout(activeWorkout.id);
     await database.customStatement('PRAGMA wal_checkpoint(TRUNCATE)');
     return _DatabaseFixture(
       mesocycleId: mesocycleId,
-      completedWorkoutId: completedWorkoutId,
+      activeWorkoutId: activeWorkoutId,
+      historicalWorkoutId: historicalWorkoutId,
     );
   } finally {
     await database.close();
@@ -317,7 +328,7 @@ void main() {
     );
     restoredSettings = BackupSettings(
       currentMesocycleId: restoredFixture.mesocycleId,
-      currentCompletedWorkoutId: restoredFixture.completedWorkoutId,
+      currentCompletedWorkoutId: restoredFixture.activeWorkoutId,
       dateOfBirth: DateTime.utc(1990, 2, 3),
       weight: 72.5,
       trainingGoal: TrainingGoal.hypertrophy,
@@ -486,9 +497,38 @@ void main() {
           _databaseEntry(restoredDatabaseBytes),
           _settingsEntry({'currentMesocycleId': 999999}),
         ]),
-        'currentMesocycleId does not exist',
+        'currentMesocycleId does not identify an active mesocycle',
       );
     });
+
+    test(
+      'rejects active workout and mesocycle pointers that do not match',
+      () async {
+        final mismatchedPath = '${tempDirectory.path}/mismatched.sqlite';
+        await File(restoredPath).copy(mismatchedPath);
+        final mismatchedDatabase = AppDatabase.withExecutor(
+          NativeDatabase(File(mismatchedPath), enableMigrations: false),
+        );
+        final templates = await mismatchedDatabase.getMesoTemplates();
+        final otherMesocycleId = await mismatchedDatabase.createMesocycle(
+          templates.first.id,
+          'Different active mesocycle',
+          2,
+        );
+        await mismatchedDatabase.close();
+
+        await expectRejectedWithoutMutation(
+          _archiveBytes([
+            _databaseEntry(await File(mismatchedPath).readAsBytes()),
+            _settingsEntry({
+              ...restoredSettings.toJson(),
+              'currentMesocycleId': otherMesocycleId,
+            }),
+          ]),
+          'active workout in the current mesocycle',
+        );
+      },
+    );
   });
 
   group('SQLite validation', () {
@@ -721,6 +761,41 @@ void main() {
     });
   });
 
+  test(
+    'startup rolls back a restore interrupted between both stores',
+    () async {
+      await lifecycle.dispose();
+      final originalDatabaseBytes = await File(livePath).readAsBytes();
+      await File(
+        '$livePath.restore-original',
+      ).writeAsBytes(originalDatabaseBytes, flush: true);
+      await File(restoredPath).copy(livePath);
+      settingsStore.current = restoredSettings;
+      await File('$livePath.restore-transaction.json').writeAsString(
+        jsonEncode({
+          'version': 1,
+          'hadLiveDatabase': true,
+          'originalSettings': originalSettings.toJson(),
+        }),
+        flush: true,
+      );
+
+      await BackupRestoreService.recoverInterruptedRestore(
+        databasePath: livePath,
+        settingsStore: settingsStore,
+      );
+
+      expect(settingsStore.current, originalSettings);
+      expect(await _mesocycleNames(livePath), contains('Original history'));
+      expect(
+        await _mesocycleNames(livePath),
+        isNot(contains('Restored history')),
+      );
+      expect(await File('$livePath.restore-original').exists(), false);
+      expect(await File('$livePath.restore-transaction.json').exists(), false);
+    },
+  );
+
   test('successful restore works when no live database file exists', () async {
     await lifecycle.removeLiveDatabaseBeforeRestore();
 
@@ -759,13 +834,23 @@ void main() {
         NativeDatabase(File(livePath)),
       );
       try {
-        final completed =
+        final active =
             await (restoredDatabase.select(restoredDatabase.completedWorkouts)
                   ..where(
-                    (row) => row.id.equals(restoredFixture.completedWorkoutId),
+                    (row) => row.id.equals(restoredFixture.activeWorkoutId),
                   ))
                 .getSingleOrNull();
-        expect(completed, isNotNull);
+        expect(active?.status, WorkoutStatus.active);
+        expect(active?.completedAt, isNull);
+
+        final historical =
+            await (restoredDatabase.select(restoredDatabase.completedWorkouts)
+                  ..where(
+                    (row) => row.id.equals(restoredFixture.historicalWorkoutId),
+                  ))
+                .getSingleOrNull();
+        expect(historical?.status, WorkoutStatus.completed);
+        expect(historical?.completedAt, isNotNull);
       } finally {
         await restoredDatabase.close();
       }
