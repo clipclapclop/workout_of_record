@@ -385,24 +385,43 @@ class ReleaseWorkflow:
             raise ReleaseError("commitAuditExceptions must be an array.")
 
         manifest_fragments = set(self.manifest.get("changeFragments", []))
+        monitored = tuple(self.config["monitoredCodePaths"])
         exceptions: dict[str, str] = {}
         for value in values:
             if not isinstance(value, dict):
                 raise ReleaseError("Every commitAuditExceptions entry must be an object.")
             commit = value.get("commit")
+            originating_commit = value.get("originatingCommit")
             fragment = value.get("fragment")
             reason = value.get("reason")
-            if not isinstance(commit, str) or not re.fullmatch(
-                r"(?:[0-9a-f]{40}|[0-9a-f]{64})", commit
+            for field, revision in (
+                ("commit", commit),
+                ("originatingCommit", originating_commit),
             ):
-                raise ReleaseError(
-                    "commitAuditExceptions commits must be full lowercase immutable SHAs."
-                )
+                if not isinstance(revision, str) or not re.fullmatch(
+                    r"(?:[0-9a-f]{40}|[0-9a-f]{64})", revision
+                ):
+                    raise ReleaseError(
+                        f"commitAuditExceptions {field} values must be full lowercase "
+                        "immutable SHAs."
+                    )
             if commit in exceptions:
                 raise ReleaseError(f"Duplicate commit audit exception: {commit}")
             if commit not in release_commits:
                 raise ReleaseError(
                     f"Commit audit exception is outside this release range: {commit}"
+                )
+            if originating_commit not in release_commits:
+                raise ReleaseError(
+                    "Commit audit exception originating commit is outside this release "
+                    f"range: {originating_commit}"
+                )
+            if self._git(
+                "merge-base", "--is-ancestor", originating_commit, commit, check=False
+            ).returncode != 0:
+                raise ReleaseError(
+                    "Commit audit exception must follow its originating commit: "
+                    f"{commit}"
                 )
             if not isinstance(fragment, str) or fragment not in manifest_fragments:
                 raise ReleaseError(
@@ -411,6 +430,49 @@ class ReleaseWorkflow:
             if not isinstance(reason, str) or not reason.strip():
                 raise ReleaseError(
                     f"Commit audit exception requires a non-empty reason: {commit}"
+                )
+
+            fragment_id = self._load_json(self.root / fragment).get("id")
+            originating_paths = self._git_output(
+                "diff-tree", "--no-commit-id", "--name-only", "-r", originating_commit
+            ).splitlines()
+            recorded_fragment = False
+            for path in originating_paths:
+                if not (
+                    path.startswith(".changes/unreleased/")
+                    or path.startswith("release/fragments/")
+                ):
+                    continue
+                historical = self._git("show", f"{originating_commit}:{path}", check=False)
+                if historical.returncode != 0:
+                    continue
+                try:
+                    historical_fragment = json.loads(historical.stdout)
+                except json.JSONDecodeError:
+                    continue
+                if (
+                    isinstance(historical_fragment, dict)
+                    and historical_fragment.get("id") == fragment_id
+                ):
+                    recorded_fragment = True
+                    break
+            if not recorded_fragment:
+                raise ReleaseError(
+                    "Commit audit exception originating commit did not record the linked "
+                    f"fragment: {commit}"
+                )
+
+            commit_paths = self._git_output(
+                "diff-tree", "--no-commit-id", "--name-only", "-r", commit
+            ).splitlines()
+            originating_code = {
+                path for path in originating_paths if path.startswith(monitored)
+            }
+            exception_code = {path for path in commit_paths if path.startswith(monitored)}
+            if not originating_code.intersection(exception_code):
+                raise ReleaseError(
+                    "Commit audit exception does not share an application path with its "
+                    f"originating implementation: {commit}"
                 )
             exceptions[commit] = fragment
         return exceptions

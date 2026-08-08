@@ -34,7 +34,7 @@ After the first automated release, the tool audits each application-code commit.
 Release-Impact: none
 ```
 
-Do not rewrite shared release history merely to repair missing metadata. For an already-published commit that belongs to an implementation whose fragment was recorded in another commit, the release manifest may use `commitAuditExceptions`. Each entry must name the full immutable commit SHA, reference a fragment listed by that manifest, and give a concrete reason. The tool rejects abbreviated SHAs, commits outside the release range, unrelated fragments, duplicate entries, and exceptions for commits that already pass the audit. Treat this as a reviewed recovery mechanism, not the normal fragment workflow.
+Do not rewrite shared release history merely to repair missing metadata. For an already-published commit that belongs to an implementation whose fragment was recorded in another commit, the release manifest may use `commitAuditExceptions`. Each entry must name the full immutable exception and originating commit SHAs, reference a fragment listed by that manifest, and give a concrete reason. The originating commit must precede the exception, must have recorded the linked fragment ID, and must share a monitored application path with the follow-up commit. The tool also rejects abbreviated SHAs, commits outside the release range, duplicate entries, and exceptions for commits that already pass the audit. Treat this as a reviewed recovery mechanism, not the normal fragment workflow.
 
 ## Prepare
 

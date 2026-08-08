@@ -106,6 +106,25 @@ class ReleaseWorkflowTest(unittest.TestCase):
         workflow._preflight_git()
         return workflow
 
+    def _commit_fragment_follow_up(self) -> tuple[str, str]:
+        archived = self.root / "release/fragments/1.0.1/fixture.json"
+        self._write(".changes/unreleased/fixture.json", archived.read_text(encoding="utf-8"))
+        self._write("lib/app.dart", "void main() { print('origin'); }\n")
+        self._run(["git", "add", "."], cwd=self.root)
+        self._run(["git", "commit", "-m", "originating change"], cwd=self.root)
+        originating = self._run(
+            ["git", "rev-parse", "HEAD"], cwd=self.root
+        ).stdout.strip()
+
+        self._write("lib/app.dart", "void main() { print('follow-up'); }\n")
+        self._run(["git", "add", "."], cwd=self.root)
+        self._run(["git", "commit", "-m", "follow-up fix"], cwd=self.root)
+        self._run(["git", "push"], cwd=self.root)
+        follow_up = self._run(
+            ["git", "rev-parse", "HEAD"], cwd=self.root
+        ).stdout.strip()
+        return originating, follow_up
+
     def test_canonical_and_github_remotes_must_be_distinct(self) -> None:
         config_path = self.root / "tool/release-config.json"
         config = json.loads(config_path.read_text(encoding="utf-8"))
@@ -217,17 +236,14 @@ class ReleaseWorkflowTest(unittest.TestCase):
 
     def test_commit_audit_accepts_exact_release_exception(self) -> None:
         self._run(["git", "tag", "v1.0.0"], cwd=self.root)
-        self._write("lib/app.dart", "void main() { print('follow-up'); }\n")
-        self._run(["git", "add", "."], cwd=self.root)
-        self._run(["git", "commit", "-m", "follow-up fix"], cwd=self.root)
-        self._run(["git", "push"], cwd=self.root)
-        commit = self._run(["git", "rev-parse", "HEAD"], cwd=self.root).stdout.strip()
+        originating, commit = self._commit_fragment_follow_up()
 
         workflow = self._workflow_after_preflight()
         workflow.manifest = dict(self.manifest)
         workflow.manifest["commitAuditExceptions"] = [
             {
                 "commit": commit,
+                "originatingCommit": originating,
                 "fragment": "release/fragments/1.0.1/fixture.json",
                 "reason": "The fragment was recorded in the originating implementation commit.",
             }
@@ -236,21 +252,57 @@ class ReleaseWorkflowTest(unittest.TestCase):
 
     def test_commit_audit_exception_requires_full_immutable_sha(self) -> None:
         self._run(["git", "tag", "v1.0.0"], cwd=self.root)
-        self._write("lib/app.dart", "void main() { print('follow-up'); }\n")
-        self._run(["git", "add", "."], cwd=self.root)
-        self._run(["git", "commit", "-m", "follow-up fix"], cwd=self.root)
-        self._run(["git", "push"], cwd=self.root)
+        originating, _ = self._commit_fragment_follow_up()
 
         workflow = self._workflow_after_preflight()
         workflow.manifest = dict(self.manifest)
         workflow.manifest["commitAuditExceptions"] = [
             {
                 "commit": "deadbee",
+                "originatingCommit": originating,
                 "fragment": "release/fragments/1.0.1/fixture.json",
                 "reason": "Too broad to be safe.",
             }
         ]
         with self.assertRaisesRegex(ReleaseError, "full lowercase immutable SHAs"):
+            workflow._audit_commits_for_fragments("v1.0.0")
+
+    def test_commit_audit_exception_rejects_unrelated_fragment(self) -> None:
+        other_fragment = {
+            "id": "other",
+            "summary": "Other change.",
+            "audience": "internal",
+            "releaseNote": "Other release note.",
+            "docs": {
+                "impact": "updated",
+                "paths": ["docs/guide.md"],
+                "reason": "",
+            },
+            "screenshots": [],
+        }
+        self._write(
+            "release/fragments/1.0.1/other.json", json.dumps(other_fragment)
+        )
+        self._run(["git", "add", "."], cwd=self.root)
+        self._run(["git", "commit", "-m", "other release metadata"], cwd=self.root)
+        self._run(["git", "tag", "v1.0.0"], cwd=self.root)
+        originating, commit = self._commit_fragment_follow_up()
+
+        workflow = self._workflow_after_preflight()
+        workflow.manifest = dict(self.manifest)
+        workflow.manifest["changeFragments"] = [
+            *self.manifest["changeFragments"],
+            "release/fragments/1.0.1/other.json",
+        ]
+        workflow.manifest["commitAuditExceptions"] = [
+            {
+                "commit": commit,
+                "originatingCommit": originating,
+                "fragment": "release/fragments/1.0.1/other.json",
+                "reason": "This fragment belongs to a different implementation.",
+            }
+        ]
+        with self.assertRaisesRegex(ReleaseError, "did not record the linked fragment"):
             workflow._audit_commits_for_fragments("v1.0.0")
 
 
