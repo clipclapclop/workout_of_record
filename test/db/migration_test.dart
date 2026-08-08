@@ -254,6 +254,22 @@ Future<void> _expectRepresentativeData(
     },
   ]);
 
+  // Schema 10 intentionally removed uniqueness from workout/order_index so
+  // replaced exercises can retain their history at the same display position.
+  await database.customStatement('''
+    INSERT INTO completed_exercises
+      (id, completed_workout_id, movement_id, order_index, persistence,
+       skip_reason, ai_planned)
+    VALUES (99, 1, 1, 0, 2, 'time', 0)
+  ''');
+  expect(
+    await _singleValue<int>(database, '''
+      SELECT COUNT(*) FROM completed_exercises
+      WHERE completed_workout_id = 1 AND order_index = 0
+    '''),
+    2,
+  );
+
   final plannedExercises = await database.customSelect('''
     SELECT ai_planned FROM planned_exercises ORDER BY id
   ''').get();

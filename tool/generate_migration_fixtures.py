@@ -167,6 +167,9 @@ def _add_schema_9(connection: sqlite3.Connection) -> None:
 
 
 def _add_schema_10(connection: sqlite3.Connection) -> None:
+    # Schema 10 deliberately removed UNIQUE(completed_workout_id, order_index)
+    # while replacing is_persistent with persistence. Keep the source fixture
+    # unconstrained so it matches the production 9 -> 10 migration.
     connection.executescript(
         """
         CREATE TABLE completed_exercises_new (
