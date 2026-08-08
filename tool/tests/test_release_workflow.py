@@ -152,7 +152,6 @@ class ReleaseWorkflowTest(unittest.TestCase):
         config_path = self.root / "tool/release-config.json"
         config = json.loads(config_path.read_text(encoding="utf-8"))
         config["githubMirrorEnabled"] = False
-        config.pop("githubRepository")
         config.pop("githubRemote")
         config_path.write_text(json.dumps(config), encoding="utf-8")
         self._run(["git", "remote", "remove", "github"], cwd=self.root)

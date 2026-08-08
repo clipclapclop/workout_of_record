@@ -141,6 +141,7 @@ class ReleaseWorkflow:
             "displayName",
             "forgejoBaseUrl",
             "forgejoRepository",
+            "githubRepository",
             "androidPackage",
             "apkFilename",
             "expectedCertificateSha256",
@@ -173,12 +174,11 @@ class ReleaseWorkflow:
         if not isinstance(mirror_enabled, bool):
             raise ReleaseError("release-config.json: githubMirrorEnabled must be boolean.")
         if mirror_enabled:
-            for field in ("githubRepository", "githubRemote"):
-                value = self.config.get(field)
-                if not isinstance(value, str) or not value.strip():
-                    raise ReleaseError(
-                        f"release-config.json: {field} must be set when the GitHub mirror is enabled."
-                    )
+            value = self.config.get("githubRemote")
+            if not isinstance(value, str) or not value.strip():
+                raise ReleaseError(
+                    "release-config.json: githubRemote must be set when the GitHub mirror is enabled."
+                )
         offset = self.config.get("androidAbiVersionCodeOffset", 0)
         if not isinstance(offset, int) or offset < 0:
             raise ReleaseError(

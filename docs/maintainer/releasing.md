@@ -76,7 +76,7 @@ Publication is Forgejo-first:
 4. Publish the canonical Forgejo Release.
 5. If `githubMirrorEnabled` is true, push the same branch and tag to GitHub, reconcile matching GitHub Release assets, deploy MkDocs to GitHub Pages, mirror `gh-pages` back to Forgejo, and publish the GitHub mirror.
 
-Every GitHub CLI operation names `clipclapclop/workout_of_record` explicitly rather than inferring it from canonical `origin`. Set `githubMirrorEnabled` to `false` to publish only on Forgejo; in that mode the GitHub remote and CLI are not required.
+Every GitHub CLI operation names `clipclapclop/workout_of_record` explicitly rather than inferring it from canonical `origin`. Set `githubMirrorEnabled` to `false` to publish only on Forgejo; in that mode the GitHub remote and CLI are not required for ordinary releases. `githubRepository` remains configured as the immutable historical source identity for the one-time backfill command.
 
 ## Recovery
 
