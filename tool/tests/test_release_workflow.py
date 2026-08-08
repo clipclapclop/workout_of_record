@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import urllib.parse
 from pathlib import Path
 
 
@@ -34,6 +35,9 @@ class ReleaseWorkflowTest(unittest.TestCase):
             json.dumps(
                 {
                     "displayName": "Fixture",
+                    "forgejoBaseUrl": "https://forgejo.example",
+                    "forgejoRepository": "example/fixture",
+                    "githubMirrorEnabled": True,
                     "githubRepository": "example/fixture",
                     "androidPackage": "example.fixture",
                     "androidAbiVersionCodeOffset": 2000,
@@ -143,6 +147,20 @@ class ReleaseWorkflowTest(unittest.TestCase):
         with self.assertRaisesRegex(ReleaseError, "Configured Git remote does not exist"):
             ReleaseWorkflow(self.root, dry_run=True)._preflight_git()
 
+    def test_github_remote_is_optional_when_mirror_is_disabled(self) -> None:
+        config_path = self.root / "tool/release-config.json"
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+        config["githubMirrorEnabled"] = False
+        config.pop("githubRepository")
+        config.pop("githubRemote")
+        config_path.write_text(json.dumps(config), encoding="utf-8")
+        self._run(["git", "remote", "remove", "github"], cwd=self.root)
+        self._run(["git", "add", "."], cwd=self.root)
+        self._run(["git", "commit", "-m", "disable GitHub mirror"], cwd=self.root)
+        self._run(["git", "push"], cwd=self.root)
+
+        ReleaseWorkflow(self.root, dry_run=True)._preflight_git()
+
     def test_dirty_working_tree_is_rejected(self) -> None:
         self._write("untracked.txt", "dirty\n")
         with self.assertRaisesRegex(ReleaseError, "working tree must be clean"):
@@ -163,6 +181,26 @@ class ReleaseWorkflowTest(unittest.TestCase):
 
         with self.assertRaisesRegex(ReleaseError, "outdated or diverged"):
             ReleaseWorkflow(self.root, dry_run=True)._preflight_git()
+
+    def test_forgejo_backfill_accepts_annotated_ancestor_tag(self) -> None:
+        self._run(
+            ["git", "tag", "-a", "v1.0.1", "-m", "Fixture 1.0.1"],
+            cwd=self.root,
+        )
+        self._run(["git", "push", "origin", "v1.0.1"], cwd=self.root)
+        self._write("tool/backfill.txt", "backfill support\n")
+        self._run(["git", "add", "."], cwd=self.root)
+        self._run(["git", "commit", "-m", "add backfill support"], cwd=self.root)
+        self._run(["git", "push"], cwd=self.root)
+
+        workflow = ReleaseWorkflow(
+            self.root,
+            dry_run=False,
+            backfill_forgejo="v1.0.1",
+        )
+        workflow._forgejo_token = lambda: "token"  # type: ignore[method-assign]
+
+        workflow._preflight_forgejo_backfill()
 
     def test_stale_docs_environment_python_is_rejected(self) -> None:
         python = self.root / ".venv-docs/bin/python"
@@ -304,6 +342,179 @@ class ReleaseWorkflowTest(unittest.TestCase):
         ]
         with self.assertRaisesRegex(ReleaseError, "did not record the linked fragment"):
             workflow._audit_commits_for_fragments("v1.0.0")
+
+    def test_forgejo_draft_is_verified_before_publication(self) -> None:
+        workflow = ReleaseWorkflow(self.root, dry_run=False)
+        workflow.manifest = dict(self.manifest)
+        apk = self.root / "fixture-arm64.apk"
+        checksum = self.root / "fixture-arm64.apk.sha256"
+        apk.write_bytes(b"verified apk")
+        checksum.write_bytes(b"verified checksum")
+        notes = (self.root / "docs/releases/1.0.1.md").read_text(encoding="utf-8")
+        release = {
+            "id": 7,
+            "tag_name": "v1.0.1",
+            "name": "Fixture 1.0.1",
+            "body": notes,
+            "draft": True,
+            "prerelease": False,
+            "assets": [],
+        }
+        created = False
+        calls: list[tuple[str, str]] = []
+        uploaded: dict[str, bytes] = {}
+        downloaded: list[str] = []
+
+        def fake_state() -> dict[str, object] | None:
+            return dict(release) if created else None
+
+        def fake_api(method: str, path: str, **kwargs: object) -> dict[str, object]:
+            nonlocal created
+            calls.append((method, path))
+            if method == "POST" and path.endswith("/releases"):
+                created = True
+                return dict(release)
+            if method == "POST" and "/assets?" in path:
+                name = urllib.parse.parse_qs(urllib.parse.urlparse(path).query)["name"][0]
+                uploaded[name] = kwargs["data"]  # type: ignore[assignment]
+                release["assets"].append(  # type: ignore[union-attr]
+                    {"name": name, "browser_download_url": f"https://forgejo/{name}"}
+                )
+                return {"name": name}
+            if method == "PATCH":
+                release["draft"] = False
+                return dict(release)
+            self.fail(f"Unexpected Forgejo API call: {method} {path}")
+
+        def fake_download(asset: dict[str, object], destination: Path) -> None:
+            name = str(asset["name"])
+            downloaded.append(name)
+            destination.write_bytes(uploaded[name])
+
+        workflow._forgejo_release_state = fake_state  # type: ignore[method-assign]
+        workflow._forgejo_api = fake_api  # type: ignore[method-assign]
+        workflow._download_forgejo_asset = fake_download  # type: ignore[method-assign]
+        workflow._git_output = lambda *args: "a" * 40  # type: ignore[method-assign]
+
+        workflow._publish_forgejo_release(apk, checksum)
+
+        self.assertFalse(release["draft"])
+        self.assertEqual(
+            [method for method, _ in calls],
+            ["POST", "POST", "POST", "PATCH"],
+        )
+        self.assertEqual(uploaded[apk.name], apk.read_bytes())
+        self.assertEqual(uploaded[checksum.name], checksum.read_bytes())
+        self.assertEqual(downloaded, [apk.name, checksum.name])
+
+    def test_forgejo_matching_asset_is_reused(self) -> None:
+        workflow = ReleaseWorkflow(self.root, dry_run=False)
+        local = self.root / "fixture-arm64.apk"
+        local.write_bytes(b"same")
+        release = {
+            "assets": [
+                {"name": local.name, "browser_download_url": "https://forgejo/asset"}
+            ]
+        }
+        workflow._download_forgejo_asset = (  # type: ignore[method-assign]
+            lambda asset, destination: destination.write_bytes(b"same")
+        )
+
+        uploaded = workflow._ensure_forgejo_release_asset(
+            local, release, allow_upload=False
+        )
+
+        self.assertFalse(uploaded)
+
+    def test_forgejo_conflicting_asset_is_rejected(self) -> None:
+        workflow = ReleaseWorkflow(self.root, dry_run=False)
+        local = self.root / "fixture-arm64.apk"
+        local.write_bytes(b"expected")
+        release = {
+            "assets": [
+                {"name": local.name, "browser_download_url": "https://forgejo/asset"}
+            ]
+        }
+        workflow._download_forgejo_asset = (  # type: ignore[method-assign]
+            lambda asset, destination: destination.write_bytes(b"different")
+        )
+
+        with self.assertRaisesRegex(ReleaseError, "different asset"):
+            workflow._ensure_forgejo_release_asset(
+                local, release, allow_upload=False
+            )
+
+    def test_published_forgejo_release_cannot_be_repaired_with_missing_asset(self) -> None:
+        workflow = ReleaseWorkflow(self.root, dry_run=False)
+        local = self.root / "fixture-arm64.apk"
+        local.write_bytes(b"expected")
+
+        with self.assertRaisesRegex(ReleaseError, "missing required asset"):
+            workflow._ensure_forgejo_release_asset(
+                local, {"id": 7, "assets": []}, allow_upload=False
+            )
+
+    def test_canonical_release_precedes_github_mirror(self) -> None:
+        workflow = ReleaseWorkflow(self.root, dry_run=False)
+        workflow.manifest = dict(self.manifest)
+        apk = self.root / "fixture-arm64.apk"
+        checksum = self.root / "fixture-arm64.apk.sha256"
+        apk.write_bytes(b"apk")
+        checksum.write_bytes(b"checksum")
+        events: list[str] = []
+
+        class RecordingRunner:
+            def run(self, args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+                command = [str(value) for value in args]  # type: ignore[union-attr]
+                events.append("command:" + " ".join(command))
+                return subprocess.CompletedProcess(command, 0, "", "")
+
+        workflow.runner = RecordingRunner()  # type: ignore[assignment]
+        workflow._forgejo_token = lambda: "token"  # type: ignore[method-assign]
+        workflow._ensure_release_tag = lambda: events.append("tag")  # type: ignore[method-assign]
+        workflow._publish_forgejo_release = (  # type: ignore[method-assign]
+            lambda apk, checksum: events.append("forgejo")
+        )
+        workflow._publish_github_mirror = (  # type: ignore[method-assign]
+            lambda apk, checksum: events.append("github")
+        )
+
+        workflow._publish(apk, checksum)
+
+        self.assertLess(events.index("forgejo"), events.index("github"))
+        self.assertLess(
+            events.index("command:git push origin v1.0.1"),
+            events.index("forgejo"),
+        )
+
+    def test_disabled_github_mirror_is_not_published(self) -> None:
+        workflow = ReleaseWorkflow(self.root, dry_run=False)
+        workflow.config["githubMirrorEnabled"] = False
+        workflow.manifest = dict(self.manifest)
+        apk = self.root / "fixture-arm64.apk"
+        checksum = self.root / "fixture-arm64.apk.sha256"
+        apk.write_bytes(b"apk")
+        checksum.write_bytes(b"checksum")
+        events: list[str] = []
+
+        class RecordingRunner:
+            def run(self, args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+                command = [str(value) for value in args]  # type: ignore[union-attr]
+                return subprocess.CompletedProcess(command, 0, "", "")
+
+        workflow.runner = RecordingRunner()  # type: ignore[assignment]
+        workflow._forgejo_token = lambda: "token"  # type: ignore[method-assign]
+        workflow._ensure_release_tag = lambda: None  # type: ignore[method-assign]
+        workflow._publish_forgejo_release = (  # type: ignore[method-assign]
+            lambda apk, checksum: events.append("forgejo")
+        )
+        workflow._publish_github_mirror = (  # type: ignore[method-assign]
+            lambda apk, checksum: events.append("github")
+        )
+
+        workflow._publish(apk, checksum)
+
+        self.assertEqual(events, ["forgejo"])
 
 
 if __name__ == "__main__":

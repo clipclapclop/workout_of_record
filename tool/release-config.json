@@ -1,5 +1,8 @@
 {
   "displayName": "Workout of Record",
+  "forgejoBaseUrl": "https://git.oorangy.com",
+  "forgejoRepository": "chad/workout_of_record",
+  "githubMirrorEnabled": true,
   "githubRepository": "clipclapclop/workout_of_record",
   "androidPackage": "com.clipclapclop.workoutofrecord",
   "androidAbiVersionCodeOffset": 2000,

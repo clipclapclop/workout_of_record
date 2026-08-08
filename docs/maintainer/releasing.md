@@ -1,6 +1,6 @@
 # Releasing
 
-Releases are built on the local Linux workstation. Forgejo is the canonical source repository; GitHub remains the staged APK and documentation distribution destination. The release tool never edits, stages, or commits tracked files.
+Releases are built on the local Linux workstation. Forgejo is the canonical source and release authority. GitHub is an optional mirror for Obtainium and documentation while `githubMirrorEnabled` is true in `tool/release-config.json`. The release tool never edits, stages, or commits tracked files.
 
 ## One-time workstation setup
 
@@ -10,17 +10,27 @@ Required tools:
 - the existing ignored `android/key.properties` and release keystore;
 - Python 3 with `venv` support;
 - Git and authenticated SSH access to canonical Forgejo `origin`;
-- a `github` Git remote for `clipclapclop/workout_of_record`; and
-- GitHub CLI authenticated for `clipclapclop/workout_of_record`.
+- a Forgejo token with repository release write access; and
+- while GitHub mirroring is enabled, a `github` Git remote for `clipclapclop/workout_of_record` and GitHub CLI authenticated for that repository.
 
-Install GitHub CLI using the operating system package manager, then run:
+Store the Forgejo token outside the repository with owner-only permissions:
+
+```bash
+install -d -m 700 ~/.config/workout-of-record
+install -m 600 /dev/null ~/.config/workout-of-record/forgejo-release.token
+vim ~/.config/workout-of-record/forgejo-release.token
+```
+
+For an ephemeral environment, `WORKOUT_OF_RECORD_FORGEJO_TOKEN` is accepted only when `WORKOUT_OF_RECORD_FORGEJO_TOKEN_HOST=git.oorangy.com` is also set. Do not put the token on a command line or in a tracked file.
+
+When GitHub mirroring is enabled, install GitHub CLI using the operating system package manager, then run:
 
 ```bash
 gh auth login
 gh auth status
 ```
 
-The release command creates `.venv-docs`, rebuilds it if its Python launcher is stale, installs the pinned documentation dependency, and creates/configures `gh-pages` on the first publication.
+The release command creates `.venv-docs`, rebuilds it if its Python launcher is stale, installs the pinned documentation dependency, and creates/configures `gh-pages` on the first mirrored publication.
 
 ## Change fragments
 
@@ -58,18 +68,37 @@ Ask Codex to **publish the prepared release**, or run:
 ./tool/release
 ```
 
-Publishing pushes `main` and the annotated version tag to Forgejo and GitHub, creates a draft GitHub Release, uploads the APK and checksum, deploys MkDocs to GitHub Pages, mirrors `gh-pages` back to Forgejo, and finally makes the release public. Every GitHub CLI operation names `clipclapclop/workout_of_record` explicitly rather than inferring it from canonical `origin`.
+Publication is Forgejo-first:
+
+1. Push `main` and the annotated version tag to Forgejo.
+2. Create or resume a draft Forgejo Release using the prepared notes.
+3. Upload the APK and checksum, download each attachment again, and compare it byte-for-byte by SHA-256.
+4. Publish the canonical Forgejo Release.
+5. If `githubMirrorEnabled` is true, push the same branch and tag to GitHub, reconcile matching GitHub Release assets, deploy MkDocs to GitHub Pages, mirror `gh-pages` back to Forgejo, and publish the GitHub mirror.
+
+Every GitHub CLI operation names `clipclapclop/workout_of_record` explicitly rather than inferring it from canonical `origin`. Set `githubMirrorEnabled` to `false` to publish only on Forgejo; in that mode the GitHub remote and CLI are not required.
 
 ## Recovery
 
 The command is rerunnable:
 
 - An existing tag must point to `HEAD`.
-- Existing release assets are downloaded and compared before reuse.
+- Existing Forgejo and enabled GitHub assets are downloaded and compared before reuse.
 - A differing same-name asset is never overwritten.
-- Documentation or repository-mirroring failures leave the release as a draft, so Obtainium cannot discover an incomplete release.
+- A published Forgejo Release must already contain both matching assets; the tool will not silently repair an incomplete public release.
+- Forgejo is published before the optional mirror. A later GitHub or documentation failure leaves the canonical release available and can be reconciled by rerunning the command.
 - A matching already-published release is treated as complete.
+
+## One-time Forgejo backfill
+
+A historical release that was published on the GitHub mirror before Forgejo became the release authority can be backfilled without moving its immutable tag:
+
+```bash
+./tool/release --backfill-forgejo v1.0.5
+```
+
+The backfill requires clean `main`, an annotated canonical tag that is an ancestor of `HEAD`, a public matching GitHub mirror, and the Forgejo release token. It downloads the mirror APK and checksum, re-verifies checksum, package, version/build, arm64 architecture, and signing certificate, then creates and verifies the canonical Forgejo Release. It does not edit the tag or republish GitHub.
 
 ## Phone setup
 
-Install Obtainium once, add `https://github.com/clipclapclop/workout_of_record`, and filter assets to `workout-of-record-android-arm64.apk`. Enable scheduled checks and permit installation from Obtainium. Back up the application before testing the first automated update, then verify the local database and settings remain intact.
+Install Obtainium once, add `https://github.com/clipclapclop/workout_of_record`, and filter assets to `workout-of-record-android-arm64.apk`. This source remains valid while GitHub mirroring is enabled. Enable scheduled checks and permit installation from Obtainium. Back up the application before testing the first automated update, then verify the local database and settings remain intact.

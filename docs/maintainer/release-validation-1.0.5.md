@@ -1,6 +1,6 @@
 # Release 1.0.5 validation record
 
-This page records the first real release after Forgejo became canonical while GitHub remained the APK, documentation, and Obtainium destination. It is intentionally incomplete until publication and phone verification finish.
+This page records the first real release after Forgejo became canonical. Forgejo is also the release authority; GitHub remains an optional APK, documentation, and Obtainium mirror. It is intentionally incomplete until the Forgejo backfill and phone verification finish.
 
 ## Preparation
 
@@ -23,12 +23,21 @@ Future follow-up commits that touch application code must update their task's fr
 
 The strict documentation build also exposed a stale ignored `.venv-docs` whose Python launcher still referenced the repository's former filesystem location. Deleting and recreating the environment recovered the build. The release tool now probes that interpreter and automatically rebuilds an unusable documentation environment before installing the pinned requirements.
 
+## Publication evidence
+
+- Release preparation merged to canonical `main` at `18fec46d08513858b6c7763e5b883b43a644dd0f`.
+- `./tool/release --dry-run` passed analyzer, 84 Flutter tests, strict MkDocs, package `com.clipclapclop.workoutofrecord`, version `1.0.5`, arm64 build code `2006`, ABI `arm64-v8a`, and signing certificate `c6ea597a06ae86049cb28bfdaac8048ccfd592821fc71bb4ee5b4b63dd0b57cb`.
+- The verified APK checksum is `0a63f660c3fe29226d3e3c2316067e61e336109efed5d522ad3f4fed8890fac1`.
+- The first build attempt exposed Flutter selecting Android Studio JBR 25.0.2. Configuring `/usr/lib/jvm/java-17-openjdk` with `flutter config --jdk-dir` recovered the build.
+- Publication occurred only after explicit authorization. Forgejo and GitHub `main` both resolved to `18fec46d08513858b6c7763e5b883b43a644dd0f`; annotated tag object `352f78ecfb4062eaf0435d112c9f97206d538788` dereferenced to that revision on both; and both `gh-pages` branches resolved to `313894649c89918b74d62e4e40d4a8c0017d56ca`.
+- The downloaded GitHub APK and checksum matched the locally verified files, the release was public and non-draft, and GitHub Pages reported built with HTTP 200.
+
+## Authority correction
+
+The initial workflow published the release object only on GitHub even though Forgejo was canonical. The owner overrode that distribution design: Forgejo must own the canonical release, with GitHub retained only as an optional mirror. Issue #21 adds Forgejo-first publication and a one-time, fully re-verified v1.0.5 backfill. The existing GitHub Release remains available as the requested mirror.
+
 ## Remaining validation
 
-- [ ] Merge the reviewed release preparation to canonical `main`.
-- [ ] Run `./tool/release --dry-run` from clean `main` and record package identity, arm64 architecture, signing certificate, version/build number, checksum, tests, and strict documentation results.
-- [ ] Publish only after explicit authorization.
-- [ ] Verify `main`, annotated `v1.0.5`, and `gh-pages` revisions on Forgejo and GitHub.
-- [ ] Verify the GitHub Release became public only after matching APK/checksum assets and documentation deployment completed.
+- [ ] Backfill and verify the canonical Forgejo v1.0.5 Release with the matching APK and checksum.
 - [ ] Update through Obtainium on the Pixel and confirm database, settings, active state, and signing continuity.
-- [ ] Record any further defects or recovery steps here.
+- [ ] Record any further defects or recovery steps in the governing Forgejo issue.

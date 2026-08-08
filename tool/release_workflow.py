@@ -12,6 +12,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.error
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -76,14 +79,20 @@ class ReleaseWorkflow:
         root: Path,
         *,
         dry_run: bool,
+        backfill_forgejo: str | None = None,
         runner: CommandRunner | None = None,
     ) -> None:
         self.root = root.resolve()
         self.dry_run = dry_run
+        self.backfill_forgejo = backfill_forgejo
         self.runner = runner or CommandRunner()
         self.config = self._load_json(self.root / "tool/release-config.json")
         self._validate_config()
-        self.version = self._read_version()
+        self.version = (
+            self._read_backfill_version(backfill_forgejo)
+            if backfill_forgejo
+            else self._read_version()
+        )
         self.manifest_path = (
             self.root / "release/manifests" / f"{self.version.name}.json"
         )
@@ -92,6 +101,10 @@ class ReleaseWorkflow:
         self.changed_paths: set[str] = set()
 
     def execute(self) -> None:
+        if self.backfill_forgejo:
+            self._backfill_forgejo_release()
+            return
+
         print(
             f"Preparing {self.version.tag} ({self.version.code})"
             + (" [dry run]" if self.dry_run else ""),
@@ -126,19 +139,46 @@ class ReleaseWorkflow:
     def _validate_config(self) -> None:
         string_fields = (
             "displayName",
-            "githubRepository",
+            "forgejoBaseUrl",
+            "forgejoRepository",
             "androidPackage",
             "apkFilename",
             "expectedCertificateSha256",
             "mainBranch",
             "canonicalRemote",
-            "githubRemote",
             "documentationBranch",
         )
         for field in string_fields:
             value = self.config.get(field)
             if not isinstance(value, str) or not value.strip():
                 raise ReleaseError(f"release-config.json: {field} must be a non-empty string.")
+        parsed_forgejo = urllib.parse.urlparse(self.config["forgejoBaseUrl"])
+        if (
+            parsed_forgejo.scheme != "https"
+            or not parsed_forgejo.hostname
+            or parsed_forgejo.username
+            or parsed_forgejo.password
+            or parsed_forgejo.path not in {"", "/"}
+            or parsed_forgejo.query
+            or parsed_forgejo.fragment
+        ):
+            raise ReleaseError(
+                "release-config.json: forgejoBaseUrl must be an HTTPS origin without credentials."
+            )
+        if not re.fullmatch(r"[^/\s]+/[^/\s]+", self.config["forgejoRepository"]):
+            raise ReleaseError(
+                "release-config.json: forgejoRepository must use owner/repository form."
+            )
+        mirror_enabled = self.config.get("githubMirrorEnabled")
+        if not isinstance(mirror_enabled, bool):
+            raise ReleaseError("release-config.json: githubMirrorEnabled must be boolean.")
+        if mirror_enabled:
+            for field in ("githubRepository", "githubRemote"):
+                value = self.config.get(field)
+                if not isinstance(value, str) or not value.strip():
+                    raise ReleaseError(
+                        f"release-config.json: {field} must be set when the GitHub mirror is enabled."
+                    )
         offset = self.config.get("androidAbiVersionCodeOffset", 0)
         if not isinstance(offset, int) or offset < 0:
             raise ReleaseError(
@@ -158,6 +198,18 @@ class ReleaseWorkflow:
         if not match:
             raise ReleaseError("pubspec.yaml must contain version: MAJOR.MINOR.PATCH+BUILD")
         version = AppVersion(match.group(1), int(match.group(2)))
+        version.semver
+        return version
+
+    def _read_backfill_version(self, tag: str) -> AppVersion:
+        if not re.fullmatch(r"v\d+\.\d+\.\d+", tag):
+            raise ReleaseError("Forgejo backfill tag must use vMAJOR.MINOR.PATCH.")
+        name = tag.removeprefix("v")
+        manifest = self._load_json(self.root / "release/manifests" / f"{name}.json")
+        code = manifest.get("versionCode")
+        if not isinstance(code, int) or code < 1:
+            raise ReleaseError(f"release/manifests/{name}.json: versionCode must be positive.")
+        version = AppVersion(name, code)
         version.semver
         return version
 
@@ -185,12 +237,15 @@ class ReleaseWorkflow:
             )
 
         canonical_remote = self.config["canonicalRemote"]
-        github_remote = self.config["githubRemote"]
-        if canonical_remote == github_remote:
-            raise ReleaseError(
-                "release-config.json: canonicalRemote and githubRemote must be different."
-            )
-        for remote in (canonical_remote, github_remote):
+        remotes = [canonical_remote]
+        if self.config["githubMirrorEnabled"]:
+            github_remote = self.config["githubRemote"]
+            if canonical_remote == github_remote:
+                raise ReleaseError(
+                    "release-config.json: canonicalRemote and githubRemote must be different."
+                )
+            remotes.append(github_remote)
+        for remote in remotes:
             if self._git("remote", "get-url", remote, check=False).returncode != 0:
                 raise ReleaseError(f"Configured Git remote does not exist: {remote}")
 
@@ -606,7 +661,16 @@ class ReleaseWorkflow:
         output_dir.mkdir(parents=True, exist_ok=True)
         apk = output_dir / self.config["apkFilename"]
         shutil.copy2(source, apk)
+        self._verify_apk(apk)
 
+        sha256 = self._sha256(apk)
+        checksum = apk.with_suffix(apk.suffix + ".sha256")
+        checksum.write_text(f"{sha256}  {apk.name}\n", encoding="utf-8")
+        return apk, checksum
+
+    def _verify_apk(self, apk: Path) -> None:
+        if not apk.is_file():
+            raise ReleaseError(f"Release APK is missing: {apk}")
         badging = self.runner.run(
             [self._build_tool("aapt"), "dump", "badging", apk],
             cwd=self.root,
@@ -652,10 +716,10 @@ class ReleaseWorkflow:
                 f"{self.config['expectedCertificateSha256']}."
             )
 
-        sha256 = self._sha256(apk)
-        checksum = apk.with_suffix(apk.suffix + ".sha256")
-        checksum.write_text(f"{sha256}  {apk.name}\n", encoding="utf-8")
-        return apk, checksum
+    def _verify_checksum_file(self, apk: Path, checksum: Path) -> None:
+        expected = f"{self._sha256(apk)}  {apk.name}\n"
+        if not checksum.is_file() or checksum.read_text(encoding="utf-8") != expected:
+            raise ReleaseError("APK checksum file does not match the release APK.")
 
     def _sha256(self, path: Path) -> str:
         digest = hashlib.sha256()
@@ -665,17 +729,20 @@ class ReleaseWorkflow:
         return digest.hexdigest()
 
     def _publish(self, apk: Path, checksum: Path) -> None:
-        if shutil.which("gh") is None:
-            raise ReleaseError("GitHub CLI is required for publishing. Install 'gh' and authenticate it.")
-        self.runner.run(["gh", "auth", "status"], cwd=self.root)
-
+        self._forgejo_token()
         canonical_remote = self.config["canonicalRemote"]
-        github_remote = self.config["githubRemote"]
-        github_repository = self.config["githubRepository"]
         branch = self.config["mainBranch"]
         self.runner.run(["git", "push", canonical_remote, branch], cwd=self.root)
-        self.runner.run(["git", "push", github_remote, branch], cwd=self.root)
+        self._ensure_release_tag()
+        self.runner.run(
+            ["git", "push", canonical_remote, self.version.tag], cwd=self.root
+        )
 
+        self._publish_forgejo_release(apk, checksum)
+        if self.config["githubMirrorEnabled"]:
+            self._publish_github_mirror(apk, checksum)
+
+    def _ensure_release_tag(self) -> None:
         tag_result = self._git("rev-parse", "--verify", self.version.tag, check=False)
         if tag_result.returncode != 0:
             self.runner.run(
@@ -693,12 +760,229 @@ class ReleaseWorkflow:
             "rev-parse", "HEAD"
         ):
             raise ReleaseError(f"Existing {self.version.tag} does not point at HEAD.")
-        self.runner.run(
-            ["git", "push", canonical_remote, self.version.tag], cwd=self.root
+
+    def _forgejo_token(self) -> str:
+        expected_host = urllib.parse.urlparse(self.config["forgejoBaseUrl"]).hostname
+        environment_token = os.environ.get("WORKOUT_OF_RECORD_FORGEJO_TOKEN")
+        if environment_token:
+            if os.environ.get("WORKOUT_OF_RECORD_FORGEJO_TOKEN_HOST") != expected_host:
+                raise ReleaseError(
+                    "WORKOUT_OF_RECORD_FORGEJO_TOKEN_HOST must match the configured Forgejo host."
+                )
+            token = environment_token.strip()
+            if not token:
+                raise ReleaseError("WORKOUT_OF_RECORD_FORGEJO_TOKEN must not be empty.")
+            return token
+
+        config_home = Path(
+            os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")
+        ).expanduser()
+        token_path = config_home / "workout-of-record/forgejo-release.token"
+        if not token_path.is_file():
+            raise ReleaseError(
+                f"Forgejo release token is missing: {token_path}."
+            )
+        metadata = token_path.stat()
+        if metadata.st_uid != os.getuid() or metadata.st_mode & 0o777 != 0o600:
+            raise ReleaseError(
+                f"Forgejo release token must be owned by the current user with mode 0600: {token_path}"
+            )
+        token = token_path.read_text(encoding="utf-8").strip()
+        if not token:
+            raise ReleaseError(f"Forgejo release token is empty: {token_path}")
+        return token
+
+    def _forgejo_api(
+        self,
+        method: str,
+        path: str,
+        *,
+        payload: dict[str, Any] | None = None,
+        data: bytes | None = None,
+        content_type: str | None = None,
+        allow_not_found: bool = False,
+    ) -> Any:
+        if payload is not None and data is not None:
+            raise ReleaseError("Forgejo API request cannot contain JSON and binary data together.")
+        body = json.dumps(payload).encode() if payload is not None else data
+        headers = {
+            "Authorization": f"token {self._forgejo_token()}",
+            "Accept": "application/json",
+        }
+        if payload is not None:
+            headers["Content-Type"] = "application/json"
+        elif content_type:
+            headers["Content-Type"] = content_type
+        url = self.config["forgejoBaseUrl"].rstrip("/") + "/api/v1" + path
+        request = urllib.request.Request(url, data=body, method=method, headers=headers)
+        try:
+            with urllib.request.urlopen(request, timeout=120) as response:
+                response_body = response.read()
+        except urllib.error.HTTPError as error:
+            if allow_not_found and error.code == 404:
+                return None
+            detail = error.read().decode("utf-8", errors="replace")[:500]
+            raise ReleaseError(
+                f"Forgejo API {method} {path} failed with HTTP {error.code}: {detail}"
+            ) from error
+        except OSError as error:
+            raise ReleaseError(f"Forgejo API {method} {path} failed: {error}") from error
+        if not response_body:
+            return None
+        try:
+            return json.loads(response_body)
+        except json.JSONDecodeError as error:
+            raise ReleaseError(f"Forgejo API returned invalid JSON for {path}.") from error
+
+    def _forgejo_repository_path(self) -> str:
+        owner, repository = self.config["forgejoRepository"].split("/", 1)
+        return "/repos/{}/{}".format(
+            urllib.parse.quote(owner, safe=""),
+            urllib.parse.quote(repository, safe=""),
         )
+
+    def _forgejo_release_state(self) -> dict[str, Any] | None:
+        tag = urllib.parse.quote(self.version.tag, safe="")
+        value = self._forgejo_api(
+            "GET",
+            f"{self._forgejo_repository_path()}/releases/tags/{tag}",
+            allow_not_found=True,
+        )
+        if value is None:
+            return None
+        if not isinstance(value, dict):
+            raise ReleaseError("Unexpected Forgejo release response.")
+        return value
+
+    def _validate_forgejo_release_metadata(self, release: dict[str, Any]) -> None:
+        if not isinstance(release.get("draft"), bool):
+            raise ReleaseError("Forgejo release response is missing its draft state.")
+        notes = (self.root / self.manifest["releaseNotes"]).read_text(encoding="utf-8")
+        expected = {
+            "tag_name": self.version.tag,
+            "name": f"{self.config['displayName']} {self.version.name}",
+            "body": notes,
+            "prerelease": False,
+        }
+        mismatched = [key for key, value in expected.items() if release.get(key) != value]
+        if mismatched:
+            raise ReleaseError(
+                "Existing Forgejo release metadata differs for: " + ", ".join(mismatched)
+            )
+
+    def _download_forgejo_asset(self, asset: dict[str, Any], destination: Path) -> None:
+        url = asset.get("browser_download_url")
+        if not isinstance(url, str) or not url:
+            raise ReleaseError("Forgejo release asset is missing its download URL.")
+        headers = {"Authorization": f"token {self._forgejo_token()}"}
+        request = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(request, timeout=120) as response, destination.open("wb") as output:
+                shutil.copyfileobj(response, output)
+        except OSError as error:
+            raise ReleaseError(f"Could not download Forgejo release asset: {error}") from error
+
+    def _ensure_forgejo_release_asset(
+        self,
+        local: Path,
+        release: dict[str, Any],
+        *,
+        allow_upload: bool,
+    ) -> bool:
+        assets = [
+            asset
+            for asset in release.get("assets", [])
+            if isinstance(asset, dict) and asset.get("name") == local.name
+        ]
+        if len(assets) > 1:
+            raise ReleaseError(f"Forgejo release has duplicate assets named {local.name}.")
+        if not assets:
+            if not allow_upload:
+                raise ReleaseError(
+                    f"Published Forgejo release is missing required asset {local.name}."
+                )
+            release_id = release.get("id")
+            if not isinstance(release_id, int):
+                raise ReleaseError("Forgejo release response is missing its numeric ID.")
+            name = urllib.parse.quote(local.name, safe="")
+            self._forgejo_api(
+                "POST",
+                f"{self._forgejo_repository_path()}/releases/{release_id}/assets?name={name}",
+                data=local.read_bytes(),
+                content_type="application/octet-stream",
+            )
+            return True
+
+        with tempfile.TemporaryDirectory(prefix="forgejo-release-asset-") as directory:
+            remote = Path(directory) / local.name
+            self._download_forgejo_asset(assets[0], remote)
+            if self._sha256(remote) != self._sha256(local):
+                raise ReleaseError(
+                    f"Forgejo already has a different asset named {local.name}; refusing to replace it."
+                )
+        return False
+
+    def _publish_forgejo_release(self, apk: Path, checksum: Path) -> None:
+        self.manifest = self.manifest or self._load_json(self.manifest_path)
+        release = self._forgejo_release_state()
+        if release is None:
+            notes = (self.root / self.manifest["releaseNotes"]).read_text(encoding="utf-8")
+            value = self._forgejo_api(
+                "POST",
+                f"{self._forgejo_repository_path()}/releases",
+                payload={
+                    "tag_name": self.version.tag,
+                    "target_commitish": self._git_output("rev-list", "-n", "1", self.version.tag),
+                    "name": f"{self.config['displayName']} {self.version.name}",
+                    "body": notes,
+                    "draft": True,
+                    "prerelease": False,
+                },
+            )
+            if not isinstance(value, dict):
+                raise ReleaseError("Forgejo release was not created.")
+            release = value
+        self._validate_forgejo_release_metadata(release)
+
+        is_draft = release.get("draft") is True
+        for asset in (apk, checksum):
+            uploaded = self._ensure_forgejo_release_asset(
+                asset, release, allow_upload=is_draft
+            )
+            if uploaded:
+                release = self._forgejo_release_state() or release
+                self._ensure_forgejo_release_asset(
+                    asset, release, allow_upload=False
+                )
+        if not is_draft:
+            print(f"Forgejo {self.version.tag} is already published and its assets match.")
+            return
+
+        release_id = release.get("id")
+        if not isinstance(release_id, int):
+            raise ReleaseError("Forgejo release response is missing its numeric ID.")
+        value = self._forgejo_api(
+            "PATCH",
+            f"{self._forgejo_repository_path()}/releases/{release_id}",
+            payload={"draft": False},
+        )
+        if not isinstance(value, dict) or value.get("draft") is not False:
+            raise ReleaseError("Forgejo release did not become public.")
+        self._validate_forgejo_release_metadata(value)
+        print(f"Published canonical Forgejo release {self.version.tag}.")
+
+    def _publish_github_mirror(self, apk: Path, checksum: Path) -> None:
+        if shutil.which("gh") is None:
+            raise ReleaseError("GitHub CLI is required while the GitHub mirror is enabled.")
+        self.runner.run(["gh", "auth", "status"], cwd=self.root)
+        canonical_remote = self.config["canonicalRemote"]
+        github_remote = self.config["githubRemote"]
+        github_repository = self.config["githubRepository"]
+        branch = self.config["mainBranch"]
+        self.runner.run(["git", "push", github_remote, branch], cwd=self.root)
         self.runner.run(["git", "push", github_remote, self.version.tag], cwd=self.root)
 
-        release = self._release_state()
+        release = self._github_release_state()
         notes = self.root / self.manifest["releaseNotes"]
         if release is None:
             self.runner.run(
@@ -710,16 +994,17 @@ class ReleaseWorkflow:
                 ],
                 cwd=self.root,
             )
-            release = self._release_state()
+            release = self._github_release_state()
         if release is None:
-            raise ReleaseError("GitHub release was not created.")
+            raise ReleaseError("GitHub mirror release was not created.")
+        self._validate_github_release_metadata(release)
 
         for asset in (apk, checksum):
-            self._ensure_release_asset(asset, release)
-            release = self._release_state() or release
+            self._ensure_github_release_asset(asset, release)
+            release = self._github_release_state() or release
 
         if not release.get("isDraft"):
-            print(f"{self.version.tag} is already published and its assets match.")
+            print(f"GitHub mirror {self.version.tag} is already published and its assets match.")
             return
 
         mkdocs = self.root / ".venv-docs/bin/mkdocs"
@@ -751,12 +1036,12 @@ class ReleaseWorkflow:
             cwd=self.root,
         )
 
-    def _release_state(self) -> dict[str, Any] | None:
+    def _github_release_state(self) -> dict[str, Any] | None:
         result = self.runner.run(
             [
                 "gh", "release", "view", self.version.tag,
                 "--repo", self.config["githubRepository"],
-                "--json", "isDraft,assets,url",
+                "--json", "isDraft,assets,url,tagName,name,body",
             ],
             cwd=self.root,
             check=False,
@@ -769,7 +1054,20 @@ class ReleaseWorkflow:
             raise ReleaseError("Unexpected GitHub release response.")
         return value
 
-    def _ensure_release_asset(self, local: Path, release: dict[str, Any]) -> None:
+    def _validate_github_release_metadata(self, release: dict[str, Any]) -> None:
+        notes = (self.root / self.manifest["releaseNotes"]).read_text(encoding="utf-8")
+        expected = {
+            "tagName": self.version.tag,
+            "name": f"{self.config['displayName']} {self.version.name}",
+            "body": notes,
+        }
+        mismatched = [key for key, value in expected.items() if release.get(key) != value]
+        if mismatched:
+            raise ReleaseError(
+                "Existing GitHub mirror metadata differs for: " + ", ".join(mismatched)
+            )
+
+    def _ensure_github_release_asset(self, local: Path, release: dict[str, Any]) -> None:
         names = {
             asset.get("name")
             for asset in release.get("assets", [])
@@ -800,6 +1098,87 @@ class ReleaseWorkflow:
                     f"GitHub already has a different asset named {local.name}; refusing to replace it."
                 )
 
+    def _preflight_forgejo_backfill(self) -> None:
+        branch = self._git_output("branch", "--show-current")
+        expected_branch = self.config["mainBranch"]
+        if branch != expected_branch:
+            raise ReleaseError(
+                f"Forgejo backfill must run from {expected_branch!r}; current branch is {branch!r}."
+            )
+        status = self._git_output("status", "--porcelain", "--untracked-files=all")
+        if status:
+            raise ReleaseError(
+                "The Forgejo backfill working tree must be clean. Commit or remove these changes:\n"
+                + status
+            )
+        if not self.config["githubMirrorEnabled"]:
+            raise ReleaseError(
+                "Forgejo backfill requires the existing GitHub mirror as its asset source."
+            )
+        for remote in (self.config["canonicalRemote"], self.config["githubRemote"]):
+            if self._git("remote", "get-url", remote, check=False).returncode != 0:
+                raise ReleaseError(f"Configured Git remote does not exist: {remote}")
+        self._git("fetch", self.config["canonicalRemote"], "--tags", "--prune")
+        if self._git("rev-parse", "--verify", self.version.tag, check=False).returncode != 0:
+            raise ReleaseError(f"Backfill tag does not exist: {self.version.tag}")
+        if self._git_output("cat-file", "-t", f"refs/tags/{self.version.tag}") != "tag":
+            raise ReleaseError(f"Backfill tag must be annotated: {self.version.tag}")
+        tag_commit = self._git_output("rev-list", "-n", "1", self.version.tag)
+        if self._git(
+            "merge-base", "--is-ancestor", tag_commit, "HEAD", check=False
+        ).returncode != 0:
+            raise ReleaseError(f"Backfill tag is not an ancestor of HEAD: {self.version.tag}")
+
+        self.manifest = self._load_json(self.manifest_path)
+        expected = {
+            "version": self.version.name,
+            "versionCode": self.version.code,
+            "releaseNotes": f"docs/releases/{self.version.name}.md",
+        }
+        for key, value in expected.items():
+            if self.manifest.get(key) != value:
+                raise ReleaseError(
+                    f"{self.manifest_path.relative_to(self.root)}: {key} must be {value!r}."
+                )
+        notes = self.root / expected["releaseNotes"]
+        if not notes.is_file() or not notes.read_text(encoding="utf-8").strip():
+            raise ReleaseError(f"Release notes are missing or empty: {notes.relative_to(self.root)}")
+        self._forgejo_token()
+
+    def _backfill_forgejo_release(self) -> None:
+        print(f"Backfilling canonical Forgejo release {self.version.tag}", flush=True)
+        self._preflight_forgejo_backfill()
+        if shutil.which("gh") is None:
+            raise ReleaseError("GitHub CLI is required to retrieve the existing mirror assets.")
+        self.runner.run(["gh", "auth", "status"], cwd=self.root)
+        mirror = self._github_release_state()
+        if mirror is None or mirror.get("isDraft") is not False:
+            raise ReleaseError("GitHub mirror release must already be public for backfill.")
+        self._validate_github_release_metadata(mirror)
+
+        with tempfile.TemporaryDirectory(prefix="forgejo-release-backfill-") as directory:
+            asset_directory = Path(directory)
+            assets = (
+                asset_directory / self.config["apkFilename"],
+                asset_directory / f"{self.config['apkFilename']}.sha256",
+            )
+            for asset in assets:
+                self.runner.run(
+                    [
+                        "gh", "release", "download", self.version.tag,
+                        "--repo", self.config["githubRepository"],
+                        "--pattern", asset.name, "--dir", asset_directory,
+                    ],
+                    cwd=self.root,
+                )
+                if not asset.is_file():
+                    raise ReleaseError(f"GitHub mirror asset is missing: {asset.name}")
+            apk, checksum = assets
+            self._verify_checksum_file(apk, checksum)
+            self._verify_apk(apk)
+            self._publish_forgejo_release(apk, checksum)
+        print(f"Forgejo backfill complete for {self.version.tag}.")
+
     def _ensure_github_pages(self) -> None:
         repository = self.config["githubRepository"]
         state = self.runner.run(
@@ -827,10 +1206,16 @@ class ReleaseWorkflow:
 
 def parser() -> argparse.ArgumentParser:
     value = argparse.ArgumentParser(description=__doc__)
-    value.add_argument(
+    mode = value.add_mutually_exclusive_group()
+    mode.add_argument(
         "--dry-run",
         action="store_true",
         help="Run all local checks and builds without changing Forgejo or GitHub.",
+    )
+    mode.add_argument(
+        "--backfill-forgejo",
+        metavar="TAG",
+        help="Backfill one canonical Forgejo release from its existing verified GitHub mirror.",
     )
     return value
 
@@ -839,7 +1224,11 @@ def main(argv: list[str] | None = None) -> None:
     args = parser().parse_args(argv)
     root = Path(__file__).resolve().parent.parent
     try:
-        ReleaseWorkflow(root, dry_run=args.dry_run).execute()
+        ReleaseWorkflow(
+            root,
+            dry_run=args.dry_run,
+            backfill_forgejo=args.backfill_forgejo,
+        ).execute()
     except ReleaseError as error:
         print(f"release: error: {error}", file=sys.stderr)
         raise SystemExit(1) from error

@@ -1,0 +1,17 @@
+{
+  "id": "forgejo-first-releases",
+  "summary": "Made Forgejo the canonical release authority, with verified draft assets published before an optional GitHub mirror and a safe backfill path for v1.0.5.",
+  "audience": "maintainer",
+  "releaseNote": "Release automation now publishes and verifies the canonical Forgejo Release before reconciling the optional GitHub mirror.",
+  "docs": {
+    "impact": "updated",
+    "paths": [
+      "README.md",
+      "docs/guides/installation.md",
+      "docs/maintainer/releasing.md",
+      "docs/maintainer/release-validation-1.0.5.md"
+    ],
+    "reason": ""
+  },
+  "screenshots": []
+}

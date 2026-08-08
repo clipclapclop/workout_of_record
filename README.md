@@ -4,7 +4,7 @@ A private, Android-first Flutter workout logger with persistent in-workout progr
 
 ## Repository
 
-The canonical source and issue tracker are hosted on [Forgejo](https://git.oorangy.com/chad/workout_of_record). GitHub remains the staged distribution destination for releases, documentation, and Obtainium updates.
+The canonical source, issue tracker, and releases are hosted on [Forgejo](https://git.oorangy.com/chad/workout_of_record). GitHub is an optional distribution mirror used for documentation and Obtainium updates while enabled.
 
 ## Six months later: start here
 
@@ -13,8 +13,8 @@ The intended workflow is:
 1. Make one or more changes in separate Codex conversations.
 2. Each implementation records durable release context in `.changes/unreleased/`; you do not need to keep the conversations open.
 3. When the accumulated changes are ready, tell Codex **“Prepare a release.”** This updates the version, user documentation, release notes, and release manifest, then validates without publishing.
-4. Review the preparation. When satisfied, tell Codex **“Publish the prepared release.”** That explicitly authorizes the commit, Forgejo and GitHub pushes, tag, GitHub Release, documentation deployment, and APK publication.
-5. Obtainium notices the GitHub Release on your Pixel. Approve Android's installation prompt.
+4. Review the preparation. When satisfied, tell Codex **“Publish the prepared release.”** That explicitly authorizes the canonical Forgejo Release and any mirror enabled in `tool/release-config.json`.
+5. While the GitHub mirror is enabled, Obtainium notices its mirrored release on your Pixel. Approve Android's installation prompt.
 
 For a one-step release, say **“Prepare and publish a patch release.”** Use the two-step form when you want to inspect documentation and release notes first.
 
@@ -22,7 +22,7 @@ Publishing is never implied by an ordinary implementation request.
 
 ## One-time computer setup
 
-The workstation needs Flutter, Java, the Android SDK, Python 3, Git, the local signing files, and GitHub CLI. Most are already configured on the original development computer.
+The workstation needs Flutter, Java, the Android SDK, Python 3, Git, the local signing files, a Forgejo release token, and GitHub CLI while the optional mirror is enabled. Most are already configured on the original development computer.
 
 Confirm the important pieces:
 
@@ -98,11 +98,11 @@ From a clean `main` branch, run:
 
 The dry run performs the same local validation and signed arm64 APK build without pushing, tagging, publishing, or deploying documentation. The publish command then:
 
-1. pushes `main` and an annotated `v<version>` tag to canonical Forgejo and the GitHub distribution remote;
-2. creates or resumes a draft GitHub Release;
-3. uploads `workout-of-record-android-arm64.apk` and its SHA-256 checksum;
+1. pushes `main` and an annotated `v<version>` tag to canonical Forgejo;
+2. creates or resumes a draft Forgejo Release, uploads and re-downloads the APK and checksum for exact comparison, then publishes the canonical release;
+3. when `githubMirrorEnabled` is true, pushes the same branch and tag to GitHub and creates or reconciles matching mirror assets;
 4. deploys the MkDocs site to GitHub's `gh-pages` and mirrors that branch to Forgejo; and
-5. publishes the release only after documentation and both repository destinations succeed.
+5. publishes the GitHub mirror only after its assets and documentation deployment succeed.
 
 The command never edits, stages, or commits tracked files. It is safe to rerun after a partial failure when the existing tag and assets match.
 
@@ -125,7 +125,8 @@ Opening Obtainium forces an immediate check. Otherwise, wait for its configured 
 | Working tree must be clean | Run `git status`; review and commit the intended release preparation. Do not blindly discard or stash unfamiliar work. |
 | Branch is outdated or diverged | Run `git fetch origin`, inspect `git log --oneline --graph --decorate --all`, and reconcile canonical Forgejo `main` before retrying. |
 | Unreleased fragments remain | Ask Codex to prepare the release so deferred docs are resolved and fragments are archived. |
-| GitHub CLI is unauthenticated | Run `gh auth login`, then verify with `gh auth status`. |
+| Forgejo release token is missing or insecure | Install the release-scoped token as documented in [`docs/maintainer/releasing.md`](docs/maintainer/releasing.md) with owner-only permissions. |
+| GitHub CLI is unauthenticated | While mirroring is enabled, run `gh auth login`, then verify with `gh auth status`. |
 | APK certificate mismatch | Stop. Confirm the original release keystore and `android/key.properties`; do not publish with a new key. |
 | Existing asset differs | Do not overwrite an immutable release. Correct the prepared version or create a newer version. |
 | Kotlin migration warning | The build currently remains valid. Follow [`docs/maintainer/kotlin-migration.md`](docs/maintainer/kotlin-migration.md) before a future Flutter upgrade removes compatibility. |
@@ -138,4 +139,4 @@ Opening Obtainium forces an immediate check. Otherwise, wait for its configured 
 - [Release history](docs/releases/index.md)
 - [Screenshot backlog](docs/screenshot-backlog.md)
 
-The NAS mirror, silent installation, automated screenshots, and headless LLM documentation generation are intentionally deferred. GitHub Releases and one Android confirmation are the supported path.
+The NAS mirror, silent installation, automated screenshots, and headless LLM documentation generation are intentionally deferred. Forgejo Releases are canonical; the enabled GitHub mirror supports Obtainium, and Android still requires one confirmation.
