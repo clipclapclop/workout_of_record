@@ -145,6 +145,15 @@ class ReleaseWorkflowTest(unittest.TestCase):
         with self.assertRaisesRegex(ReleaseError, "outdated or diverged"):
             ReleaseWorkflow(self.root, dry_run=True)._preflight_git()
 
+    def test_stale_docs_environment_python_is_rejected(self) -> None:
+        python = self.root / ".venv-docs/bin/python"
+        python.parent.mkdir(parents=True)
+        python.write_text("#!/missing/python\n", encoding="utf-8")
+        python.chmod(0o755)
+
+        workflow = ReleaseWorkflow(self.root, dry_run=True)
+        self.assertFalse(workflow._docs_python_is_usable(python))
+
     def test_docs_none_requires_reason(self) -> None:
         manifest = dict(self.manifest)
         manifest.update(
@@ -205,6 +214,44 @@ class ReleaseWorkflowTest(unittest.TestCase):
 
         workflow = self._workflow_after_preflight()
         workflow._audit_commits_for_fragments("v1.0.0")
+
+    def test_commit_audit_accepts_exact_release_exception(self) -> None:
+        self._run(["git", "tag", "v1.0.0"], cwd=self.root)
+        self._write("lib/app.dart", "void main() { print('follow-up'); }\n")
+        self._run(["git", "add", "."], cwd=self.root)
+        self._run(["git", "commit", "-m", "follow-up fix"], cwd=self.root)
+        self._run(["git", "push"], cwd=self.root)
+        commit = self._run(["git", "rev-parse", "HEAD"], cwd=self.root).stdout.strip()
+
+        workflow = self._workflow_after_preflight()
+        workflow.manifest = dict(self.manifest)
+        workflow.manifest["commitAuditExceptions"] = [
+            {
+                "commit": commit,
+                "fragment": "release/fragments/1.0.1/fixture.json",
+                "reason": "The fragment was recorded in the originating implementation commit.",
+            }
+        ]
+        workflow._audit_commits_for_fragments("v1.0.0")
+
+    def test_commit_audit_exception_requires_full_immutable_sha(self) -> None:
+        self._run(["git", "tag", "v1.0.0"], cwd=self.root)
+        self._write("lib/app.dart", "void main() { print('follow-up'); }\n")
+        self._run(["git", "add", "."], cwd=self.root)
+        self._run(["git", "commit", "-m", "follow-up fix"], cwd=self.root)
+        self._run(["git", "push"], cwd=self.root)
+
+        workflow = self._workflow_after_preflight()
+        workflow.manifest = dict(self.manifest)
+        workflow.manifest["commitAuditExceptions"] = [
+            {
+                "commit": "deadbee",
+                "fragment": "release/fragments/1.0.1/fixture.json",
+                "reason": "Too broad to be safe.",
+            }
+        ]
+        with self.assertRaisesRegex(ReleaseError, "full lowercase immutable SHAs"):
+            workflow._audit_commits_for_fragments("v1.0.0")
 
 
 if __name__ == "__main__":

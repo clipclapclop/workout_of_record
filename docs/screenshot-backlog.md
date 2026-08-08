@@ -2,7 +2,7 @@
 
 Screenshots are curated rather than generated automatically. Placeholder IDs are stable so release manifests and change fragments can refer to them.
 
-Release 1.0.4 adds no new screenshot requirements; the existing placeholders remain outstanding.
+Release 1.0.5 adds no new screenshot requirements; the existing placeholders remain outstanding.
 
 | ID | Page | Required app state | Intended caption |
 | --- | --- | --- | --- |

@@ -20,7 +20,7 @@ gh auth login
 gh auth status
 ```
 
-The release command creates `.venv-docs`, installs the pinned documentation dependency, and creates/configures `gh-pages` on the first publication.
+The release command creates `.venv-docs`, rebuilds it if its Python launcher is stale, installs the pinned documentation dependency, and creates/configures `gh-pages` on the first publication.
 
 ## Change fragments
 
@@ -33,6 +33,8 @@ After the first automated release, the tool audits each application-code commit.
 ```text
 Release-Impact: none
 ```
+
+Do not rewrite shared release history merely to repair missing metadata. For an already-published commit that belongs to an implementation whose fragment was recorded in another commit, the release manifest may use `commitAuditExceptions`. Each entry must name the full immutable commit SHA, reference a fragment listed by that manifest, and give a concrete reason. The tool rejects abbreviated SHAs, commits outside the release range, unrelated fragments, duplicate entries, and exceptions for commits that already pass the audit. Treat this as a reviewed recovery mechanism, not the normal fragment workflow.
 
 ## Prepare
 

@@ -38,6 +38,7 @@ nav:
       - Settings, backups, and recovery: guides/settings-backups.md
   - Releases:
       - Release history: releases/index.md
+      - 1.0.5: releases/1.0.5.md
       - 1.0.4: releases/1.0.4.md
       - 1.0.3: releases/1.0.3.md
       - 1.0.2: releases/1.0.2.md
@@ -45,5 +46,6 @@ nav:
   - Screenshot backlog: screenshot-backlog.md
   - Maintainers:
       - Releasing: maintainer/releasing.md
+      - Release 1.0.5 validation: maintainer/release-validation-1.0.5.md
       - Database migrations: maintainer/database-migrations.md
       - Kotlin migration: maintainer/kotlin-migration.md

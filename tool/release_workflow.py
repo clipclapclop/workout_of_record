@@ -379,8 +379,47 @@ class ReleaseWorkflow:
                 + ", ".join(missing)
             )
 
+    def _commit_audit_exceptions(self, release_commits: set[str]) -> dict[str, str]:
+        values = self.manifest.get("commitAuditExceptions", [])
+        if not isinstance(values, list):
+            raise ReleaseError("commitAuditExceptions must be an array.")
+
+        manifest_fragments = set(self.manifest.get("changeFragments", []))
+        exceptions: dict[str, str] = {}
+        for value in values:
+            if not isinstance(value, dict):
+                raise ReleaseError("Every commitAuditExceptions entry must be an object.")
+            commit = value.get("commit")
+            fragment = value.get("fragment")
+            reason = value.get("reason")
+            if not isinstance(commit, str) or not re.fullmatch(
+                r"(?:[0-9a-f]{40}|[0-9a-f]{64})", commit
+            ):
+                raise ReleaseError(
+                    "commitAuditExceptions commits must be full lowercase immutable SHAs."
+                )
+            if commit in exceptions:
+                raise ReleaseError(f"Duplicate commit audit exception: {commit}")
+            if commit not in release_commits:
+                raise ReleaseError(
+                    f"Commit audit exception is outside this release range: {commit}"
+                )
+            if not isinstance(fragment, str) or fragment not in manifest_fragments:
+                raise ReleaseError(
+                    f"Commit audit exception must reference a listed change fragment: {commit}"
+                )
+            if not isinstance(reason, str) or not reason.strip():
+                raise ReleaseError(
+                    f"Commit audit exception requires a non-empty reason: {commit}"
+                )
+            exceptions[commit] = fragment
+        return exceptions
+
     def _audit_commits_for_fragments(self, since_tag: str) -> None:
         commits = self._git_output("rev-list", "--reverse", f"{since_tag}..HEAD")
+        release_commits = set(commits.splitlines())
+        exceptions = self._commit_audit_exceptions(release_commits)
+        used_exceptions: set[str] = set()
         monitored = tuple(self.config["monitoredCodePaths"])
         missing: list[str] = []
         for commit in commits.splitlines():
@@ -398,8 +437,19 @@ class ReleaseWorkflow:
             no_impact = bool(
                 re.search(r"^Release-Impact:\s*none\s*$", message, re.MULTILINE)
             )
-            if not has_fragment and not no_impact:
-                missing.append(self._git_output("show", "-s", "--format=%h %s", commit))
+            if has_fragment or no_impact:
+                continue
+            if commit in exceptions:
+                used_exceptions.add(commit)
+                continue
+            missing.append(self._git_output("show", "-s", "--format=%h %s", commit))
+
+        unused_exceptions = sorted(set(exceptions) - used_exceptions)
+        if unused_exceptions:
+            raise ReleaseError(
+                "Commit audit exceptions must identify monitored application-code commits "
+                "that otherwise fail the audit:\n- " + "\n- ".join(unused_exceptions)
+            )
         if missing:
             raise ReleaseError(
                 "Application-code commits without a change fragment or "
@@ -437,12 +487,25 @@ class ReleaseWorkflow:
         for command in commands:
             self.runner.run(command, cwd=self.root)
 
-    def _ensure_docs_environment(self) -> None:
-        python = self.root / ".venv-docs/bin/python"
-        requirement = self.root / "docs/requirements.txt"
-        stamp = self.root / ".venv-docs/.requirements-sha256"
-        digest = hashlib.sha256(requirement.read_bytes()).hexdigest()
+    def _docs_python_is_usable(self, python: Path) -> bool:
         if not python.is_file():
+            return False
+        try:
+            result = self.runner.run(
+                [python, "--version"], cwd=self.root, check=False, capture=True
+            )
+        except OSError:
+            return False
+        return result.returncode == 0
+
+    def _ensure_docs_environment(self) -> None:
+        environment = self.root / ".venv-docs"
+        python = environment / "bin/python"
+        requirement = self.root / "docs/requirements.txt"
+        stamp = environment / ".requirements-sha256"
+        digest = hashlib.sha256(requirement.read_bytes()).hexdigest()
+        if not self._docs_python_is_usable(python):
+            shutil.rmtree(environment, ignore_errors=True)
             self.runner.run([sys.executable, "-m", "venv", ".venv-docs"], cwd=self.root)
         installed = stamp.read_text(encoding="utf-8").strip() if stamp.is_file() else ""
         if installed != digest:

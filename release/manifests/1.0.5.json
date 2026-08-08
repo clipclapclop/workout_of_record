@@ -1,0 +1,74 @@
+{
+  "version": "1.0.5",
+  "versionCode": 6,
+  "releaseNotes": "docs/releases/1.0.5.md",
+  "docsImpact": "updated",
+  "updatedGuidePaths": [
+    "README.md",
+    "docs/guides/settings-backups.md",
+    "docs/guides/workouts.md",
+    "docs/maintainer/database-migrations.md",
+    "docs/maintainer/release-validation-1.0.5.md",
+    "docs/maintainer/releasing.md",
+    "docs/screenshot-backlog.md"
+  ],
+  "noDocsReason": "",
+  "changeFragments": [
+    "release/fragments/1.0.5/20260805-harden-backup-restore.json",
+    "release/fragments/1.0.5/20260807-active-workout-recovery-tests.json",
+    "release/fragments/1.0.5/20260807-database-migration-fixtures.json"
+  ],
+  "commitAuditExceptions": [
+    {
+      "commit": "afad8ae0cfc2959104577d6d23fd06860c5a59ca",
+      "fragment": "release/fragments/1.0.5/20260805-harden-backup-restore.json",
+      "reason": "Follow-up hardening in the same implementation task after the release fragment was introduced."
+    },
+    {
+      "commit": "a5adaf4ecef2578fadcd64f40a009ce578e1f84f",
+      "fragment": "release/fragments/1.0.5/20260805-harden-backup-restore.json",
+      "reason": "Follow-up hardening in the same implementation task after the release fragment was introduced."
+    },
+    {
+      "commit": "688bff4ac2e75f60be4e2347f07bc2b776f30e94",
+      "fragment": "release/fragments/1.0.5/20260805-harden-backup-restore.json",
+      "reason": "Follow-up hardening in the same implementation task after the release fragment was introduced."
+    },
+    {
+      "commit": "691c83f52a059ffb38cb8da051983d5d6c434545",
+      "fragment": "release/fragments/1.0.5/20260805-harden-backup-restore.json",
+      "reason": "Follow-up hardening in the same implementation task after the release fragment was introduced."
+    },
+    {
+      "commit": "b4c4c121849aefec78b94dda06a3ade58f1b3ed5",
+      "fragment": "release/fragments/1.0.5/20260805-harden-backup-restore.json",
+      "reason": "Follow-up hardening in the same implementation task after the release fragment was introduced."
+    },
+    {
+      "commit": "f6d4610fbcac866de9baaeacb156bb9f1c7390cc",
+      "fragment": "release/fragments/1.0.5/20260805-harden-backup-restore.json",
+      "reason": "Follow-up hardening in the same implementation task after the release fragment was introduced."
+    },
+    {
+      "commit": "60a0e9b94874fa7762d38f52d93d519b97fc5d12",
+      "fragment": "release/fragments/1.0.5/20260805-harden-backup-restore.json",
+      "reason": "Follow-up hardening in the same implementation task after the release fragment was introduced."
+    },
+    {
+      "commit": "c68576fc276d52755336559387deee82b051255f",
+      "fragment": "release/fragments/1.0.5/20260805-harden-backup-restore.json",
+      "reason": "Follow-up hardening in the same implementation task after the release fragment was introduced."
+    },
+    {
+      "commit": "c207f0096f0c914c6601bf559f29616d317af84e",
+      "fragment": "release/fragments/1.0.5/20260805-harden-backup-restore.json",
+      "reason": "Follow-up hardening in the same implementation task after the release fragment was introduced."
+    }
+  ],
+  "outstandingScreenshots": [
+    "workout-home",
+    "mesocycle-calendar",
+    "workout-history",
+    "backup-settings"
+  ]
+}
