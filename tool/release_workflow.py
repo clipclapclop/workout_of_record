@@ -1148,6 +1148,10 @@ class ReleaseWorkflow:
     def _backfill_forgejo_release(self) -> None:
         print(f"Backfilling canonical Forgejo release {self.version.tag}", flush=True)
         self._preflight_forgejo_backfill()
+        self.runner.run(
+            ["git", "push", self.config["canonicalRemote"], self.version.tag],
+            cwd=self.root,
+        )
         if shutil.which("gh") is None:
             raise ReleaseError("GitHub CLI is required to retrieve the existing mirror assets.")
         self.runner.run(["gh", "auth", "status"], cwd=self.root)

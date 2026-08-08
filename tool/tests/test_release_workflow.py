@@ -7,6 +7,7 @@ import tempfile
 import unittest
 import urllib.parse
 from pathlib import Path
+from unittest.mock import patch
 
 
 TOOL_DIR = Path(__file__).resolve().parents[1]
@@ -201,6 +202,43 @@ class ReleaseWorkflowTest(unittest.TestCase):
         workflow._forgejo_token = lambda: "token"  # type: ignore[method-assign]
 
         workflow._preflight_forgejo_backfill()
+
+    def test_backfill_pushes_canonical_tag_before_forgejo_release(self) -> None:
+        workflow = ReleaseWorkflow(
+            self.root,
+            dry_run=False,
+            backfill_forgejo="v1.0.1",
+        )
+        workflow.manifest = dict(self.manifest)
+        events: list[str] = []
+
+        class RecordingRunner:
+            def run(self, args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+                command = [str(value) for value in args]  # type: ignore[union-attr]
+                events.append("command:" + " ".join(command))
+                if command[:3] == ["gh", "release", "download"]:
+                    name = command[command.index("--pattern") + 1]
+                    directory = Path(command[command.index("--dir") + 1])
+                    (directory / name).write_bytes(name.encode())
+                return subprocess.CompletedProcess(command, 0, "", "")
+
+        workflow.runner = RecordingRunner()  # type: ignore[assignment]
+        workflow._preflight_forgejo_backfill = lambda: None  # type: ignore[method-assign]
+        workflow._github_release_state = lambda: {"isDraft": False}  # type: ignore[method-assign]
+        workflow._validate_github_release_metadata = lambda release: None  # type: ignore[method-assign]
+        workflow._verify_checksum_file = lambda apk, checksum: None  # type: ignore[method-assign]
+        workflow._verify_apk = lambda apk: None  # type: ignore[method-assign]
+        workflow._publish_forgejo_release = (  # type: ignore[method-assign]
+            lambda apk, checksum: events.append("forgejo")
+        )
+
+        with patch("release_workflow.shutil.which", return_value="/usr/bin/gh"):
+            workflow._backfill_forgejo_release()
+
+        self.assertLess(
+            events.index("command:git push origin v1.0.1"),
+            events.index("forgejo"),
+        )
 
     def test_stale_docs_environment_python_is_rejected(self) -> None:
         python = self.root / ".venv-docs/bin/python"
