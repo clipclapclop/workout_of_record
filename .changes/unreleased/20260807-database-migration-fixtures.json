@@ -1,0 +1,15 @@
+{
+  "id": "database-migration-fixtures",
+  "summary": "Maintain tested upgrade support for database schemas 8 through 13 with reproducible, non-personal migration fixtures and semantic data checks.",
+  "audience": "user",
+  "releaseNote": "Backups using database schemas 8 through 13 are now covered by migration regression tests and can be restored through the maintained upgrade path.",
+  "docs": {
+    "impact": "updated",
+    "paths": [
+      "docs/guides/settings-backups.md",
+      "docs/maintainer/database-migrations.md"
+    ],
+    "reason": ""
+  },
+  "screenshots": []
+}

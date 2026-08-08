@@ -45,4 +45,5 @@ nav:
   - Screenshot backlog: screenshot-backlog.md
   - Maintainers:
       - Releasing: maintainer/releasing.md
+      - Database migrations: maintainer/database-migrations.md
       - Kotlin migration: maintainer/kotlin-migration.md

@@ -31,7 +31,7 @@ The ZIP may be at most 256 MiB, and `settings.json` may be at most 1 MiB. `setti
 
 Fields may be omitted for compatibility with earlier released backups, in which case the app default is restored. Unknown fields are rejected. API credentials, backup-folder access, and other device-specific values are not included.
 
-The database schema must be within the restore range supported by the installed app. The current app supports schema 13. A future app may support older backups by migrating a staged copy, but a backup from a newer, unsupported schema is rejected rather than being opened unsafely.
+The database schema must be within the restore range supported by the installed app. The current app supports schemas 8 through 13 and migrates older supported backups on a staged copy before restore. A database at schema 7 or older, or a backup from a newer unsupported schema, is rejected rather than being opened unsafely.
 
 ## Restore
 
