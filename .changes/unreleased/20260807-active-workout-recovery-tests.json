@@ -1,0 +1,12 @@
+{
+  "id": "active-workout-recovery-tests",
+  "summary": "Hardened active-workout recovery from persisted database state and added regression coverage for immediate workout mutations, cycle advancement, and immutable history.",
+  "audience": "user",
+  "releaseNote": "Active workouts now recover from persisted data even if cached navigation state was not saved before the app closed.",
+  "docs": {
+    "impact": "updated",
+    "paths": ["docs/guides/workouts.md"],
+    "reason": "Documented persisted recovery and skipped-exercise planning behavior."
+  },
+  "screenshots": []
+}

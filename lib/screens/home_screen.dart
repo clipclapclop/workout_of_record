@@ -4,6 +4,7 @@ import '../app_preferences.dart';
 import '../db/app_database.dart';
 import '../db/db.dart';
 import '../db/tables/enums.dart';
+import '../services/workout_recovery_service.dart';
 import '../widgets/app_nav_menu.dart';
 import 'mesocycle_setup_screen.dart';
 import 'pre_workout_checkin_screen.dart';
@@ -46,33 +47,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _resultFuture = _init();
   }
 
-  /// Validates the SharedPreferences acceleration pointers against DB ground
-  /// truth and clears any stale values so they are never misleading.
-  Future<void> _reconcile() async {
-    final completedWorkoutId = AppPreferences.getCurrentCompletedWorkoutId();
-    if (completedWorkoutId != null) {
-      final row = await (db.select(db.completedWorkouts)
-            ..where((w) => w.id.equals(completedWorkoutId)))
-          .getSingleOrNull();
-      final isActive = row != null &&
-          row.completedAt == null &&
-          row.status == WorkoutStatus.active;
-      if (!isActive) await AppPreferences.setCurrentCompletedWorkoutId(null);
-    }
-
-    final mesocycleId = AppPreferences.getCurrentMesocycleId();
-    if (mesocycleId != null) {
-      final row = await (db.select(db.mesocycles)
-            ..where((m) => m.id.equals(mesocycleId)))
-          .getSingleOrNull();
-      if (row == null || row.completedAt != null) {
-        await AppPreferences.setCurrentMesocycleId(null);
-      }
-    }
-  }
-
   Future<_HomeResult> _init() async {
-    await _reconcile();
+    await WorkoutRecoveryService.reconcileNavigationPointers(db);
 
     // Resume in-progress workout if one exists.
     final activeId = AppPreferences.getCurrentCompletedWorkoutId();

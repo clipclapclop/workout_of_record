@@ -1,5 +1,15 @@
 import 'app_database.dart';
 
+class ActiveWorkoutReference {
+  const ActiveWorkoutReference({
+    required this.completedWorkoutId,
+    required this.mesocycleId,
+  });
+
+  final int completedWorkoutId;
+  final int mesocycleId;
+}
+
 class SetData {
   const SetData({required this.completed, this.planned});
   final CompletedSet completed;

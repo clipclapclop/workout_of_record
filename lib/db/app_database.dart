@@ -1057,6 +1057,30 @@ class AppDatabase extends _$AppDatabase {
             ..where((c) => c.workoutId.equals(workoutId)))
           .getSingleOrNull();
 
+  /// Returns the newest workout whose persisted row is still active.
+  ///
+  /// SharedPreferences only caches navigation IDs. This query is the recovery
+  /// source of truth when those pointers are absent or stale after a restart.
+  Future<ActiveWorkoutReference?> getActiveWorkoutReference() async {
+    final row = await (select(completedWorkouts).join([
+      innerJoin(workouts, workouts.id.equalsExp(completedWorkouts.workoutId)),
+      innerJoin(weeks, weeks.id.equalsExp(workouts.weekId)),
+    ])
+          ..where(completedWorkouts.status.equals(WorkoutStatus.active.name) &
+              completedWorkouts.completedAt.isNull())
+          ..orderBy([
+            OrderingTerm.desc(completedWorkouts.startedAt),
+            OrderingTerm.desc(completedWorkouts.id),
+          ])
+          ..limit(1))
+        .getSingleOrNull();
+    if (row == null) return null;
+    return ActiveWorkoutReference(
+      completedWorkoutId: row.readTable(completedWorkouts).id,
+      mesocycleId: row.readTable(weeks).mesocycleId,
+    );
+  }
+
   Future<WorkoutData> getWorkoutData(int completedWorkoutId) async {
     final cw = await (select(completedWorkouts)
           ..where((w) => w.id.equals(completedWorkoutId)))
