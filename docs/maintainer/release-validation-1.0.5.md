@@ -36,7 +36,7 @@ The strict documentation build also exposed a stale ignored `.venv-docs` whose P
 
 The initial workflow published the release object only on GitHub even though Forgejo was canonical. The owner overrode that distribution design: Forgejo must own the canonical release, with GitHub retained only as an optional mirror. Issue #21 adds Forgejo-first publication and a one-time, fully re-verified v1.0.5 backfill. The existing GitHub Release remains available as the requested mirror.
 
-The first review of the backfill correctly found that it verified a local annotated tag without explicitly transferring that immutable tag to Forgejo. The backfill now pushes the exact tag to the canonical remote before creating the Forgejo Release; a conflicting remote tag fails rather than being replaced.
+The first review of the backfill correctly found that it verified a local annotated tag without explicitly transferring that immutable tag to Forgejo. A follow-up review then caught two recovery hazards: backfill was incorrectly coupled to the current mirror-enabled flag, and it pushed the tag before validating the historical mirror assets. The backfill now works independently of the future mirror setting and pushes the exact tag only after GitHub authentication, asset download, checksum verification, and APK identity/signing checks pass. A conflicting remote tag fails rather than being replaced.
 
 ## Remaining validation
 

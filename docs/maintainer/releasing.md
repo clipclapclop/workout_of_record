@@ -97,7 +97,7 @@ A historical release that was published on the GitHub mirror before Forgejo beca
 ./tool/release --backfill-forgejo v1.0.5
 ```
 
-The backfill requires clean `main`, an annotated tag that is an ancestor of `HEAD`, a public matching GitHub mirror, and the Forgejo release token. It pushes that exact annotated tag to canonical Forgejo, downloads the mirror APK and checksum, re-verifies checksum, package, version/build, arm64 architecture, and signing certificate, then creates and verifies the canonical Forgejo Release. It does not edit the tag or republish GitHub.
+The backfill requires clean `main`, an annotated tag that is an ancestor of `HEAD`, the historical public GitHub release named by `githubRepository`, and the Forgejo release token. It works even when future GitHub mirroring is disabled. The command authenticates to GitHub, downloads and verifies the mirror APK and checksum, re-verifies package, version/build, arm64 architecture, and signing certificate, and only then pushes the exact annotated tag to canonical Forgejo and creates the verified Forgejo Release. It does not edit the tag or republish GitHub.
 
 ## Phone setup
 

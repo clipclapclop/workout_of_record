@@ -199,6 +199,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
             dry_run=False,
             backfill_forgejo="v1.0.1",
         )
+        workflow.config["githubMirrorEnabled"] = False
         workflow._forgejo_token = lambda: "token"  # type: ignore[method-assign]
 
         workflow._preflight_forgejo_backfill()
@@ -226,8 +227,10 @@ class ReleaseWorkflowTest(unittest.TestCase):
         workflow._preflight_forgejo_backfill = lambda: None  # type: ignore[method-assign]
         workflow._github_release_state = lambda: {"isDraft": False}  # type: ignore[method-assign]
         workflow._validate_github_release_metadata = lambda release: None  # type: ignore[method-assign]
-        workflow._verify_checksum_file = lambda apk, checksum: None  # type: ignore[method-assign]
-        workflow._verify_apk = lambda apk: None  # type: ignore[method-assign]
+        workflow._verify_checksum_file = (  # type: ignore[method-assign]
+            lambda apk, checksum: events.append("checksum")
+        )
+        workflow._verify_apk = lambda apk: events.append("apk")  # type: ignore[method-assign]
         workflow._publish_forgejo_release = (  # type: ignore[method-assign]
             lambda apk, checksum: events.append("forgejo")
         )
@@ -235,10 +238,10 @@ class ReleaseWorkflowTest(unittest.TestCase):
         with patch("release_workflow.shutil.which", return_value="/usr/bin/gh"):
             workflow._backfill_forgejo_release()
 
-        self.assertLess(
-            events.index("command:git push origin v1.0.1"),
-            events.index("forgejo"),
-        )
+        tag_push = events.index("command:git push origin v1.0.1")
+        self.assertLess(events.index("checksum"), tag_push)
+        self.assertLess(events.index("apk"), tag_push)
+        self.assertLess(tag_push, events.index("forgejo"))
 
     def test_stale_docs_environment_python_is_rejected(self) -> None:
         python = self.root / ".venv-docs/bin/python"

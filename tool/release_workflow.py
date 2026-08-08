@@ -1111,13 +1111,14 @@ class ReleaseWorkflow:
                 "The Forgejo backfill working tree must be clean. Commit or remove these changes:\n"
                 + status
             )
-        if not self.config["githubMirrorEnabled"]:
+        github_repository = self.config.get("githubRepository")
+        if not isinstance(github_repository, str) or not github_repository.strip():
             raise ReleaseError(
-                "Forgejo backfill requires the existing GitHub mirror as its asset source."
+                "Forgejo backfill requires githubRepository for its historical asset source."
             )
-        for remote in (self.config["canonicalRemote"], self.config["githubRemote"]):
-            if self._git("remote", "get-url", remote, check=False).returncode != 0:
-                raise ReleaseError(f"Configured Git remote does not exist: {remote}")
+        canonical_remote = self.config["canonicalRemote"]
+        if self._git("remote", "get-url", canonical_remote, check=False).returncode != 0:
+            raise ReleaseError(f"Configured Git remote does not exist: {canonical_remote}")
         self._git("fetch", self.config["canonicalRemote"], "--tags", "--prune")
         if self._git("rev-parse", "--verify", self.version.tag, check=False).returncode != 0:
             raise ReleaseError(f"Backfill tag does not exist: {self.version.tag}")
@@ -1148,10 +1149,6 @@ class ReleaseWorkflow:
     def _backfill_forgejo_release(self) -> None:
         print(f"Backfilling canonical Forgejo release {self.version.tag}", flush=True)
         self._preflight_forgejo_backfill()
-        self.runner.run(
-            ["git", "push", self.config["canonicalRemote"], self.version.tag],
-            cwd=self.root,
-        )
         if shutil.which("gh") is None:
             raise ReleaseError("GitHub CLI is required to retrieve the existing mirror assets.")
         self.runner.run(["gh", "auth", "status"], cwd=self.root)
@@ -1180,6 +1177,10 @@ class ReleaseWorkflow:
             apk, checksum = assets
             self._verify_checksum_file(apk, checksum)
             self._verify_apk(apk)
+            self.runner.run(
+                ["git", "push", self.config["canonicalRemote"], self.version.tag],
+                cwd=self.root,
+            )
             self._publish_forgejo_release(apk, checksum)
         print(f"Forgejo backfill complete for {self.version.tag}.")
 
