@@ -182,7 +182,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         with self.assertRaisesRegex(ReleaseError, "outdated or diverged"):
             ReleaseWorkflow(self.root, dry_run=True)._preflight_git()
 
-    def test_exact_release_revision_remains_valid_after_canonical_main_advances(self) -> None:
+    def test_only_reconciliation_accepts_canonical_main_advancing(self) -> None:
         revision = self._run(["git", "rev-parse", "HEAD"], cwd=self.root).stdout.strip()
         other = Path(self.temp.name) / "advanced"
         self._run(["git", "clone", "--branch", "main", self.remote, other], cwd=Path(self.temp.name))
@@ -193,10 +193,18 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self._run(["git", "commit", "-m", "later change"], cwd=other)
         self._run(["git", "push"], cwd=other)
 
+        with self.assertRaisesRegex(ReleaseError, "initial publication"):
+            ReleaseWorkflow(
+                self.root,
+                dry_run=True,
+                expected_revision=revision,
+            )._preflight_git()
+
         ReleaseWorkflow(
             self.root,
             dry_run=True,
             expected_revision=revision,
+            reconciling=True,
         )._preflight_git()
 
     def test_exact_release_revision_must_match_head(self) -> None:
@@ -210,7 +218,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
     def test_mirror_branch_push_is_marked_as_an_external_effect(self) -> None:
         workflow = ReleaseWorkflow(self.root, dry_run=False)
         commands: list[list[str]] = []
-        ancestry_results = iter((1, 0))
+        remote_revision = "b" * 40
 
         class RecordingRunner:
             def run(self, args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
@@ -219,8 +227,12 @@ class ReleaseWorkflowTest(unittest.TestCase):
                 return subprocess.CompletedProcess(command, 0, "", "")
 
         def fake_git(*args: str, **kwargs: object) -> subprocess.CompletedProcess[str]:
-            returncode = next(ancestry_results) if args[0] == "merge-base" else 0
-            return subprocess.CompletedProcess(list(args), returncode, "", "")
+            output = (
+                f"{remote_revision}\trefs/heads/main\n"
+                if args[0] == "ls-remote"
+                else ""
+            )
+            return subprocess.CompletedProcess(list(args), 0, output, "")
 
         workflow.runner = RecordingRunner()  # type: ignore[assignment]
         workflow._git = fake_git  # type: ignore[method-assign]
@@ -233,6 +245,26 @@ class ReleaseWorkflowTest(unittest.TestCase):
             commands,
             [["git", "push", "github", f"{'a' * 40}:refs/heads/main"]],
         )
+
+    def test_mirror_branch_ahead_of_canonical_target_is_rejected(self) -> None:
+        workflow = ReleaseWorkflow(self.root, dry_run=False)
+        remote_revision = "b" * 40
+
+        def fake_git(*args: str, **kwargs: object) -> subprocess.CompletedProcess[str]:
+            output = (
+                f"{remote_revision}\trefs/heads/main\n"
+                if args[0] == "ls-remote"
+                else ""
+            )
+            returncode = 1 if args[0] == "merge-base" else 0
+            return subprocess.CompletedProcess(list(args), returncode, output, "")
+
+        workflow._git = fake_git  # type: ignore[method-assign]
+
+        with self.assertRaisesRegex(ReleaseError, "neither contains nor can safely advance"):
+            workflow._ensure_remote_branch_contains(
+                "github", "main", "a" * 40, allow_push=True
+            )
 
     def test_missing_mirror_branch_is_created_at_exact_revision(self) -> None:
         workflow = ReleaseWorkflow(self.root, dry_run=False)

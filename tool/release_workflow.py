@@ -83,6 +83,7 @@ class ReleaseWorkflow:
         backfill_forgejo: str | None = None,
         verify_published: bool = False,
         expected_revision: str | None = None,
+        reconciling: bool = False,
         runner: CommandRunner | None = None,
     ) -> None:
         self.root = root.resolve()
@@ -90,6 +91,8 @@ class ReleaseWorkflow:
         self.backfill_forgejo = backfill_forgejo
         self.verify_published = verify_published
         self.expected_revision = expected_revision
+        self.reconciling = reconciling
+        self.canonical_branch_revision: str | None = None
         if expected_revision is not None and not re.fullmatch(r"[0-9a-f]{40}", expected_revision):
             raise ReleaseError("The expected release revision must be a full lowercase SHA-1.")
         self.runner = runner or CommandRunner()
@@ -272,18 +275,26 @@ class ReleaseWorkflow:
                 f"HEAD is {head_revision}, expected exact release revision "
                 f"{self.expected_revision}."
             )
-        ancestor_args = (
-            (self.expected_revision, remote_branch)
-            if self.expected_revision is not None
-            else (remote_branch, "HEAD")
-        )
-        ancestor = self._git("merge-base", "--is-ancestor", *ancestor_args, check=False)
-        if ancestor.returncode != 0:
-            if self.expected_revision is not None:
+        if self.expected_revision is not None:
+            remote_revision = self._git_output("rev-parse", remote_branch)
+            if remote_revision != self.expected_revision and (
+                not self.reconciling
+                or self._git(
+                    "merge-base",
+                    "--is-ancestor",
+                    self.expected_revision,
+                    remote_branch,
+                    check=False,
+                ).returncode
+                != 0
+            ):
                 raise ReleaseError(
-                    f"Exact release revision {self.expected_revision} is not contained in "
-                    f"{remote_branch}."
+                    f"{remote_branch} must equal exact release revision "
+                    f"{self.expected_revision} for initial publication."
                 )
+        elif self._git(
+            "merge-base", "--is-ancestor", remote_branch, "HEAD", check=False
+        ).returncode != 0:
             raise ReleaseError(
                 f"HEAD is outdated or diverged from {remote_branch}; reconcile it before release."
             )
@@ -765,8 +776,12 @@ class ReleaseWorkflow:
             self.effects_started = True
             self.runner.run(["git", "push", canonical_remote, branch], cwd=self.root)
         else:
-            self._ensure_remote_branch_contains(
-                canonical_remote, branch, self.expected_revision, allow_push=False
+            self.canonical_branch_revision = self._ensure_remote_branch_contains(
+                canonical_remote,
+                branch,
+                self.expected_revision,
+                allow_push=False,
+                allow_ahead=self.reconciling,
             )
         self._ensure_release_tag()
         self.effects_started = True
@@ -785,7 +800,8 @@ class ReleaseWorkflow:
         revision: str,
         *,
         allow_push: bool,
-    ) -> None:
+        allow_ahead: bool = False,
+    ) -> str:
         remote_ref = f"refs/heads/{branch}"
         state = self._git("ls-remote", "--exit-code", remote, remote_ref, check=False)
         if state.returncode == 2:
@@ -795,15 +811,29 @@ class ReleaseWorkflow:
             self.runner.run(
                 ["git", "push", remote, f"{revision}:{remote_ref}"], cwd=self.root
             )
-            return
+            return revision
         if state.returncode != 0:
             raise ReleaseError(f"Could not determine remote branch state: {remote}/{branch}")
+        remote_revision = next(
+            (
+                line.split("\t", 1)[0]
+                for line in state.stdout.splitlines()
+                if line.endswith(f"\t{remote_ref}")
+            ),
+            None,
+        )
+        if not isinstance(remote_revision, str) or not re.fullmatch(
+            r"[0-9a-f]{40}", remote_revision
+        ):
+            raise ReleaseError(f"Remote branch response is malformed: {remote}/{branch}")
+        if remote_revision == revision:
+            return revision
         self._git("fetch", remote, branch)
         remote_branch = f"{remote}/{branch}"
-        if self._git(
+        if allow_ahead and self._git(
             "merge-base", "--is-ancestor", revision, remote_branch, check=False
         ).returncode == 0:
-            return
+            return remote_revision
         if allow_push and self._git(
             "merge-base", "--is-ancestor", remote_branch, revision, check=False
         ).returncode == 0:
@@ -811,7 +841,7 @@ class ReleaseWorkflow:
             self.runner.run(
                 ["git", "push", remote, f"{revision}:refs/heads/{branch}"], cwd=self.root
             )
-            return
+            return revision
         raise ReleaseError(
             f"{remote_branch} neither contains nor can safely advance to exact release "
             f"revision {revision}."
@@ -1057,8 +1087,9 @@ class ReleaseWorkflow:
         if self.expected_revision is None:
             self.runner.run(["git", "push", github_remote, branch], cwd=self.root)
         else:
+            mirror_revision = self.canonical_branch_revision or self.expected_revision
             self._ensure_remote_branch_contains(
-                github_remote, branch, self.expected_revision, allow_push=True
+                github_remote, branch, mirror_revision, allow_push=True
             )
         self.runner.run(["git", "push", github_remote, self.version.tag], cwd=self.root)
 
@@ -1346,6 +1377,9 @@ class ReleaseWorkflow:
                         f"GitHub {self.version.tag} does not resolve to exact release revision."
                     )
                 self._remote_branch_contains(github_remote, branch, revision)
+                main_ref = f"refs/heads/{branch}"
+                if github_refs.get(main_ref) != canonical_refs.get(main_ref):
+                    raise ReleaseError("Forgejo and GitHub main branch refs differ.")
 
                 docs_ref = f"refs/heads/{self.config['documentationBranch']}"
                 documentation_revision = canonical_refs.get(docs_ref)
@@ -1516,6 +1550,7 @@ def main(argv: list[str] | None = None) -> None:
             backfill_forgejo=args.backfill_forgejo,
             verify_published=args.verify_published,
             expected_revision=os.environ.get("WORKOUT_OF_RECORD_RELEASE_REVISION"),
+            reconciling=os.environ.get("WORKOUT_OF_RECORD_RELEASE_RECONCILING") == "1",
         )
         workflow.execute()
     except ReleaseError as error:
