@@ -1,0 +1,12 @@
+{
+  "id": "preserve-workout-timer-navigation",
+  "summary": "Keep the active workout route mounted while navigating through the app so its in-memory rest timer is not recreated.",
+  "audience": "user",
+  "releaseNote": "The rest timer now keeps counting down when you visit History or another screen and return to an active workout.",
+  "docs": {
+    "impact": "updated",
+    "paths": ["docs/guides/workouts.md"],
+    "reason": ""
+  },
+  "screenshots": []
+}

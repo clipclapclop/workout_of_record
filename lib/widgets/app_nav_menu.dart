@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../app_preferences.dart';
 import '../screens/chat_screen.dart';
 import '../screens/history_screen.dart';
 import '../screens/home_screen.dart';
@@ -82,14 +81,18 @@ class AppNavMenu extends StatelessWidget {
       if (!ok) return;
     }
     if (!context.mounted) return;
+
+    final navigator = Navigator.of(context);
+    if (activeWorkoutId != null && screen == AppScreen.workout) {
+      navigator.popUntil(
+        (route) =>
+            route.settings.name == WorkoutScreen.routeName || route.isFirst,
+      );
+      return;
+    }
+
     final Widget dest = switch (screen) {
-      AppScreen.workout => activeWorkoutId != null
-          ? WorkoutScreen(
-              completedWorkoutId: activeWorkoutId!,
-              workoutName: activeWorkoutName!,
-              mesocycleId: AppPreferences.getCurrentMesocycleId()!,
-            )
-          : const HomeScreen(),
+      AppScreen.workout => const HomeScreen(),
       AppScreen.exercises => MovementsScreen(
           activeWorkoutId: activeWorkoutId,
           activeWorkoutName: activeWorkoutName,
@@ -102,15 +105,36 @@ class AppNavMenu extends StatelessWidget {
           activeWorkoutId: activeWorkoutId,
           activeWorkoutName: activeWorkoutName,
         ),
-      AppScreen.chat => const ChatScreen(),
-      AppScreen.notes => const NotesScreen(),
-      AppScreen.profile => const ProfileScreen(),
-      AppScreen.settings => const SettingsScreen(),
+      AppScreen.chat => ChatScreen(
+          activeWorkoutId: activeWorkoutId,
+          activeWorkoutName: activeWorkoutName,
+        ),
+      AppScreen.notes => NotesScreen(
+          activeWorkoutId: activeWorkoutId,
+          activeWorkoutName: activeWorkoutName,
+        ),
+      AppScreen.profile => ProfileScreen(
+          activeWorkoutId: activeWorkoutId,
+          activeWorkoutName: activeWorkoutName,
+        ),
+      AppScreen.settings => SettingsScreen(
+          activeWorkoutId: activeWorkoutId,
+          activeWorkoutName: activeWorkoutName,
+        ),
     };
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => dest),
-      (_) => false,
-    );
+    final route = MaterialPageRoute<void>(builder: (_) => dest);
+
+    if (activeWorkoutId != null) {
+      // Keep the live workout route mounted so in-memory session state, notably
+      // the rest timer, survives visits to history and other app screens.
+      navigator.popUntil(
+        (route) =>
+            route.settings.name == WorkoutScreen.routeName || route.isFirst,
+      );
+      navigator.push(route);
+      return;
+    }
+
+    navigator.pushAndRemoveUntil(route, (_) => false);
   }
 }

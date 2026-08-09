@@ -6,7 +6,14 @@ import 'settings/general_settings_screen.dart';
 import 'settings/timer_settings_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({
+    super.key,
+    this.activeWorkoutId,
+    this.activeWorkoutName,
+  });
+
+  final int? activeWorkoutId;
+  final String? activeWorkoutName;
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +21,13 @@ class SettingsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Settings'),
         automaticallyImplyLeading: false,
-        actions: const [AppNavMenu(current: AppScreen.settings)],
+        actions: [
+          AppNavMenu(
+            current: AppScreen.settings,
+            activeWorkoutId: activeWorkoutId,
+            activeWorkoutName: activeWorkoutName,
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),

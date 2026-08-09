@@ -4,7 +4,14 @@ import '../app_preferences.dart';
 import '../widgets/app_nav_menu.dart';
 
 class NotesScreen extends StatefulWidget {
-  const NotesScreen({super.key});
+  const NotesScreen({
+    super.key,
+    this.activeWorkoutId,
+    this.activeWorkoutName,
+  });
+
+  final int? activeWorkoutId;
+  final String? activeWorkoutName;
 
   @override
   State<NotesScreen> createState() => _NotesScreenState();
@@ -51,6 +58,8 @@ class _NotesScreenState extends State<NotesScreen> {
             ),
           AppNavMenu(
             current: AppScreen.notes,
+            activeWorkoutId: widget.activeWorkoutId,
+            activeWorkoutName: widget.activeWorkoutName,
             onNavigateAway: () async {
               if (!_dirty) return true;
               await _save();

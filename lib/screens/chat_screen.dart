@@ -4,10 +4,17 @@ import '../services/chat_session_manager.dart';
 import '../widgets/app_nav_menu.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key, this.initialContext});
+  const ChatScreen({
+    super.key,
+    this.initialContext,
+    this.activeWorkoutId,
+    this.activeWorkoutName,
+  });
 
   /// Optional extra context to prepend (e.g. current workout or template data).
   final String? initialContext;
+  final int? activeWorkoutId;
+  final String? activeWorkoutName;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -107,7 +114,11 @@ class _ChatScreenState extends State<ChatScreen> {
               tooltip: 'New conversation',
               onPressed: loading ? null : _confirmClear,
             ),
-          const AppNavMenu(current: AppScreen.chat),
+          AppNavMenu(
+            current: AppScreen.chat,
+            activeWorkoutId: widget.activeWorkoutId,
+            activeWorkoutName: widget.activeWorkoutName,
+          ),
         ],
       ),
       body: Column(

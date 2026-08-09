@@ -65,6 +65,7 @@ class _PreWorkoutCheckinScreenState extends State<PreWorkoutCheckinScreen> {
       await Navigator.pushReplacement(
         context,
         MaterialPageRoute(
+          settings: const RouteSettings(name: WorkoutScreen.routeName),
           builder: (_) => WorkoutScreen(
             completedWorkoutId: completedWorkoutId,
             workoutName: widget.workoutName,

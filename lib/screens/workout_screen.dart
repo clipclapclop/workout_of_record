@@ -24,6 +24,8 @@ import '../widgets/set_ui_state.dart';
 import 'home_screen.dart';
 
 class WorkoutScreen extends StatefulWidget {
+  static const routeName = '/active-workout';
+
   const WorkoutScreen({
     super.key,
     required this.completedWorkoutId,
@@ -1229,6 +1231,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                   initialContext:
                       'The user is currently in a workout: "${widget.workoutName}".\n'
                       'Completed workout ID: ${widget.completedWorkoutId}.',
+                  activeWorkoutId: widget.completedWorkoutId,
+                  activeWorkoutName: widget.workoutName,
                 ),
               ),
             ),

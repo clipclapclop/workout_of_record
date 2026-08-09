@@ -6,6 +6,8 @@ The home screen shows the next workout in the active mesocycle. Starting it open
 
 You can skip the scheduled workout by selecting a skip reason. Workouts advance in cycle order; the home screen does not substitute a different workout for the scheduled one.
 
+While a workout is active, you can use the top-right menu to visit History or another app screen. Returning to Workout keeps the active session mounted, so its rest timer continues from the same countdown instead of restarting.
+
 !!! note "Screenshot pending — workout-home"
     Capture the home screen with the next workout, mesocycle progress, expected date, and start/skip controls visible.
 

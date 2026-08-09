@@ -59,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
+              settings: const RouteSettings(name: WorkoutScreen.routeName),
               builder: (_) => WorkoutScreen(
                 completedWorkoutId: activeId,
                 workoutName: data.workout.name,

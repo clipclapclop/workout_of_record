@@ -4,9 +4,17 @@ import '../app_preferences.dart';
 import '../db/tables/enums.dart';
 import '../widgets/app_nav_menu.dart';
 import 'home_screen.dart';
+import 'workout_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({
+    super.key,
+    this.activeWorkoutId,
+    this.activeWorkoutName,
+  });
+
+  final int? activeWorkoutId;
+  final String? activeWorkoutName;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -68,13 +76,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await AppPreferences.setTrainingGoal(_trainingGoal);
     await AppPreferences.setCalorieState(_calorieState);
     await AppPreferences.setTrainingStartDate(trainingStartDate);
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
+    if (!mounted) return;
+    if (widget.activeWorkoutId != null) {
+      Navigator.popUntil(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-        (_) => false,
+        (route) =>
+            route.settings.name == WorkoutScreen.routeName || route.isFirst,
       );
+      return;
     }
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      (_) => false,
+    );
   }
 
   void _showCalorieStateInfo(BuildContext context) {
@@ -126,7 +141,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AppBar(
         title: const Text('Profile'),
         automaticallyImplyLeading: false,
-        actions: [AppNavMenu(current: AppScreen.profile)],
+        actions: [
+          AppNavMenu(
+            current: AppScreen.profile,
+            activeWorkoutId: widget.activeWorkoutId,
+            activeWorkoutName: widget.activeWorkoutName,
+          ),
+        ],
       ),
       body: ListView(
         padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).padding.bottom),
