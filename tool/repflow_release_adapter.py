@@ -281,9 +281,6 @@ def run(action: str) -> int:
         environment["WORKOUT_OF_RECORD_KEY_PROPERTIES"] = config["keyProperties"]
         effect_marker = log.parent / "publication-possible"
         publication_was_possible = effect_marker.exists()
-        environment.pop("WORKOUT_OF_RECORD_RELEASE_RECONCILING", None)
-        if action == "verify" or publication_was_possible:
-            environment["WORKOUT_OF_RECORD_RELEASE_RECONCILING"] = "1"
         if action == "execute":
             effect_marker.write_text("publication may have started\n", encoding="utf-8")
             os.chmod(effect_marker, 0o600)

@@ -182,7 +182,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         with self.assertRaisesRegex(ReleaseError, "outdated or diverged"):
             ReleaseWorkflow(self.root, dry_run=True)._preflight_git()
 
-    def test_dry_run_and_reconciliation_accept_canonical_main_advancing(self) -> None:
+    def test_exact_release_revision_remains_valid_after_canonical_main_advances(self) -> None:
         revision = self._run(["git", "rev-parse", "HEAD"], cwd=self.root).stdout.strip()
         other = Path(self.temp.name) / "advanced"
         self._run(["git", "clone", "--branch", "main", self.remote, other], cwd=Path(self.temp.name))
@@ -193,23 +193,10 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self._run(["git", "commit", "-m", "later change"], cwd=other)
         self._run(["git", "push"], cwd=other)
 
-        with self.assertRaisesRegex(ReleaseError, "initial publication"):
-            ReleaseWorkflow(
-                self.root,
-                dry_run=False,
-                expected_revision=revision,
-            )._preflight_git()
-
-        ReleaseWorkflow(
-            self.root,
-            dry_run=True,
-            expected_revision=revision,
-        )._preflight_git()
         ReleaseWorkflow(
             self.root,
             dry_run=False,
             expected_revision=revision,
-            reconciling=True,
         )._preflight_git()
 
     def test_exact_release_revision_must_match_head(self) -> None:
@@ -270,6 +257,27 @@ class ReleaseWorkflowTest(unittest.TestCase):
             workflow._ensure_remote_branch_contains(
                 "github", "main", "a" * 40, allow_push=True
             )
+
+    def test_advanced_canonical_branch_is_selected_for_mirror_sync(self) -> None:
+        workflow = ReleaseWorkflow(self.root, dry_run=False)
+        remote_revision = "b" * 40
+
+        def fake_git(*args: str, **kwargs: object) -> subprocess.CompletedProcess[str]:
+            output = (
+                f"{remote_revision}\trefs/heads/main\n"
+                if args[0] == "ls-remote"
+                else ""
+            )
+            return subprocess.CompletedProcess(list(args), 0, output, "")
+
+        workflow._git = fake_git  # type: ignore[method-assign]
+
+        selected = workflow._ensure_remote_branch_contains(
+            "origin", "main", "a" * 40, allow_push=False, allow_ahead=True
+        )
+
+        self.assertEqual(selected, remote_revision)
+        self.assertFalse(workflow.effects_started)
 
     def test_missing_mirror_branch_is_created_at_exact_revision(self) -> None:
         workflow = ReleaseWorkflow(self.root, dry_run=False)

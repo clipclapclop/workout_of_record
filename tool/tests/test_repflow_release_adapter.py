@@ -84,7 +84,6 @@ class RepflowReleaseAdapterTest(unittest.TestCase):
             environment["WORKOUT_OF_RECORD_KEY_PROPERTIES"],
             "/host/android-key.properties",
         )
-        self.assertNotIn("WORKOUT_OF_RECORD_RELEASE_RECONCILING", environment)
         self.assertEqual(json.loads(stdout)["status"], "succeeded")
         self.assertEqual(json.loads(stdout)["externalId"], "v1.2.3")
 
@@ -128,20 +127,18 @@ class RepflowReleaseAdapterTest(unittest.TestCase):
         marker.parent.mkdir(parents=True)
         marker.write_text("prior uncertain publication\n", encoding="utf-8")
 
-        result, stdout, stderr, _, environment = self._run("execute", returncode=2)
+        result, stdout, stderr, _, _ = self._run("execute", returncode=2)
 
         self.assertEqual(result, 1)
         self.assertEqual(stdout, "")
         self.assertIn("prior publication attempt remains uncertain", stderr)
-        self.assertEqual(environment["WORKOUT_OF_RECORD_RELEASE_RECONCILING"], "1")
         self.assertTrue(marker.is_file())
 
     def test_verification_failure_is_bounded_structured_evidence(self) -> None:
-        result, stdout, _, command, environment = self._run("verify", returncode=2)
+        result, stdout, _, command, _ = self._run("verify", returncode=2)
 
         self.assertEqual(result, 0)
         self.assertEqual(command[-1], "--verify-published")
-        self.assertEqual(environment["WORKOUT_OF_RECORD_RELEASE_RECONCILING"], "1")
         self.assertEqual(json.loads(stdout)["status"], "failed")
         self.assertNotIn(str(self.root), stdout)
 

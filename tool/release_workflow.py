@@ -83,7 +83,6 @@ class ReleaseWorkflow:
         backfill_forgejo: str | None = None,
         verify_published: bool = False,
         expected_revision: str | None = None,
-        reconciling: bool = False,
         runner: CommandRunner | None = None,
     ) -> None:
         self.root = root.resolve()
@@ -91,7 +90,6 @@ class ReleaseWorkflow:
         self.backfill_forgejo = backfill_forgejo
         self.verify_published = verify_published
         self.expected_revision = expected_revision
-        self.reconciling = reconciling
         self.canonical_branch_revision: str | None = None
         if expected_revision is not None and not re.fullmatch(r"[0-9a-f]{40}", expected_revision):
             raise ReleaseError("The expected release revision must be a full lowercase SHA-1.")
@@ -276,21 +274,16 @@ class ReleaseWorkflow:
                 f"{self.expected_revision}."
             )
         if self.expected_revision is not None:
-            remote_revision = self._git_output("rev-parse", remote_branch)
-            if remote_revision != self.expected_revision and (
-                not (self.dry_run or self.reconciling)
-                or self._git(
-                    "merge-base",
-                    "--is-ancestor",
-                    self.expected_revision,
-                    remote_branch,
-                    check=False,
-                ).returncode
-                != 0
-            ):
+            if self._git(
+                "merge-base",
+                "--is-ancestor",
+                self.expected_revision,
+                remote_branch,
+                check=False,
+            ).returncode != 0:
                 raise ReleaseError(
-                    f"{remote_branch} must equal exact release revision "
-                    f"{self.expected_revision} for initial publication."
+                    f"Exact release revision {self.expected_revision} is not contained in "
+                    f"{remote_branch}."
                 )
         elif self._git(
             "merge-base", "--is-ancestor", remote_branch, "HEAD", check=False
@@ -781,7 +774,7 @@ class ReleaseWorkflow:
                 branch,
                 self.expected_revision,
                 allow_push=False,
-                allow_ahead=self.reconciling,
+                allow_ahead=True,
             )
         self._ensure_release_tag()
         self.effects_started = True
@@ -1550,7 +1543,6 @@ def main(argv: list[str] | None = None) -> None:
             backfill_forgejo=args.backfill_forgejo,
             verify_published=args.verify_published,
             expected_revision=os.environ.get("WORKOUT_OF_RECORD_RELEASE_REVISION"),
-            reconciling=os.environ.get("WORKOUT_OF_RECORD_RELEASE_RECONCILING") == "1",
         )
         workflow.execute()
     except ReleaseError as error:
