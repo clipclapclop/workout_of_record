@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app_preferences.dart';
 import '../screens/chat_screen.dart';
 import '../screens/history_screen.dart';
 import '../screens/home_screen.dart';
@@ -75,6 +76,45 @@ class AppNavMenu extends StatelessWidget {
     );
   }
 
+  static bool _popToActiveWorkout(NavigatorState navigator) {
+    var found = false;
+    navigator.popUntil((route) {
+      if (route.settings.name == WorkoutScreen.routeName) {
+        found = true;
+        return true;
+      }
+      return route.isFirst;
+    });
+    return found;
+  }
+
+  static void returnToActiveWorkout(
+    BuildContext context, {
+    required int activeWorkoutId,
+    required String? activeWorkoutName,
+  }) {
+    final navigator = Navigator.of(context);
+    if (_popToActiveWorkout(navigator)) return;
+
+    final mesocycleId = AppPreferences.getCurrentMesocycleId();
+    final Widget destination = activeWorkoutName != null && mesocycleId != null
+        ? WorkoutScreen(
+            completedWorkoutId: activeWorkoutId,
+            workoutName: activeWorkoutName,
+            mesocycleId: mesocycleId,
+          )
+        : const HomeScreen();
+    navigator.pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        settings: destination is WorkoutScreen
+            ? const RouteSettings(name: WorkoutScreen.routeName)
+            : null,
+        builder: (_) => destination,
+      ),
+      (_) => false,
+    );
+  }
+
   void _navigate(BuildContext context, AppScreen screen) async {
     if (onNavigateAway != null) {
       final ok = await onNavigateAway!();
@@ -84,9 +124,10 @@ class AppNavMenu extends StatelessWidget {
 
     final navigator = Navigator.of(context);
     if (activeWorkoutId != null && screen == AppScreen.workout) {
-      navigator.popUntil(
-        (route) =>
-            route.settings.name == WorkoutScreen.routeName || route.isFirst,
+      returnToActiveWorkout(
+        context,
+        activeWorkoutId: activeWorkoutId!,
+        activeWorkoutName: activeWorkoutName,
       );
       return;
     }
@@ -127,10 +168,7 @@ class AppNavMenu extends StatelessWidget {
     if (activeWorkoutId != null) {
       // Keep the live workout route mounted so in-memory session state, notably
       // the rest timer, survives visits to history and other app screens.
-      navigator.popUntil(
-        (route) =>
-            route.settings.name == WorkoutScreen.routeName || route.isFirst,
-      );
+      _popToActiveWorkout(navigator);
       navigator.push(route);
       return;
     }

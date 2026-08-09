@@ -4,7 +4,6 @@ import '../app_preferences.dart';
 import '../db/tables/enums.dart';
 import '../widgets/app_nav_menu.dart';
 import 'home_screen.dart';
-import 'workout_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
@@ -78,10 +77,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await AppPreferences.setTrainingStartDate(trainingStartDate);
     if (!mounted) return;
     if (widget.activeWorkoutId != null) {
-      Navigator.popUntil(
+      AppNavMenu.returnToActiveWorkout(
         context,
-        (route) =>
-            route.settings.name == WorkoutScreen.routeName || route.isFirst,
+        activeWorkoutId: widget.activeWorkoutId!,
+        activeWorkoutName: widget.activeWorkoutName,
       );
       return;
     }
