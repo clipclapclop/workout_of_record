@@ -234,6 +234,32 @@ class ReleaseWorkflowTest(unittest.TestCase):
             [["git", "push", "github", f"{'a' * 40}:refs/heads/main"]],
         )
 
+    def test_missing_mirror_branch_is_created_at_exact_revision(self) -> None:
+        workflow = ReleaseWorkflow(self.root, dry_run=False)
+        commands: list[list[str]] = []
+
+        class RecordingRunner:
+            def run(self, args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+                command = [str(value) for value in args]  # type: ignore[union-attr]
+                commands.append(command)
+                return subprocess.CompletedProcess(command, 0, "", "")
+
+        workflow.runner = RecordingRunner()  # type: ignore[assignment]
+        workflow._git = (  # type: ignore[method-assign]
+            lambda *args, **kwargs: subprocess.CompletedProcess(list(args), 2, "", "")
+        )
+        revision = "a" * 40
+
+        workflow._ensure_remote_branch_contains(
+            "github", "main", revision, allow_push=True
+        )
+
+        self.assertTrue(workflow.effects_started)
+        self.assertEqual(
+            commands,
+            [["git", "push", "github", f"{revision}:refs/heads/main"]],
+        )
+
     def test_forgejo_backfill_accepts_annotated_ancestor_tag(self) -> None:
         self._run(
             ["git", "tag", "-a", "v1.0.1", "-m", "Fixture 1.0.1"],

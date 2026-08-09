@@ -786,6 +786,18 @@ class ReleaseWorkflow:
         *,
         allow_push: bool,
     ) -> None:
+        remote_ref = f"refs/heads/{branch}"
+        state = self._git("ls-remote", "--exit-code", remote, remote_ref, check=False)
+        if state.returncode == 2:
+            if not allow_push:
+                raise ReleaseError(f"Required canonical branch is missing: {remote_ref}")
+            self.effects_started = True
+            self.runner.run(
+                ["git", "push", remote, f"{revision}:{remote_ref}"], cwd=self.root
+            )
+            return
+        if state.returncode != 0:
+            raise ReleaseError(f"Could not determine remote branch state: {remote}/{branch}")
         self._git("fetch", remote, branch)
         remote_branch = f"{remote}/{branch}"
         if self._git(
