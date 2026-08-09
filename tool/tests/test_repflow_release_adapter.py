@@ -120,6 +120,22 @@ class RepflowReleaseAdapterTest(unittest.TestCase):
             (self.root / "operations" / operation_key / "publication-possible").exists()
         )
 
+    def test_retry_preflight_failure_preserves_prior_uncertainty(self) -> None:
+        operation_key = adapter.hashlib.sha256(
+            ENVIRONMENT["REPFLOW_OPERATION_ID"].encode()
+        ).hexdigest()
+        marker = self.root / "operations" / operation_key / "publication-possible"
+        marker.parent.mkdir(parents=True)
+        marker.write_text("prior uncertain publication\n", encoding="utf-8")
+
+        result, stdout, stderr, _, environment = self._run("execute", returncode=2)
+
+        self.assertEqual(result, 1)
+        self.assertEqual(stdout, "")
+        self.assertIn("prior publication attempt remains uncertain", stderr)
+        self.assertEqual(environment["WORKOUT_OF_RECORD_RELEASE_RECONCILING"], "1")
+        self.assertTrue(marker.is_file())
+
     def test_verification_failure_is_bounded_structured_evidence(self) -> None:
         result, stdout, _, command, environment = self._run("verify", returncode=2)
 

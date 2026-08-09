@@ -278,7 +278,7 @@ class ReleaseWorkflow:
         if self.expected_revision is not None:
             remote_revision = self._git_output("rev-parse", remote_branch)
             if remote_revision != self.expected_revision and (
-                not self.reconciling
+                not (self.dry_run or self.reconciling)
                 or self._git(
                     "merge-base",
                     "--is-ancestor",

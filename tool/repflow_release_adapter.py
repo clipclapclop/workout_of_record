@@ -280,8 +280,9 @@ def run(action: str) -> int:
         environment["WORKOUT_OF_RECORD_RELEASE_REVISION"] = values["REPFLOW_REVISION"]
         environment["WORKOUT_OF_RECORD_KEY_PROPERTIES"] = config["keyProperties"]
         effect_marker = log.parent / "publication-possible"
+        publication_was_possible = effect_marker.exists()
         environment.pop("WORKOUT_OF_RECORD_RELEASE_RECONCILING", None)
-        if action == "verify" or effect_marker.exists():
+        if action == "verify" or publication_was_possible:
             environment["WORKOUT_OF_RECORD_RELEASE_RECONCILING"] = "1"
         if action == "execute":
             effect_marker.write_text("publication may have started\n", encoding="utf-8")
@@ -321,6 +322,13 @@ def run(action: str) -> int:
             _result("failed", f"{tag} failed before any publication effect.", tag)
             return 0
         if completed.returncode == 2:
+            if publication_was_possible:
+                print(
+                    "A prior publication attempt remains uncertain; repair the preflight "
+                    "failure and retry the same Repflow operation.",
+                    file=sys.stderr,
+                )
+                return 1
             effect_marker.unlink(missing_ok=True)
             _result("failed", f"{tag} failed before any publication effect.", tag)
             return 0

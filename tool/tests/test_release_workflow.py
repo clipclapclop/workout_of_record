@@ -182,7 +182,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         with self.assertRaisesRegex(ReleaseError, "outdated or diverged"):
             ReleaseWorkflow(self.root, dry_run=True)._preflight_git()
 
-    def test_only_reconciliation_accepts_canonical_main_advancing(self) -> None:
+    def test_dry_run_and_reconciliation_accept_canonical_main_advancing(self) -> None:
         revision = self._run(["git", "rev-parse", "HEAD"], cwd=self.root).stdout.strip()
         other = Path(self.temp.name) / "advanced"
         self._run(["git", "clone", "--branch", "main", self.remote, other], cwd=Path(self.temp.name))
@@ -196,13 +196,18 @@ class ReleaseWorkflowTest(unittest.TestCase):
         with self.assertRaisesRegex(ReleaseError, "initial publication"):
             ReleaseWorkflow(
                 self.root,
-                dry_run=True,
+                dry_run=False,
                 expected_revision=revision,
             )._preflight_git()
 
         ReleaseWorkflow(
             self.root,
             dry_run=True,
+            expected_revision=revision,
+        )._preflight_git()
+        ReleaseWorkflow(
+            self.root,
+            dry_run=False,
             expected_revision=revision,
             reconciling=True,
         )._preflight_git()
