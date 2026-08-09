@@ -647,6 +647,14 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertEqual(verified_apks, ["fixture-arm64.apk", "fixture-arm64.apk"])
         self.assertEqual(documentation, [docs_revision])
 
+    def test_published_verification_rejects_malformed_asset_response(self) -> None:
+        workflow = ReleaseWorkflow(self.root, dry_run=False)
+
+        with self.assertRaisesRegex(ReleaseError, "assets response is malformed"):
+            workflow._required_release_asset(
+                {"assets": None}, "fixture-arm64.apk", "Forgejo"
+            )
+
     def test_published_verification_rejects_a_lightweight_tag(self) -> None:
         revision = self._run(["git", "rev-parse", "HEAD"], cwd=self.root).stdout.strip()
         workflow = ReleaseWorkflow(

@@ -1187,9 +1187,12 @@ class ReleaseWorkflow:
     def _required_release_asset(
         self, release: dict[str, Any], name: str, provider: str
     ) -> dict[str, Any]:
+        values = release.get("assets")
+        if not isinstance(values, list):
+            raise ReleaseError(f"{provider} release assets response is malformed.")
         assets = [
             asset
-            for asset in release.get("assets", [])
+            for asset in values
             if isinstance(asset, dict) and asset.get("name") == name
         ]
         if len(assets) != 1:
