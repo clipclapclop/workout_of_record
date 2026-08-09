@@ -795,6 +795,7 @@ class ReleaseWorkflow:
         if allow_push and self._git(
             "merge-base", "--is-ancestor", remote_branch, revision, check=False
         ).returncode == 0:
+            self.effects_started = True
             self.runner.run(
                 ["git", "push", remote, f"{revision}:refs/heads/{branch}"], cwd=self.root
             )

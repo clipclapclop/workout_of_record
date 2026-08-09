@@ -207,6 +207,33 @@ class ReleaseWorkflowTest(unittest.TestCase):
                 expected_revision="a" * 40,
             )._preflight_git()
 
+    def test_mirror_branch_push_is_marked_as_an_external_effect(self) -> None:
+        workflow = ReleaseWorkflow(self.root, dry_run=False)
+        commands: list[list[str]] = []
+        ancestry_results = iter((1, 0))
+
+        class RecordingRunner:
+            def run(self, args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+                command = [str(value) for value in args]  # type: ignore[union-attr]
+                commands.append(command)
+                return subprocess.CompletedProcess(command, 0, "", "")
+
+        def fake_git(*args: str, **kwargs: object) -> subprocess.CompletedProcess[str]:
+            returncode = next(ancestry_results) if args[0] == "merge-base" else 0
+            return subprocess.CompletedProcess(list(args), returncode, "", "")
+
+        workflow.runner = RecordingRunner()  # type: ignore[assignment]
+        workflow._git = fake_git  # type: ignore[method-assign]
+        workflow._ensure_remote_branch_contains(
+            "github", "main", "a" * 40, allow_push=True
+        )
+
+        self.assertTrue(workflow.effects_started)
+        self.assertEqual(
+            commands,
+            [["git", "push", "github", f"{'a' * 40}:refs/heads/main"]],
+        )
+
     def test_forgejo_backfill_accepts_annotated_ancestor_tag(self) -> None:
         self._run(
             ["git", "tag", "-a", "v1.0.1", "-m", "Fixture 1.0.1"],
