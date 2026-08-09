@@ -167,7 +167,8 @@ class AppNavMenu extends StatelessWidget {
 
     if (activeWorkoutId != null) {
       // Keep the live workout route mounted so in-memory session state, notably
-      // the rest timer, survives visits to history and other app screens.
+      // the rest timer, survives visits to History and every other destination
+      // above. History already carries the active workout ID and name.
       _popToActiveWorkout(navigator);
       navigator.push(route);
       return;
