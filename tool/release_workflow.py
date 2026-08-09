@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -80,12 +81,19 @@ class ReleaseWorkflow:
         *,
         dry_run: bool,
         backfill_forgejo: str | None = None,
+        verify_published: bool = False,
+        expected_revision: str | None = None,
         runner: CommandRunner | None = None,
     ) -> None:
         self.root = root.resolve()
         self.dry_run = dry_run
         self.backfill_forgejo = backfill_forgejo
+        self.verify_published = verify_published
+        self.expected_revision = expected_revision
+        if expected_revision is not None and not re.fullmatch(r"[0-9a-f]{40}", expected_revision):
+            raise ReleaseError("The expected release revision must be a full lowercase SHA-1.")
         self.runner = runner or CommandRunner()
+        self.effects_started = False
         self.config = self._load_json(self.root / "tool/release-config.json")
         self._validate_config()
         self.version = (
@@ -105,8 +113,9 @@ class ReleaseWorkflow:
             self._backfill_forgejo_release()
             return
 
+        action = "Verifying published" if self.verify_published else "Preparing"
         print(
-            f"Preparing {self.version.tag} ({self.version.code})"
+            f"{action} {self.version.tag} ({self.version.code})"
             + (" [dry run]" if self.dry_run else ""),
             flush=True,
         )
@@ -114,6 +123,12 @@ class ReleaseWorkflow:
         self._validate_release_metadata()
         self._validate_change_fragments()
         self._validate_no_tracked_secrets()
+
+        if self.verify_published:
+            self._verify_published_release()
+            print(f"Verified published {self.version.tag} successfully.")
+            return
+
         self._run_validations()
         apk, checksum_file = self._stage_and_verify_apk()
 
@@ -251,10 +266,24 @@ class ReleaseWorkflow:
 
         self._git("fetch", canonical_remote, "--tags", "--prune")
         remote_branch = f"{canonical_remote}/{expected_branch}"
-        ancestor = self._git(
-            "merge-base", "--is-ancestor", remote_branch, "HEAD", check=False
+        head_revision = self._git_output("rev-parse", "HEAD")
+        if self.expected_revision is not None and head_revision != self.expected_revision:
+            raise ReleaseError(
+                f"HEAD is {head_revision}, expected exact release revision "
+                f"{self.expected_revision}."
+            )
+        ancestor_args = (
+            (self.expected_revision, remote_branch)
+            if self.expected_revision is not None
+            else (remote_branch, "HEAD")
         )
+        ancestor = self._git("merge-base", "--is-ancestor", *ancestor_args, check=False)
         if ancestor.returncode != 0:
+            if self.expected_revision is not None:
+                raise ReleaseError(
+                    f"Exact release revision {self.expected_revision} is not contained in "
+                    f"{remote_branch}."
+                )
             raise ReleaseError(
                 f"HEAD is outdated or diverged from {remote_branch}; reconcile it before release."
             )
@@ -732,8 +761,15 @@ class ReleaseWorkflow:
         self._forgejo_token()
         canonical_remote = self.config["canonicalRemote"]
         branch = self.config["mainBranch"]
-        self.runner.run(["git", "push", canonical_remote, branch], cwd=self.root)
+        if self.expected_revision is None:
+            self.effects_started = True
+            self.runner.run(["git", "push", canonical_remote, branch], cwd=self.root)
+        else:
+            self._ensure_remote_branch_contains(
+                canonical_remote, branch, self.expected_revision, allow_push=False
+            )
         self._ensure_release_tag()
+        self.effects_started = True
         self.runner.run(
             ["git", "push", canonical_remote, self.version.tag], cwd=self.root
         )
@@ -741,6 +777,32 @@ class ReleaseWorkflow:
         self._publish_forgejo_release(apk, checksum)
         if self.config["githubMirrorEnabled"]:
             self._publish_github_mirror(apk, checksum)
+
+    def _ensure_remote_branch_contains(
+        self,
+        remote: str,
+        branch: str,
+        revision: str,
+        *,
+        allow_push: bool,
+    ) -> None:
+        self._git("fetch", remote, branch)
+        remote_branch = f"{remote}/{branch}"
+        if self._git(
+            "merge-base", "--is-ancestor", revision, remote_branch, check=False
+        ).returncode == 0:
+            return
+        if allow_push and self._git(
+            "merge-base", "--is-ancestor", remote_branch, revision, check=False
+        ).returncode == 0:
+            self.runner.run(
+                ["git", "push", remote, f"{revision}:refs/heads/{branch}"], cwd=self.root
+            )
+            return
+        raise ReleaseError(
+            f"{remote_branch} neither contains nor can safely advance to exact release "
+            f"revision {revision}."
+        )
 
     def _ensure_release_tag(self) -> None:
         tag_result = self._git("rev-parse", "--verify", self.version.tag, check=False)
@@ -979,7 +1041,12 @@ class ReleaseWorkflow:
         github_remote = self.config["githubRemote"]
         github_repository = self.config["githubRepository"]
         branch = self.config["mainBranch"]
-        self.runner.run(["git", "push", github_remote, branch], cwd=self.root)
+        if self.expected_revision is None:
+            self.runner.run(["git", "push", github_remote, branch], cwd=self.root)
+        else:
+            self._ensure_remote_branch_contains(
+                github_remote, branch, self.expected_revision, allow_push=True
+            )
         self.runner.run(["git", "push", github_remote, self.version.tag], cwd=self.root)
 
         release = self._github_release_state()
@@ -1041,7 +1108,7 @@ class ReleaseWorkflow:
             [
                 "gh", "release", "view", self.version.tag,
                 "--repo", self.config["githubRepository"],
-                "--json", "isDraft,assets,url,tagName,name,body",
+                "--json", "isDraft,isPrerelease,assets,url,tagName,name,body",
             ],
             cwd=self.root,
             check=False,
@@ -1060,6 +1127,7 @@ class ReleaseWorkflow:
             "tagName": self.version.tag,
             "name": f"{self.config['displayName']} {self.version.name}",
             "body": notes,
+            "isPrerelease": False,
         }
         mismatched = [key for key, value in expected.items() if release.get(key) != value]
         if mismatched:
@@ -1097,6 +1165,196 @@ class ReleaseWorkflow:
                 raise ReleaseError(
                     f"GitHub already has a different asset named {local.name}; refusing to replace it."
                 )
+
+    def _remote_refs(self, remote: str, *refs: str) -> dict[str, str]:
+        output = self._git_output("ls-remote", remote, *refs)
+        values: dict[str, str] = {}
+        for line in output.splitlines():
+            revision, separator, name = line.partition("\t")
+            if separator and re.fullmatch(r"[0-9a-f]{40}", revision):
+                values[name] = revision
+        return values
+
+    def _remote_branch_contains(self, remote: str, branch: str, revision: str) -> None:
+        self._git("fetch", remote, branch)
+        if self._git(
+            "merge-base", "--is-ancestor", revision, f"{remote}/{branch}", check=False
+        ).returncode != 0:
+            raise ReleaseError(
+                f"{remote}/{branch} does not contain exact release revision {revision}."
+            )
+
+    def _required_release_asset(
+        self, release: dict[str, Any], name: str, provider: str
+    ) -> dict[str, Any]:
+        assets = [
+            asset
+            for asset in release.get("assets", [])
+            if isinstance(asset, dict) and asset.get("name") == name
+        ]
+        if len(assets) != 1:
+            raise ReleaseError(
+                f"{provider} release must contain exactly one asset named {name}."
+            )
+        return assets[0]
+
+    def _download_github_asset(self, name: str, destination: Path) -> None:
+        self.runner.run(
+            [
+                "gh", "release", "download", self.version.tag,
+                "--repo", self.config["githubRepository"],
+                "--pattern", name, "--dir", destination.parent,
+            ],
+            cwd=self.root,
+        )
+        downloaded = destination.parent / name
+        if not downloaded.is_file():
+            raise ReleaseError(f"GitHub release asset is missing after download: {name}")
+        if downloaded != destination:
+            shutil.move(downloaded, destination)
+
+    def _verify_documentation_publication(self, documentation_revision: str) -> None:
+        repository = self.config["githubRepository"]
+        deadline = time.monotonic() + 300
+        last_problem = "GitHub Pages did not become ready."
+        while True:
+            result = self.runner.run(
+                ["gh", "api", f"repos/{repository}/pages"],
+                cwd=self.root,
+                check=False,
+                capture=True,
+            )
+            state: dict[str, Any] | None = None
+            if result.returncode == 0:
+                try:
+                    value = json.loads(result.stdout)
+                    state = value if isinstance(value, dict) else None
+                except json.JSONDecodeError:
+                    last_problem = "GitHub Pages returned invalid JSON."
+            else:
+                last_problem = "GitHub Pages state is temporarily unavailable."
+
+            source = state.get("source") if state is not None else None
+            public_url = state.get("html_url") if state is not None else None
+            correctly_configured = (
+                isinstance(source, dict)
+                and source.get("branch") == self.config["documentationBranch"]
+                and source.get("path") == "/"
+            )
+            if not correctly_configured:
+                last_problem = "GitHub Pages is not configured for the documentation branch."
+            elif state.get("status") != "built":
+                last_problem = "GitHub Pages has not finished building."
+            elif not isinstance(public_url, str) or not public_url.startswith("https://"):
+                last_problem = "GitHub Pages did not report a public HTTPS URL."
+            else:
+                try:
+                    with urllib.request.urlopen(public_url, timeout=60) as response:
+                        body = response.read(1024)
+                        status = response.status
+                    if status == 200 and body:
+                        print(
+                            f"Verified documentation revision {documentation_revision} "
+                            f"at {public_url}",
+                            flush=True,
+                        )
+                        return
+                    last_problem = "Published documentation is not a non-empty HTTP 200 response."
+                except OSError:
+                    last_problem = "Published documentation is temporarily unavailable."
+
+            if time.monotonic() >= deadline:
+                raise ReleaseError(last_problem)
+            time.sleep(5)
+
+    def _verify_published_release(self) -> None:
+        revision = self.expected_revision or self._git_output("rev-parse", "HEAD")
+        canonical_remote = self.config["canonicalRemote"]
+        branch = self.config["mainBranch"]
+        tag_ref = f"refs/tags/{self.version.tag}"
+        peeled_tag_ref = f"{tag_ref}^{{}}"
+        canonical_refs = self._remote_refs(
+            canonical_remote,
+            f"refs/heads/{branch}",
+            tag_ref,
+            peeled_tag_ref,
+            f"refs/heads/{self.config['documentationBranch']}",
+        )
+        if canonical_refs.get(peeled_tag_ref) != revision:
+            raise ReleaseError(
+                f"Canonical {self.version.tag} does not resolve to exact release revision {revision}."
+            )
+        if tag_ref not in canonical_refs or canonical_refs[tag_ref] == revision:
+            raise ReleaseError(f"Canonical {self.version.tag} must be an annotated tag.")
+        self._remote_branch_contains(canonical_remote, branch, revision)
+
+        forgejo = self._forgejo_release_state()
+        if forgejo is None or forgejo.get("draft") is not False:
+            raise ReleaseError("Canonical Forgejo release is not public.")
+        self._validate_forgejo_release_metadata(forgejo)
+
+        apk_name = self.config["apkFilename"]
+        checksum_name = f"{apk_name}.sha256"
+        forgejo_assets = {
+            name: self._required_release_asset(forgejo, name, "Forgejo")
+            for name in (apk_name, checksum_name)
+        }
+        with tempfile.TemporaryDirectory(prefix="published-release-verify-") as directory:
+            root = Path(directory)
+            canonical_apk = root / "forgejo" / apk_name
+            canonical_checksum = root / "forgejo" / checksum_name
+            canonical_apk.parent.mkdir()
+            self._download_forgejo_asset(forgejo_assets[apk_name], canonical_apk)
+            self._download_forgejo_asset(
+                forgejo_assets[checksum_name], canonical_checksum
+            )
+            self._verify_checksum_file(canonical_apk, canonical_checksum)
+            self._verify_apk(canonical_apk)
+
+            if self.config["githubMirrorEnabled"]:
+                if shutil.which("gh") is None:
+                    raise ReleaseError("GitHub CLI is required to verify the enabled mirror.")
+                self.runner.run(["gh", "auth", "status"], cwd=self.root)
+                github_remote = self.config["githubRemote"]
+                github_refs = self._remote_refs(
+                    github_remote,
+                    f"refs/heads/{branch}",
+                    tag_ref,
+                    peeled_tag_ref,
+                    f"refs/heads/{self.config['documentationBranch']}",
+                )
+                if github_refs.get(tag_ref) != canonical_refs[tag_ref]:
+                    raise ReleaseError("Forgejo and GitHub annotated tag objects differ.")
+                if github_refs.get(peeled_tag_ref) != revision:
+                    raise ReleaseError(
+                        f"GitHub {self.version.tag} does not resolve to exact release revision."
+                    )
+                self._remote_branch_contains(github_remote, branch, revision)
+
+                docs_ref = f"refs/heads/{self.config['documentationBranch']}"
+                documentation_revision = canonical_refs.get(docs_ref)
+                if not documentation_revision or github_refs.get(docs_ref) != documentation_revision:
+                    raise ReleaseError("Forgejo and GitHub documentation branch refs differ.")
+
+                github = self._github_release_state()
+                if github is None or github.get("isDraft") is not False:
+                    raise ReleaseError("GitHub mirror release is not public.")
+                self._validate_github_release_metadata(github)
+                for name in (apk_name, checksum_name):
+                    self._required_release_asset(github, name, "GitHub")
+                github_apk = root / "github" / apk_name
+                github_checksum = root / "github" / checksum_name
+                github_apk.parent.mkdir()
+                self._download_github_asset(apk_name, github_apk)
+                self._download_github_asset(checksum_name, github_checksum)
+                if (
+                    self._sha256(github_apk) != self._sha256(canonical_apk)
+                    or self._sha256(github_checksum) != self._sha256(canonical_checksum)
+                ):
+                    raise ReleaseError("Forgejo and GitHub release assets differ.")
+                self._verify_checksum_file(github_apk, github_checksum)
+                self._verify_apk(github_apk)
+                self._verify_documentation_publication(documentation_revision)
 
     def _preflight_forgejo_backfill(self) -> None:
         branch = self._git_output("branch", "--show-current")
@@ -1177,6 +1435,7 @@ class ReleaseWorkflow:
             apk, checksum = assets
             self._verify_checksum_file(apk, checksum)
             self._verify_apk(apk)
+            self.effects_started = True
             self.runner.run(
                 ["git", "push", self.config["canonicalRemote"], self.version.tag],
                 cwd=self.root,
@@ -1222,21 +1481,31 @@ def parser() -> argparse.ArgumentParser:
         metavar="TAG",
         help="Backfill one canonical Forgejo release from its existing verified GitHub mirror.",
     )
+    mode.add_argument(
+        "--verify-published",
+        action="store_true",
+        help="Verify exact published refs, assets, signing, and documentation without publishing.",
+    )
     return value
 
 
 def main(argv: list[str] | None = None) -> None:
     args = parser().parse_args(argv)
     root = Path(__file__).resolve().parent.parent
+    workflow: ReleaseWorkflow | None = None
     try:
-        ReleaseWorkflow(
+        workflow = ReleaseWorkflow(
             root,
             dry_run=args.dry_run,
             backfill_forgejo=args.backfill_forgejo,
-        ).execute()
+            verify_published=args.verify_published,
+            expected_revision=os.environ.get("WORKOUT_OF_RECORD_RELEASE_REVISION"),
+        )
+        workflow.execute()
     except ReleaseError as error:
         print(f"release: error: {error}", file=sys.stderr)
-        raise SystemExit(1) from error
+        exit_code = 3 if workflow is not None and workflow.effects_started else 2
+        raise SystemExit(exit_code) from error
 
 
 if __name__ == "__main__":

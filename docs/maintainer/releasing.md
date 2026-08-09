@@ -60,9 +60,47 @@ Review and commit the preparation. The resulting working tree must be clean.
 
 The dry run fetches canonical Forgejo state, validates metadata and fragments, runs Flutter analysis/tests, builds MkDocs strictly, builds an arm64-only release APK, and verifies package identity, version, architecture, signing certificate, and checksum. Flutter adds its arm64 split offset (`2000`) to the base build number from `pubspec.yaml`; the release tool verifies both values. It does not push or change Forgejo or GitHub.
 
+## Repflow release adapter
+
+Repflow publication wraps this same release tool; it is not a second publisher. Release preparation still updates and commits versioned repository content without publication. Only a later explicit request to release a named merged preparation PR authorizes Repflow to run the host adapter.
+
+After this adapter change is reviewed and merged, install the reviewed executable from canonical `main`:
+
+```bash
+git switch main
+git pull --ff-only origin main
+./tool/install-repflow-release-adapter
+vim ~/.config/workout-of-record/repflow-release-adapter.json
+```
+
+The installer places the executable at `/home/chad/.local/bin/workout-of-record-release-adapter` and creates its owner-only working directory at `/home/chad/.local/state/workout-of-record/release-adapter`. Its owner-only JSON configuration names the canonical and mirror Git URLs and an absolute path to a dedicated `key.properties`. That properties file must use an absolute path to the release keystore so the key and passwords remain outside every exact-revision checkout. Keep both files mode `0600`; keep the keystore owner-only as well. Forgejo, GitHub, Android, and signing credentials remain in their existing host-owned stores and never belong in policy, command arguments, adapter JSON output, logs shared for review, or repository content.
+
+Before authorizing the first adapter publication for a prepared release, run the adapter's non-publishing preparation action with disposable state. Substitute the merged preparation PR and exact full revision:
+
+```bash
+revision="$(git rev-parse HEAD)"
+disposable_state="$(mktemp -d)"
+chmod 700 "$disposable_state"
+(
+  cd "$disposable_state"
+  REPFLOW_STAGE=release \
+  REPFLOW_PHASE=execute \
+  REPFLOW_REVISION="$revision" \
+  REPFLOW_OPERATION_ID="release-preparation:$revision" \
+  REPFLOW_PULL_REQUEST="PREPARATION_PR_NUMBER" \
+  REPFLOW_REPOSITORY="chad/workout_of_record" \
+    /home/chad/.local/bin/workout-of-record-release-adapter prepare
+)
+rm -rf "$disposable_state"
+```
+
+`prepare` checks out the exact canonical revision outside the working repository and invokes `./tool/release --dry-run`; it cannot publish. Production execution uses the stable Repflow operation ID and a persistent operation-specific checkout. A retry reuses that identity and reconciles the existing publisher's immutable tag and asset checks rather than replacing anything.
+
+After execution, Repflow always invokes independent verification. Verification requires the exact annotated tag on Forgejo and GitHub, containing branch refs, public matching release metadata, byte-identical APK and checksum assets, checksum validity, package/version/arm64/signing identity, matching documentation refs, a built GitHub Pages source, and a non-empty public HTTP 200 documentation response. No rollback is configured: deleting or replacing an immutable public tag, asset, or release is not safe. Preserve Repflow's adapter recovery state and this adapter's operation directory after any uncertain interruption, then retry only the same operation ID and revision.
+
 ## Publish
 
-Ask Codex to **publish the prepared release**, or run:
+Ask Codex to **publish the prepared release** and name the merged release-preparation PR so it can use the protected Repflow adapter. Direct workstation publication remains available for documented recovery only:
 
 ```bash
 ./tool/release

@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source_adapter="$repository_root/tool/repflow_release_adapter.py"
+target_adapter="/home/chad/.local/bin/workout-of-record-release-adapter"
+state_directory="/home/chad/.local/state/workout-of-record/release-adapter"
+config_directory="/home/chad/.config/workout-of-record"
+config_file="$config_directory/repflow-release-adapter.json"
+
+install -d -m 755 "$(dirname "$target_adapter")"
+install -m 755 "$source_adapter" "$target_adapter"
+install -d -m 700 "$state_directory" "$config_directory"
+
+if [[ ! -e "$config_file" ]]; then
+  umask 077
+  cat >"$config_file" <<'JSON'
+{
+  "schema": 1,
+  "canonicalRepository": "ssh://git@git.oorangy.com:2222/chad/workout_of_record.git",
+  "githubRepository": "git@github.com:clipclapclop/workout_of_record.git",
+  "keyProperties": "/absolute/host/path/to/android-key.properties"
+}
+JSON
+  echo "Created $config_file; update keyProperties before using the adapter."
+fi
+
+printf 'Installed %s\nState directory: %s\nConfiguration: %s\n' \
+  "$target_adapter" "$state_directory" "$config_file"

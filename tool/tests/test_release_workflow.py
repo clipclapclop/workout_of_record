@@ -182,6 +182,31 @@ class ReleaseWorkflowTest(unittest.TestCase):
         with self.assertRaisesRegex(ReleaseError, "outdated or diverged"):
             ReleaseWorkflow(self.root, dry_run=True)._preflight_git()
 
+    def test_exact_release_revision_remains_valid_after_canonical_main_advances(self) -> None:
+        revision = self._run(["git", "rev-parse", "HEAD"], cwd=self.root).stdout.strip()
+        other = Path(self.temp.name) / "advanced"
+        self._run(["git", "clone", "--branch", "main", self.remote, other], cwd=Path(self.temp.name))
+        self._run(["git", "config", "user.name", "Other"], cwd=other)
+        self._run(["git", "config", "user.email", "other@example.invalid"], cwd=other)
+        (other / "later.txt").write_text("later\n", encoding="utf-8")
+        self._run(["git", "add", "."], cwd=other)
+        self._run(["git", "commit", "-m", "later change"], cwd=other)
+        self._run(["git", "push"], cwd=other)
+
+        ReleaseWorkflow(
+            self.root,
+            dry_run=True,
+            expected_revision=revision,
+        )._preflight_git()
+
+    def test_exact_release_revision_must_match_head(self) -> None:
+        with self.assertRaisesRegex(ReleaseError, "expected exact release revision"):
+            ReleaseWorkflow(
+                self.root,
+                dry_run=True,
+                expected_revision="a" * 40,
+            )._preflight_git()
+
     def test_forgejo_backfill_accepts_annotated_ancestor_tag(self) -> None:
         self._run(
             ["git", "tag", "-a", "v1.0.1", "-m", "Fixture 1.0.1"],
@@ -555,6 +580,89 @@ class ReleaseWorkflowTest(unittest.TestCase):
         workflow._publish(apk, checksum)
 
         self.assertEqual(events, ["forgejo"])
+
+    def test_published_verification_checks_both_providers_and_documentation(self) -> None:
+        revision = self._run(["git", "rev-parse", "HEAD"], cwd=self.root).stdout.strip()
+        workflow = ReleaseWorkflow(
+            self.root,
+            dry_run=False,
+            verify_published=True,
+            expected_revision=revision,
+        )
+        workflow.manifest = dict(self.manifest)
+        tag_object = "b" * 40
+        docs_revision = "c" * 40
+        refs = {
+            "refs/heads/main": revision,
+            "refs/tags/v1.0.1": tag_object,
+            "refs/tags/v1.0.1^{}": revision,
+            "refs/heads/gh-pages": docs_revision,
+        }
+        notes = (self.root / "docs/releases/1.0.1.md").read_text(encoding="utf-8")
+        forgejo = {
+            "tag_name": "v1.0.1",
+            "name": "Fixture 1.0.1",
+            "body": notes,
+            "draft": False,
+            "prerelease": False,
+            "assets": [
+                {"name": "fixture-arm64.apk", "browser_download_url": "https://forgejo/apk"},
+                {"name": "fixture-arm64.apk.sha256", "browser_download_url": "https://forgejo/checksum"},
+            ],
+        }
+        github = {
+            "tagName": "v1.0.1",
+            "name": "Fixture 1.0.1",
+            "body": notes,
+            "isDraft": False,
+            "isPrerelease": False,
+            "assets": [
+                {"name": "fixture-arm64.apk"},
+                {"name": "fixture-arm64.apk.sha256"},
+            ],
+        }
+        verified_apks: list[str] = []
+        documentation: list[str] = []
+
+        workflow._remote_refs = lambda remote, *names: dict(refs)  # type: ignore[method-assign]
+        workflow._remote_branch_contains = lambda *args: None  # type: ignore[method-assign]
+        workflow._forgejo_release_state = lambda: forgejo  # type: ignore[method-assign]
+        workflow._github_release_state = lambda: github  # type: ignore[method-assign]
+        workflow._download_forgejo_asset = (  # type: ignore[method-assign]
+            lambda asset, destination: destination.write_bytes(str(asset["name"]).encode())
+        )
+        workflow._download_github_asset = (  # type: ignore[method-assign]
+            lambda name, destination: destination.write_bytes(name.encode())
+        )
+        workflow._verify_checksum_file = lambda apk, checksum: None  # type: ignore[method-assign]
+        workflow._verify_apk = lambda apk: verified_apks.append(apk.name)  # type: ignore[method-assign]
+        workflow._verify_documentation_publication = (  # type: ignore[method-assign]
+            lambda value: documentation.append(value)
+        )
+        workflow.runner.run = lambda *args, **kwargs: subprocess.CompletedProcess([], 0)  # type: ignore[method-assign]
+
+        with patch("release_workflow.shutil.which", return_value="/usr/bin/gh"):
+            workflow._verify_published_release()
+
+        self.assertEqual(verified_apks, ["fixture-arm64.apk", "fixture-arm64.apk"])
+        self.assertEqual(documentation, [docs_revision])
+
+    def test_published_verification_rejects_a_lightweight_tag(self) -> None:
+        revision = self._run(["git", "rev-parse", "HEAD"], cwd=self.root).stdout.strip()
+        workflow = ReleaseWorkflow(
+            self.root,
+            dry_run=False,
+            verify_published=True,
+            expected_revision=revision,
+        )
+        workflow._remote_refs = lambda remote, *names: {  # type: ignore[method-assign]
+            "refs/heads/main": revision,
+            "refs/tags/v1.0.1": revision,
+            "refs/tags/v1.0.1^{}": revision,
+        }
+
+        with self.assertRaisesRegex(ReleaseError, "annotated tag"):
+            workflow._verify_published_release()
 
 
 if __name__ == "__main__":

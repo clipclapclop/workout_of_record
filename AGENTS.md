@@ -46,8 +46,8 @@ When the user says **prepare a release**:
 
 ## Publishing a release
 
-When the user says **publish the prepared release**, that explicitly authorizes the canonical Forgejo Release, Forgejo pushes and asset uploads, and any GitHub mirror and documentation deployment enabled in `tool/release-config.json`. Ensure the working tree is committed and clean, then run `./tool/release`.
+When the user says **publish the prepared release**, that explicitly authorizes the canonical Forgejo Release, Forgejo pushes and asset uploads, and any GitHub mirror and documentation deployment enabled in `tool/release-config.json`. Ensure the preparation was merged through a named pull request, then use Repflow's protected release operation for that merged PR. Run `./tool/release` directly only for explicit recovery under `docs/maintainer/releasing.md`.
 
-When the user says **prepare and publish a release**, perform both workflows. Do not infer publication authority from an ordinary implementation request.
+When the user says **prepare and publish a release**, perform both workflows. Do not infer publication authority from an ordinary implementation request, and do not treat preparation as authority to invoke the adapter before the preparation PR is merged.
 
-The release command is deterministic and never edits, stages, or commits tracked files. See `docs/maintainer/releasing.md` for setup, recovery, and phone instructions.
+The release command is deterministic and never edits, stages, or commits tracked files. The host-installed Repflow adapter checks out the exact merged revision, invokes that command, and independently verifies publication. See `docs/maintainer/releasing.md` for setup, recovery, and phone instructions.

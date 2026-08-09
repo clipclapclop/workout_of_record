@@ -43,6 +43,14 @@ processes:
     strategy: rebase
     authorization: manual
 
+  release:
+    authorization: manual
+    adapter:
+      command: ["/home/chad/.local/bin/workout-of-record-release-adapter", "execute"]
+      verify: ["/home/chad/.local/bin/workout-of-record-release-adapter", "verify"]
+      workingDirectory: /home/chad/.local/state/workout-of-record/release-adapter
+      timeoutSeconds: 3600
+
 notifications:
   forgejo: true
 ---
@@ -66,7 +74,8 @@ Give additional scrutiny to schema migrations, backup and restore behavior, acti
 - Completed workout records must retain their original meaning when movements, templates, preferences, or progression logic later change.
 - Backup and restore changes must preserve documented application state and fail safely on malformed, incomplete, or incompatible input.
 - Android package identity and signing identity must remain stable across updates.
-- Repflow release and deployment operations are unsupported until complete project-owned adapters are added through a separately reviewed policy change. The existing manually authorized release workflow remains governed by `AGENTS.md` and `docs/maintainer/releasing.md`.
+- Repflow release operations use only the protected host-installed adapter and remain separate from release preparation. Deployment operations are unsupported.
+- A release adapter invocation must use the exact merged revision and stable operation ID, publish through the existing deterministic release tool, verify every configured publication surface, and return only bounded secret-free evidence. No release rollback is configured because published immutable tags and assets cannot be safely undone.
 
 # Evidence
 

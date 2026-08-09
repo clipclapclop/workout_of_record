@@ -8,7 +8,9 @@ plugins {
 }
 
 val keyProperties = Properties()
-val keyPropertiesFile = rootProject.file("key.properties")
+val keyPropertiesFile = System.getenv("WORKOUT_OF_RECORD_KEY_PROPERTIES")
+    ?.let { file(it) }
+    ?: rootProject.file("key.properties")
 if (keyPropertiesFile.exists()) {
     keyProperties.load(keyPropertiesFile.inputStream())
 }
