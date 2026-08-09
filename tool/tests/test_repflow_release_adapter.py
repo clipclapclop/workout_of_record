@@ -127,6 +127,71 @@ class RepflowReleaseAdapterTest(unittest.TestCase):
         self.assertEqual(json.loads(stdout)["status"], "failed")
         self.assertNotIn(str(self.root), stdout)
 
+    def test_safe_precondition_is_terminal_structured_failure(self) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with (
+            patch.object(adapter, "run", side_effect=adapter.AdapterError("safe failure")),
+            patch.object(adapter.Path, "cwd", return_value=self.root),
+            patch.dict(os.environ, ENVIRONMENT, clear=True),
+            redirect_stdout(stdout),
+            redirect_stderr(stderr),
+        ):
+            with self.assertRaises(SystemExit) as exit_status:
+                adapter.main(["execute"])
+
+        self.assertEqual(exit_status.exception.code, 0)
+        self.assertEqual(json.loads(stdout.getvalue())["status"], "failed")
+        self.assertIn("safe failure", stderr.getvalue())
+
+    def test_interrupted_checkout_without_github_remote_is_reconciled(self) -> None:
+        source = self.root / "source"
+        canonical = self.root / "canonical.git"
+        github = self.root / "github.git"
+        operation_id = ENVIRONMENT["REPFLOW_OPERATION_ID"]
+        operation_key = adapter.hashlib.sha256(operation_id.encode()).hexdigest()
+        checkout = self.root / "operations" / operation_key / "checkout"
+        source.mkdir()
+        subprocess.run(["git", "init", "--initial-branch=main"], cwd=source, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Adapter Test"], cwd=source, check=True)
+        subprocess.run(["git", "config", "user.email", "adapter@example.invalid"], cwd=source, check=True)
+        (source / "pubspec.yaml").write_text("name: fixture\nversion: 1.2.3+4\n", encoding="utf-8")
+        subprocess.run(["git", "add", "."], cwd=source, check=True)
+        subprocess.run(["git", "commit", "-m", "fixture"], cwd=source, check=True, capture_output=True)
+        revision = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=source, check=True, text=True, capture_output=True
+        ).stdout.strip()
+        subprocess.run(["git", "clone", "--bare", str(source), str(canonical)], check=True, capture_output=True)
+        subprocess.run(["git", "init", "--bare", str(github)], check=True, capture_output=True)
+        checkout.parent.mkdir(parents=True)
+        subprocess.run(
+            ["git", "clone", "--no-checkout", str(canonical), str(checkout)],
+            check=True,
+            capture_output=True,
+        )
+        values = dict(ENVIRONMENT)
+        values["REPFLOW_REVISION"] = revision
+        config = {
+            "canonicalRepository": str(canonical),
+            "githubRepository": str(github),
+        }
+
+        result = adapter._checkout(
+            self.root, values, config, self.root / "checkout-recovery.log"
+        )
+
+        self.assertEqual(result, checkout)
+        self.assertEqual(
+            subprocess.run(
+                ["git", "remote", "get-url", "github"],
+                cwd=checkout,
+                check=True,
+                text=True,
+                capture_output=True,
+            ).stdout.strip(),
+            str(github),
+        )
+
     def test_operation_metadata_cannot_be_reused_for_another_revision(self) -> None:
         path = self.root / "operation.json"
         adapter._write_metadata(path, ENVIRONMENT)

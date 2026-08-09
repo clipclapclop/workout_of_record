@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import stat
 import subprocess
 import sys
@@ -114,6 +115,19 @@ def _checked(command: list[str], *, cwd: Path, log: Path) -> None:
         raise AdapterError(f"Host checkout command failed: {command[0]}")
 
 
+def _succeeds(command: list[str], *, cwd: Path) -> bool:
+    try:
+        return subprocess.run(
+            command,
+            cwd=cwd,
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode == 0
+    except OSError:
+        return False
+
+
 def _output(command: list[str], *, cwd: Path) -> str:
     try:
         result = subprocess.run(
@@ -166,12 +180,26 @@ def _checkout(
     checkout = operation / "checkout"
     if checkout.exists() and (checkout.is_symlink() or not checkout.is_dir()):
         raise AdapterError("Existing operation checkout is not a regular directory.")
+    if checkout.exists() and not _succeeds(
+        ["git", "rev-parse", "--git-dir"], cwd=checkout
+    ):
+        shutil.rmtree(checkout)
     if not checkout.exists():
         _checked(
             ["git", "clone", "--no-checkout", config["canonicalRepository"], str(checkout)],
             cwd=operation,
             log=log,
         )
+    remotes = set(_output(["git", "remote"], cwd=checkout).splitlines())
+    if "origin" not in remotes:
+        shutil.rmtree(checkout)
+        _checked(
+            ["git", "clone", "--no-checkout", config["canonicalRepository"], str(checkout)],
+            cwd=operation,
+            log=log,
+        )
+        remotes = set(_output(["git", "remote"], cwd=checkout).splitlines())
+    if "github" not in remotes:
         _checked(
             ["git", "remote", "add", "github", config["githubRepository"]],
             cwd=checkout,
@@ -323,6 +351,9 @@ def main(argv: list[str] | None = None) -> None:
         phase = "verification" if action == "verify" else "preparation"
         _result("failed", f"Release {phase} stopped at a safe host precondition.")
         print(f"release adapter: {error}", file=sys.stderr)
+        # A valid structured `failed` result is terminal evidence. Nonzero exit is
+        # reserved for uncertain effects so Repflow retains recovery state and its lock.
+        raise SystemExit(0) from error
 
 
 if __name__ == "__main__":
