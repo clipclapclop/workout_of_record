@@ -1,6 +1,6 @@
 {
   "id": "repflow-release-adapter",
-  "summary": "Added a protected host-installed Repflow adapter that publishes through the existing deterministic release tool at an exact merged revision, preserves uncertainty across retries, keeps canonical and mirror refs synchronized when main advances, safely initializes missing mirror state, reconciles interrupted local setup, independently verifies every configured release surface, and fails closed on malformed provider evidence.",
+  "summary": "Added a protected host-installed Repflow adapter that publishes through the existing deterministic release tool at an exact merged revision, records uncertain and completed outcomes in its protected state directory, keeps canonical and mirror refs synchronized when main advances, safely initializes missing mirror state, reconciles interrupted local setup, independently verifies every configured release surface, and fails closed on malformed provider evidence.",
   "audience": "maintainer",
   "releaseNote": "Release publication can now run through a protected exact-revision Repflow adapter with independent Forgejo, GitHub, asset, signing, and documentation verification.",
   "docs": {

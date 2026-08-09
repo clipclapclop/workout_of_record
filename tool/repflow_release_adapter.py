@@ -19,6 +19,7 @@ from typing import Any
 EXPECTED_REPOSITORY = "chad/workout_of_record"
 EXPECTED_CANONICAL_REMOTE = "ssh://git@git.oorangy.com:2222/chad/workout_of_record.git"
 EXPECTED_GITHUB_REMOTE = "git@github.com:clipclapclop/workout_of_record.git"
+EXPECTED_STATE_ROOT = Path("/home/chad/.local/state/workout-of-record/release-adapter")
 CONFIG_PATH = Path.home() / ".config/workout-of-record/repflow-release-adapter.json"
 
 
@@ -259,6 +260,8 @@ def run(action: str) -> int:
     values = _environment(action)
     config = _load_config()
     state_root = Path.cwd().resolve()
+    if action != "prepare" and state_root != EXPECTED_STATE_ROOT:
+        raise AdapterError("Production adapter phase is outside its configured state directory.")
     state_root.mkdir(mode=0o700, parents=True, exist_ok=True)
     lock_path = state_root / ".adapter.lock"
     with lock_path.open("a+b") as lock:
@@ -302,6 +305,11 @@ def run(action: str) -> int:
 
         short_revision = values["REPFLOW_REVISION"][:12]
         if completed.returncode == 0:
+            if action == "execute":
+                effect_marker.unlink(missing_ok=True)
+                succeeded = log.parent / "publication-succeeded"
+                succeeded.write_text("publication completed\n", encoding="utf-8")
+                os.chmod(succeeded, 0o600)
             verb = (
                 "Prepared"
                 if action == "prepare"

@@ -67,6 +67,7 @@ class RepflowReleaseAdapterTest(unittest.TestCase):
             patch.object(adapter, "_checkout", return_value=self.checkout),
             patch.object(adapter, "_secure_file"),
             patch.object(adapter.Path, "cwd", return_value=self.root),
+            patch.object(adapter, "EXPECTED_STATE_ROOT", self.root),
             patch.object(adapter.subprocess, "run", side_effect=fake_run),
             redirect_stdout(stdout),
             redirect_stderr(stderr),
@@ -86,6 +87,12 @@ class RepflowReleaseAdapterTest(unittest.TestCase):
         )
         self.assertEqual(json.loads(stdout)["status"], "succeeded")
         self.assertEqual(json.loads(stdout)["externalId"], "v1.2.3")
+        operation_key = adapter.hashlib.sha256(
+            ENVIRONMENT["REPFLOW_OPERATION_ID"].encode()
+        ).hexdigest()
+        operation = self.root / "operations" / operation_key
+        self.assertFalse((operation / "publication-possible").exists())
+        self.assertTrue((operation / "publication-succeeded").is_file())
 
     def test_prepare_is_non_publishing(self) -> None:
         result, stdout, _, command, _ = self._run("prepare")
@@ -215,6 +222,16 @@ class RepflowReleaseAdapterTest(unittest.TestCase):
 
         with self.assertRaisesRegex(adapter.AdapterError, "conflicts"):
             adapter._write_metadata(path, changed)
+
+    def test_production_phase_rejects_wrong_state_directory(self) -> None:
+        with (
+            patch.object(adapter, "_environment", return_value=dict(ENVIRONMENT)),
+            patch.object(adapter, "_load_config", return_value={}),
+            patch.object(adapter.Path, "cwd", return_value=self.root),
+            patch.object(adapter, "EXPECTED_STATE_ROOT", self.root / "expected"),
+        ):
+            with self.assertRaisesRegex(adapter.AdapterError, "configured state directory"):
+                adapter.run("execute")
 
     def test_environment_rejects_another_repository(self) -> None:
         values = dict(ENVIRONMENT)
