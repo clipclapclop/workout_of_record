@@ -8,6 +8,8 @@ You can skip the scheduled workout by selecting a skip reason. Workouts advance 
 
 While a workout is active, you can use the top-right menu to visit History or another app screen. Returning to Workout keeps the active session mounted, so its rest timer continues from the same countdown instead of restarting.
 
+History includes the current mesocycle as soon as its first workout starts. Its calendar marks completed workouts in green with a checkmark, the active workout with a play icon, skipped workouts in red, and workouts that have not started in gray.
+
 !!! note "Screenshot pending — workout-home"
     Capture the home screen with the next workout, mesocycle progress, expected date, and start/skip controls visible.
 

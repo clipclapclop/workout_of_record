@@ -1843,6 +1843,32 @@ class AppDatabase extends _$AppDatabase {
         );
       });
 
+  /// Returns mesocycle IDs that have at least one started non-rest workout.
+  ///
+  /// Includes active workouts so the History calendar can distinguish the
+  /// current workout from completed and future workouts. Mesocycles are
+  /// ordered by their most recently started workout, newest first.
+  Future<List<int>> getMesocycleIdsWithWorkoutHistory() async {
+    final rows = await (select(completedWorkouts).join([
+      innerJoin(workouts, workouts.id.equalsExp(completedWorkouts.workoutId)),
+      innerJoin(weeks, weeks.id.equalsExp(workouts.weekId)),
+    ])
+          ..where(workouts.isRestDay.equals(false))
+          ..orderBy([
+            OrderingTerm.desc(completedWorkouts.startedAt),
+            OrderingTerm.desc(completedWorkouts.id),
+          ]))
+        .get();
+
+    final seen = <int>{};
+    final ids = <int>[];
+    for (final row in rows) {
+      final id = row.readTable(weeks).mesocycleId;
+      if (seen.add(id)) ids.add(id);
+    }
+    return ids;
+  }
+
   /// Returns all non-rest-day completed workouts (excludes active/in-progress), newest first.
   Future<List<CompletedWorkoutSummary>> getCompletedWorkoutSummaries() async {
     final rows = await (select(completedWorkouts).join([

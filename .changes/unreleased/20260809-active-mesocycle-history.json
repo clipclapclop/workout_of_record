@@ -1,0 +1,12 @@
+{
+  "id": "active-mesocycle-history",
+  "summary": "Restore the active mesocycle to History and preserve visual distinctions between completed, active, skipped, and future workouts.",
+  "audience": "user",
+  "releaseNote": "History now includes the current mesocycle and clearly distinguishes completed, active, skipped, and upcoming workouts.",
+  "docs": {
+    "impact": "updated",
+    "paths": ["docs/guides/workouts.md"],
+    "reason": ""
+  },
+  "screenshots": []
+}

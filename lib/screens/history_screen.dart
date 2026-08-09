@@ -11,10 +11,14 @@ class HistoryScreen extends StatefulWidget {
     super.key,
     this.activeWorkoutId,
     this.activeWorkoutName,
+    this.loadCalendars,
   });
 
   final int? activeWorkoutId;
   final String? activeWorkoutName;
+
+  /// Overrides calendar loading for tests.
+  final Future<List<MesocycleCalendar>> Function()? loadCalendars;
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
@@ -30,10 +34,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Future<List<MesocycleCalendar>> _loadHistoryCalendars() async {
-    final mesos = await db.getMesocyclesWithCompletedWeeks();
+    if (widget.loadCalendars != null) return widget.loadCalendars!();
+
+    final mesocycleIds = await db.getMesocycleIdsWithWorkoutHistory();
     final calendars = <MesocycleCalendar>[];
-    for (final m in mesos) {
-      calendars.add(await db.getMesocycleCalendar(m.mesocycle.id));
+    for (final mesocycleId in mesocycleIds) {
+      calendars.add(await db.getMesocycleCalendar(mesocycleId));
     }
     return calendars;
   }
@@ -106,6 +112,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     cell: cell,
                     width: w,
                     height: h,
+                    highlightId: widget.activeWorkoutId,
                     onTap: cell.completedWorkout != null
                         ? () => _onCellTap(context, cell, week)
                         : null,
