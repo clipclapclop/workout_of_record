@@ -107,8 +107,14 @@ class WorkoutForegroundService {
   static Future<bool> start() async {
     // Notification permission controls where Android 13+ displays the required
     // foreground-service notice; denial does not prohibit starting the service.
+    // Verify the service itself below instead of inferring availability from
+    // the permission result.
     try {
-      await FlutterForegroundTask.requestNotificationPermission();
+      final permission =
+          await FlutterForegroundTask.checkNotificationPermission();
+      if (permission != NotificationPermission.granted) {
+        await FlutterForegroundTask.requestNotificationPermission();
+      }
     } catch (_) {}
 
     if (!await FlutterForegroundTask.isRunningService) {
@@ -120,6 +126,18 @@ class WorkoutForegroundService {
       );
       if (result is ServiceRequestFailure) return false;
     }
+
+    // Confirm Android actually brought up the foreground service. This also
+    // fails safely on devices that impose restrictions beyond notification
+    // permission handling.
+    var running = false;
+    for (var attempt = 0; attempt < 10 && !running; attempt++) {
+      running = await FlutterForegroundTask.isRunningService;
+      if (!running) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+    }
+    if (!running) return false;
 
     // Starting the Android service and creating its Dart task are separate
     // asynchronous steps. Prompt an existing task to identify itself; whether
