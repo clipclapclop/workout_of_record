@@ -97,10 +97,14 @@ class WorkoutForegroundService {
         _cuedByBackground = true;
         return;
       case 'cueFallback':
-        _cuedByBackground = true;
-        WorkoutCueService.fire(map['cueText'] as String?);
+        _deliverUiFallback(map['cueText'] as String?);
         return;
     }
+  }
+
+  static Future<void> _deliverUiFallback(String? cueText) async {
+    final delivered = await WorkoutCueService.fire(cueText);
+    if (delivered) _cuedByBackground = true;
   }
 
   /// Start the foreground service (shows the persistent notification).
@@ -243,19 +247,19 @@ class _WorkoutTaskHandler implements TaskHandler {
     _sendTaskSignal('heartbeat', timestamp);
     final tick = _state.tick(timestamp);
     if (tick.shouldCue) {
-      final delivered = await WorkoutBackgroundCue.instance.fire(
+      final nativeDelivery = await WorkoutBackgroundCue.instance.fire(
         cueText: tick.cueText,
         sound: tick.sound,
         haptic: tick.haptic,
       );
-      var cueDelivered = delivered;
+      var cueDelivered = nativeDelivery.delivered;
       if (!cueDelivered) {
         // The foreground task has its own Flutter engine, so this fallback does
         // not depend on the paused UI isolate either.
         cueDelivered = await WorkoutCueService.fire(
           tick.cueText,
           soundOverride: tick.sound,
-          hapticOverride: tick.haptic,
+          hapticOverride: tick.haptic && !nativeDelivery.hapticDelivered,
         );
       }
       FlutterForegroundTask.sendDataToMain({

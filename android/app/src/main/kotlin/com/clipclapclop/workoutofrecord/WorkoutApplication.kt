@@ -61,12 +61,10 @@ class WorkoutApplication : Application(), FlutterForegroundTaskLifecycleListener
 private data class PendingSpeech(
     val text: String,
     val result: MethodChannel.Result,
-    val haptic: Boolean,
 )
 
 private data class UtteranceResult(
     val result: MethodChannel.Result,
-    val haptic: Boolean,
 )
 
 /** Plays speech and vibration without depending on the activity/UI engine. */
@@ -112,22 +110,20 @@ private class WorkoutCueChannel(
         }
 
         val haptic = call.argument<Boolean>("haptic") ?: false
+        if (haptic) vibrate()
+
         val sound = call.argument<String>("sound") ?: "tts"
         val cueText = call.argument<String>("cueText")
         when (sound) {
-            "silent" -> {
-                if (haptic) vibrate()
-                result.success(null)
-            }
+            "silent" -> result.success(null)
             "tts" -> speakOrQueue(
                 cueText?.takeIf { it.isNotBlank() } ?: "ready",
                 result,
-                haptic,
             )
             // TimerSound.chime has always meant spoken "ready"; the settings
             // screen explains that the app does not bundle an audio file.
-            "chime" -> speakOrQueue("ready", result, haptic)
-            else -> speakOrQueue("ready", result, haptic)
+            "chime" -> speakOrQueue("ready", result)
+            else -> speakOrQueue("ready", result)
         }
     }
 
@@ -177,14 +173,13 @@ private class WorkoutCueChannel(
         ttsReady = true
         pendingSpeech?.let { pending ->
             pendingSpeech = null
-            speak(pending.text, pending.result, pending.haptic)
+            speak(pending.text, pending.result)
         }
     }
 
     private fun speakOrQueue(
         text: String,
         result: MethodChannel.Result,
-        haptic: Boolean,
     ) {
         val failure = ttsFailure
         if (disposed) {
@@ -192,25 +187,24 @@ private class WorkoutCueChannel(
         } else if (failure != null) {
             result.error(failure.first, failure.second, null)
         } else if (ttsReady) {
-            speak(text, result, haptic)
+            speak(text, result)
         } else {
             pendingSpeech?.result?.error(
                 "cue_superseded",
                 "A newer workout cue replaced this cue",
                 null,
             )
-            pendingSpeech = PendingSpeech(text, result, haptic)
+            pendingSpeech = PendingSpeech(text, result)
         }
     }
 
     private fun speak(
         text: String,
         methodResult: MethodChannel.Result,
-        haptic: Boolean,
     ) {
         requestAudioFocus()
         val utteranceId = "workout-cue-${UUID.randomUUID()}"
-        utteranceResults[utteranceId] = UtteranceResult(methodResult, haptic)
+        utteranceResults[utteranceId] = UtteranceResult(methodResult)
         val speechResult =
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, Bundle(), utteranceId)
         if (speechResult != TextToSpeech.SUCCESS) {
@@ -234,7 +228,6 @@ private class WorkoutCueChannel(
             val pending = utteranceResults.remove(utteranceId)
             if (pending != null) {
                 if (error == null) {
-                    if (pending.haptic) vibrate()
                     pending.result.success(null)
                 } else {
                     pending.result.error("tts_utterance_failed", error, null)

@@ -28,7 +28,8 @@ void main() {
       channel: channel,
     ).fire(cueText: '12 reps', sound: TimerSound.tts, haptic: true);
 
-    expect(delivered, isTrue);
+    expect(delivered.delivered, isTrue);
+    expect(delivered.hapticDelivered, isTrue);
     expect(received?.method, 'fire');
     expect(received?.arguments, {
       'cueText': '12 reps',
@@ -44,9 +45,23 @@ void main() {
         channel: channel,
       ).fire(cueText: null, sound: TimerSound.chime, haptic: false);
 
-      expect(delivered, isFalse);
+      expect(delivered.delivered, isFalse);
+      expect(delivered.hapticDelivered, isFalse);
     },
   );
+
+  test('does not repeat a haptic after a native speech failure', () async {
+    messenger.setMockMethodCallHandler(channel, (_) async {
+      throw PlatformException(code: 'tts_failed');
+    });
+
+    final delivered = await WorkoutBackgroundCue(
+      channel: channel,
+    ).fire(cueText: '12 reps', sound: TimerSound.tts, haptic: true);
+
+    expect(delivered.delivered, isFalse);
+    expect(delivered.hapticDelivered, isTrue);
+  });
 
   test('explicit settings do not require UI-isolate preferences', () async {
     final delivered = await WorkoutCueService.fire(
