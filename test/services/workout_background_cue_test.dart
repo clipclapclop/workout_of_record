@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_of_record/db/tables/enums.dart';
 import 'package:workout_of_record/services/workout_background_cue.dart';
+import 'package:workout_of_record/services/workout_cue_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -36,11 +37,22 @@ void main() {
     });
   });
 
-  test('reports unavailable native delivery for UI fallback', () async {
-    final delivered = await WorkoutBackgroundCue(
-      channel: channel,
-    ).fire(cueText: null, sound: TimerSound.chime, haptic: false);
+  test(
+    'reports unavailable native delivery for task-isolate fallback',
+    () async {
+      final delivered = await WorkoutBackgroundCue(
+        channel: channel,
+      ).fire(cueText: null, sound: TimerSound.chime, haptic: false);
 
-    expect(delivered, isFalse);
+      expect(delivered, isFalse);
+    },
+  );
+
+  test('explicit settings do not require UI-isolate preferences', () async {
+    await WorkoutCueService.fire(
+      null,
+      soundOverride: TimerSound.silent,
+      hapticOverride: false,
+    );
   });
 }

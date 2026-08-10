@@ -96,10 +96,6 @@ class WorkoutForegroundService {
       case 'cue':
         _cuedByBackground = true;
         return;
-      case 'cueFallback':
-        _cuedByBackground = true;
-        WorkoutCueService.fire(map['cueText'] as String?);
-        return;
     }
   }
 
@@ -232,8 +228,17 @@ class _WorkoutTaskHandler implements TaskHandler {
         sound: tick.sound,
         haptic: tick.haptic,
       );
+      if (!delivered) {
+        // The foreground task has its own Flutter engine, so this fallback does
+        // not depend on the paused UI isolate either.
+        await WorkoutCueService.fire(
+          tick.cueText,
+          soundOverride: tick.sound,
+          hapticOverride: tick.haptic,
+        );
+      }
       FlutterForegroundTask.sendDataToMain({
-        'type': delivered ? 'cue' : 'cueFallback',
+        'type': 'cue',
         'cueText': tick.cueText,
       });
     }

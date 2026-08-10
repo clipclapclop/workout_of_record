@@ -66,9 +66,13 @@ class WorkoutCueService {
   /// All TTS calls are wrapped in try/catch so a missing engine (e.g. on
   /// GrapheneOS without Google TTS) degrades to haptic-only instead of
   /// crashing the workout.
-  static Future<void> fire(String? cueText) async {
-    final haptic = AppPreferences.getTimerHaptic();
-    final sound = AppPreferences.getTimerSound();
+  static Future<void> fire(
+    String? cueText, {
+    TimerSound? soundOverride,
+    bool? hapticOverride,
+  }) async {
+    final haptic = hapticOverride ?? AppPreferences.getTimerHaptic();
+    final sound = soundOverride ?? AppPreferences.getTimerSound();
 
     if (haptic) {
       try {
