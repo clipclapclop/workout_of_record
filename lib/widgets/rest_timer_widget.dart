@@ -2,8 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../app_preferences.dart';
+import '../db/tables/enums.dart';
 import '../services/workout_cue_service.dart';
 import '../services/workout_foreground_service.dart';
+import '../services/workout_get_ready_chime.dart';
 import 'rest_timer_controller.dart';
 
 /// Displays a countdown rest timer with stop / reset / per-workout-toggle controls.
@@ -34,11 +37,13 @@ class RestTimerWidget extends StatefulWidget {
 class _RestTimerWidgetState extends State<RestTimerWidget> {
   Timer? _ticker;
   DateTime? _zeroObservedAt;
+  int? _previousRemainingMs;
 
   @override
   void initState() {
     super.initState();
     widget.controller.addListener(_onControllerChanged);
+    _previousRemainingMs = widget.controller.remainingMs;
     _ticker = Timer.periodic(const Duration(milliseconds: 200), _tick);
   }
 
@@ -48,6 +53,7 @@ class _RestTimerWidgetState extends State<RestTimerWidget> {
     if (old.controller != widget.controller) {
       old.controller.removeListener(_onControllerChanged);
       widget.controller.addListener(_onControllerChanged);
+      _previousRemainingMs = widget.controller.remainingMs;
     }
   }
 
@@ -65,6 +71,7 @@ class _RestTimerWidgetState extends State<RestTimerWidget> {
   void _tick(Timer _) {
     if (!mounted) return;
     final ctrl = widget.controller;
+    _playGetReadyChimeIfNeeded(ctrl);
     if (ctrl.remainingMs > 0 || !ctrl.isRunning) _zeroObservedAt = null;
 
     // The foreground task owns cue delivery once it is ready. This avoids a
@@ -91,6 +98,26 @@ class _RestTimerWidgetState extends State<RestTimerWidget> {
       }
     }
     if (mounted) setState(() {});
+  }
+
+  void _playGetReadyChimeIfNeeded(RestTimerController ctrl) {
+    final remainingMs = ctrl.remainingMs;
+    final previousRemainingMs = _previousRemainingMs;
+    _previousRemainingMs = remainingMs;
+
+    if (!ctrl.isRunning ||
+        previousRemainingMs == null ||
+        remainingMs > previousRemainingMs ||
+        WorkoutForegroundService.taskReady ||
+        !AppPreferences.getTimerGetReadyChimes() ||
+        AppPreferences.getTimerSound() == TimerSound.silent) {
+      return;
+    }
+
+    final chime = getReadyChimeCrossed(previousRemainingMs, remainingMs);
+    if (chime != null) {
+      unawaited(WorkoutGetReadyChimeService.play(chime));
+    }
   }
 
   String _format(int ms) {

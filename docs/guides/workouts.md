@@ -19,7 +19,7 @@ Each set displays the fields required by its movement, such as reps, weight, or 
 
 Changing a set's weight carries that weight into its later unchecked sets. Repetition changes apply only to the edited set.
 
-When the rest timer ends, its spoken cue uses the rightmost planned value shown for the next set. If the planner left that value empty, the cue says “ready” instead of announcing an earlier value from the row. On Android, an active workout delivers the cue and optional vibration from its foreground workout service, so switching to another app does not postpone the alert until Workout of Record is visible again.
+When enabled in **Settings → Rest Timer**, get-ready chimes play a lower tone at 10 seconds remaining and a higher tone at 5 seconds without changing the displayed countdown. Silent alert mode suppresses both tones. When the rest timer ends, its spoken cue uses the rightmost planned value shown for the next set. If the planner left that value empty, the cue says “ready” instead of announcing an earlier value from the row. On Android, an active workout delivers the get-ready chimes, final cue, and optional vibration from its foreground workout service, so switching to another app does not postpone the alerts until Workout of Record is visible again.
 
 Exercises and prescribed sets can be skipped when the app requests a reason. Skipping clears completed values so the history does not imply the work was performed. The skip reason remains in history, and later planning falls back to earlier completed values instead of treating a skipped exercise as a new exercise. User-added sets can be removed. Required exercise and muscle-group feedback must be completed before the workout can advance or finish.
 

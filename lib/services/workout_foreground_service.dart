@@ -3,6 +3,7 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import '../db/tables/enums.dart';
 import 'workout_background_cue.dart';
 import 'workout_cue_service.dart';
+import 'workout_get_ready_chime.dart';
 
 // ── Background task entry point ────────────────────────────────────────────────
 // Must be a top-level function annotated with @pragma('vm:entry-point').
@@ -18,7 +19,8 @@ void _workoutTaskCallback() {
 ///
 /// Responsibilities:
 ///   1. Shows a live-updating notification (exercise name + rest countdown).
-///   2. Fires the rest-timer cue (TTS / haptic) when the countdown expires
+///   2. Plays optional get-ready chimes at 10 and 5 seconds remaining.
+///   3. Fires the rest-timer cue (TTS / haptic) when the countdown expires
 ///      while the app is backgrounded.
 ///
 /// Double-cue prevention:
@@ -179,6 +181,7 @@ class WorkoutForegroundService {
     String? setInfo,
     required TimerSound sound,
     required bool haptic,
+    required bool getReadyChimes,
     DateTime? timerEndsAt,
   }) {
     _latestTaskState = {
@@ -188,6 +191,7 @@ class WorkoutForegroundService {
       'setInfo': setInfo,
       'sound': sound.name,
       'haptic': haptic,
+      'getReadyChimes': getReadyChimes,
       'timerEndsAtMs': timerEndsAt?.millisecondsSinceEpoch,
     };
     _sendLatestTaskState();
@@ -197,15 +201,22 @@ class WorkoutForegroundService {
   static void updateCueSettings({
     required TimerSound sound,
     required bool haptic,
+    required bool getReadyChimes,
   }) {
     final latest = _latestTaskState;
     if (latest?['type'] == 'update') {
-      _latestTaskState = {...latest!, 'sound': sound.name, 'haptic': haptic};
+      _latestTaskState = {
+        ...latest!,
+        'sound': sound.name,
+        'haptic': haptic,
+        'getReadyChimes': getReadyChimes,
+      };
     }
     FlutterForegroundTask.sendDataToTask({
       'type': 'cueSettings',
       'sound': sound.name,
       'haptic': haptic,
+      'getReadyChimes': getReadyChimes,
     });
   }
 
@@ -226,7 +237,22 @@ class WorkoutForegroundService {
 
   static void _sendLatestTaskState() {
     final state = _latestTaskState;
-    if (state != null) FlutterForegroundTask.sendDataToTask(state);
+    if (state == null) return;
+
+    if (state['type'] == 'update' && state['timerEndsAtMs'] is int) {
+      final endsAt = DateTime.fromMillisecondsSinceEpoch(
+        state['timerEndsAtMs'] as int,
+      );
+      FlutterForegroundTask.sendDataToTask({
+        ...state,
+        'timerRemainingMsAtUpdate': endsAt
+            .difference(DateTime.now())
+            .inMilliseconds
+            .clamp(0, 5999000),
+      });
+      return;
+    }
+    FlutterForegroundTask.sendDataToTask(state);
   }
 
   /// Called by the widget after it fires the cue, so the background task skips.
@@ -255,6 +281,10 @@ class _WorkoutTaskHandler implements TaskHandler {
   Future<void> onRepeatEvent(DateTime timestamp) async {
     _sendTaskSignal('heartbeat', timestamp);
     final tick = _state.tick(timestamp);
+    final getReadyChime = tick.getReadyChime;
+    if (getReadyChime != null) {
+      await WorkoutGetReadyChimeService.play(getReadyChime);
+    }
     if (tick.shouldCue) {
       final nativeDelivery = await WorkoutBackgroundCue.instance.fire(
         cueText: tick.cueText,
@@ -324,7 +354,9 @@ class WorkoutTimerTaskState {
   String? _setInfo;
   TimerSound _sound = TimerSound.tts;
   bool _haptic = true;
+  bool _getReadyChimes = false;
   DateTime? _timerEndsAt;
+  int? _previousRemainingMs;
   bool _cuedByWidget = false;
   bool _ready = false;
 
@@ -336,25 +368,30 @@ class WorkoutTimerTaskState {
         _setInfo = map['setInfo'] as String?;
         _sound = _parseSound(map['sound']);
         _haptic = map['haptic'] as bool? ?? true;
+        _getReadyChimes = map['getReadyChimes'] as bool? ?? false;
         final ms = map['timerEndsAtMs'] as int?;
         _timerEndsAt = ms == null
             ? null
             : DateTime.fromMillisecondsSinceEpoch(ms);
+        _previousRemainingMs = map['timerRemainingMsAtUpdate'] as int?;
         _cuedByWidget = false;
         _ready = false;
         return;
       case 'cueSettings':
         _sound = _parseSound(map['sound']);
         _haptic = map['haptic'] as bool? ?? true;
+        _getReadyChimes = map['getReadyChimes'] as bool? ?? false;
         return;
       case 'clearTimer':
         _timerEndsAt = null;
+        _previousRemainingMs = null;
         _cuedByWidget = false;
         _ready = false;
         return;
       case 'widgetCued':
         _cuedByWidget = true;
         _timerEndsAt = null;
+        _previousRemainingMs = null;
         _ready = true;
         return;
     }
@@ -363,6 +400,22 @@ class WorkoutTimerTaskState {
   WorkoutTimerTaskTick tick(DateTime now) {
     final remaining = _timerEndsAt?.difference(now);
     final expired = remaining != null && remaining.inMicroseconds <= 0;
+    final remainingMs = remaining?.inMilliseconds;
+    final previousRemainingMs = _previousRemainingMs;
+
+    GetReadyChime? getReadyChime;
+    if (!expired &&
+        remainingMs != null &&
+        previousRemainingMs != null &&
+        _getReadyChimes &&
+        _sound != TimerSound.silent) {
+      getReadyChime = getReadyChimeCrossed(
+        previousRemainingMs,
+        remainingMs,
+      );
+    }
+    _previousRemainingMs = expired ? null : remainingMs;
+
     final shouldCue = expired && !_cuedByWidget;
     if (shouldCue) {
       _timerEndsAt = null;
@@ -393,6 +446,7 @@ class WorkoutTimerTaskState {
 
     return WorkoutTimerTaskTick(
       shouldCue: shouldCue,
+      getReadyChime: getReadyChime,
       cueText: _cueText,
       sound: _sound,
       haptic: _haptic,
@@ -414,6 +468,7 @@ class WorkoutTimerTaskState {
 class WorkoutTimerTaskTick {
   const WorkoutTimerTaskTick({
     required this.shouldCue,
+    required this.getReadyChime,
     required this.cueText,
     required this.sound,
     required this.haptic,
@@ -422,6 +477,7 @@ class WorkoutTimerTaskTick {
   });
 
   final bool shouldCue;
+  final GetReadyChime? getReadyChime;
   final String? cueText;
   final TimerSound sound;
   final bool haptic;

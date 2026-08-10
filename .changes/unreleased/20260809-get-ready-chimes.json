@@ -1,0 +1,15 @@
+{
+  "id": "get-ready-chimes",
+  "summary": "Add optional, pitch-distinct rest-timer warnings at 10 and 5 seconds so users can prepare for the next set without confusing spoken numbers for workout targets.",
+  "audience": "user",
+  "releaseNote": "The rest timer can now play a low get-ready chime at 10 seconds and a higher chime at 5 seconds, including while the app is in the background on Android.",
+  "docs": {
+    "impact": "updated",
+    "paths": [
+      "docs/guides/settings-backups.md",
+      "docs/guides/workouts.md"
+    ],
+    "reason": ""
+  },
+  "screenshots": []
+}

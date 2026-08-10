@@ -78,10 +78,11 @@ class AppPreferences {
   static bool getUnitsMetric() => _prefs.getBool(_kSettingsUnitsMetric) ?? false;
   static Future<void> setUnitsMetric(bool v) => _prefs.setBool(_kSettingsUnitsMetric, v);
 
-  static Future<String?> getApiKey() => _secure.read(key: _kSettingsApiKey);
+  static Future<String?> getApiKey() =>
+      _secure.read(key: _kSettingsCredential);
   static Future<void> setApiKey(String? v) => v == null
-      ? _secure.delete(key: _kSettingsApiKey)
-      : _secure.write(key: _kSettingsApiKey, value: v);
+      ? _secure.delete(key: _kSettingsCredential)
+      : _secure.write(key: _kSettingsCredential, value: v);
 
   // ── AI ─────────────────────────────────────────────────────────────────────
 
@@ -172,6 +173,11 @@ Keep answers focused and practical. When suggesting changes, be specific about e
   static bool getTimerKeepAwake() => _prefs.getBool(_kTimerKeepAwake) ?? false;
   static Future<void> setTimerKeepAwake(bool v) => _prefs.setBool(_kTimerKeepAwake, v);
 
+  static bool getTimerGetReadyChimes() =>
+      _prefs.getBool(_timerGetReadyChimesPreference) ?? false;
+  static Future<void> setTimerGetReadyChimes(bool v) =>
+      _prefs.setBool(_timerGetReadyChimesPreference, v);
+
   // ── Backup ─────────────────────────────────────────────────────────────────
 
   static bool getBackupEnabled() => _prefs.getBool(_kBackupEnabled) ?? false;
@@ -210,7 +216,7 @@ Keep answers focused and practical. When suggesting changes, be specific about e
   static const _kProfileTrainingStartDate = 'profile_training_start_date';
   static const _kSettingsAiEnabled = 'settings_ai_enabled';
   static const _kSettingsUnitsMetric = 'settings_units_metric';
-  static const _kSettingsApiKey = 'settings_api_key';
+  static const _kSettingsCredential = 'settings_api_key';
   static const _kAiModel = 'ai_model';
   static const _kAiCreditId = 'ai_credit_id';
   static const _kAiRecommendationPrompt = 'ai_recommendation_prompt';
@@ -224,6 +230,7 @@ Keep answers focused and practical. When suggesting changes, be specific about e
   static const _kTimerSound = 'timer_sound';
   static const _kTimerHaptic = 'timer_haptic';
   static const _kTimerKeepAwake = 'timer_keep_awake';
+  static const _timerGetReadyChimesPreference = 'timer_get_ready_chimes';
   static const _kBackupEnabled = 'backup_enabled';
   static const _kAutoBackupEnabled = 'auto_backup_enabled';
   static const _kBackupDirectoryPath = 'backup_directory_path';

@@ -29,6 +29,7 @@ class WorkoutApplication : Application(), FlutterForegroundTaskLifecycleListener
     // the activity/UI engine does not invoke this listener. The plugin destroys
     // the current task engine before creating its replacement.
     private var foregroundTaskCueChannel: WorkoutCueChannel? = null
+    private var foregroundTaskChimeChannel: WorkoutChimeChannel? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -39,6 +40,8 @@ class WorkoutApplication : Application(), FlutterForegroundTaskLifecycleListener
         FlutterForegroundTaskPlugin.removeTaskLifecycleListener(this)
         foregroundTaskCueChannel?.dispose()
         foregroundTaskCueChannel = null
+        foregroundTaskChimeChannel?.dispose()
+        foregroundTaskChimeChannel = null
         super.onTerminate()
     }
 
@@ -46,6 +49,10 @@ class WorkoutApplication : Application(), FlutterForegroundTaskLifecycleListener
         foregroundTaskCueChannel?.dispose()
         foregroundTaskCueChannel = flutterEngine?.let {
             WorkoutCueChannel(applicationContext, it.dartExecutor.binaryMessenger)
+        }
+        foregroundTaskChimeChannel?.dispose()
+        foregroundTaskChimeChannel = flutterEngine?.let {
+            WorkoutChimeChannel(applicationContext, it.dartExecutor.binaryMessenger)
         }
     }
 
@@ -58,6 +65,8 @@ class WorkoutApplication : Application(), FlutterForegroundTaskLifecycleListener
     override fun onEngineWillDestroy() {
         foregroundTaskCueChannel?.dispose()
         foregroundTaskCueChannel = null
+        foregroundTaskChimeChannel?.dispose()
+        foregroundTaskChimeChannel = null
     }
 }
 

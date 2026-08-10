@@ -16,6 +16,7 @@ class _TimerSettingsScreenState extends State<TimerSettingsScreen> {
   late TimerSound _timerSound;
   late bool _timerHaptic;
   late bool _timerKeepAwake;
+  late bool _timerGetReadyChimes;
   late int _timerDefaultSeconds;
   late final TextEditingController _timerSecondsCtrl;
 
@@ -23,6 +24,7 @@ class _TimerSettingsScreenState extends State<TimerSettingsScreen> {
   late TimerSound _initTimerSound;
   late bool _initTimerHaptic;
   late bool _initTimerKeepAwake;
+  late bool _initTimerGetReadyChimes;
   late int _initTimerDefaultSeconds;
 
   /// null = still checking, true = engine present, false = no engine.
@@ -33,7 +35,8 @@ class _TimerSettingsScreenState extends State<TimerSettingsScreen> {
       _timerDefaultSeconds != _initTimerDefaultSeconds ||
       _timerSound != _initTimerSound ||
       _timerHaptic != _initTimerHaptic ||
-      _timerKeepAwake != _initTimerKeepAwake;
+      _timerKeepAwake != _initTimerKeepAwake ||
+      _timerGetReadyChimes != _initTimerGetReadyChimes;
 
   @override
   void initState() {
@@ -42,6 +45,7 @@ class _TimerSettingsScreenState extends State<TimerSettingsScreen> {
     _timerSound = AppPreferences.getTimerSound();
     _timerHaptic = AppPreferences.getTimerHaptic();
     _timerKeepAwake = AppPreferences.getTimerKeepAwake();
+    _timerGetReadyChimes = AppPreferences.getTimerGetReadyChimes();
     _timerDefaultSeconds = AppPreferences.getTimerDefaultSeconds();
     _timerSecondsCtrl =
         TextEditingController(text: _timerDefaultSeconds.toString());
@@ -50,6 +54,7 @@ class _TimerSettingsScreenState extends State<TimerSettingsScreen> {
     _initTimerSound = _timerSound;
     _initTimerHaptic = _timerHaptic;
     _initTimerKeepAwake = _timerKeepAwake;
+    _initTimerGetReadyChimes = _timerGetReadyChimes;
     _initTimerDefaultSeconds = _timerDefaultSeconds;
 
     WorkoutCueService.isAvailable().then((ok) {
@@ -63,17 +68,19 @@ class _TimerSettingsScreenState extends State<TimerSettingsScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Text-to-speech engine'),
         content: const Text(
-          'The rest-timer alert (both "read value aloud" and "chime") is '
-          'spoken by your phone\'s text-to-speech engine — this app does not '
-          'play its own audio file.\n\n'
+          'The final rest-timer alert (both "read value aloud" and "chime") '
+          'is spoken by your phone\'s text-to-speech engine. The app does not '
+          'play its own audio file for that final alert.\n\n'
           'On GrapheneOS and other de-Googled Android builds there is no '
-          'TTS engine installed by default, so the timer will be silent '
+          'TTS engine installed by default, so the final alert will be silent '
           '(haptic still works).\n\n'
           'Fix: install a TTS engine and select it under '
           'Android Settings → System → Languages → Text-to-speech output. '
           'Free options on F-Droid:\n'
           '  • RHVoice — offline, natural-sounding\n'
-          '  • eSpeak NG — tiny, robotic',
+          '  • eSpeak NG — tiny, robotic\n\n'
+          'Get-ready chimes are built into the app and do not require a '
+          'text-to-speech engine.',
         ),
         actions: [
           TextButton(
@@ -97,15 +104,18 @@ class _TimerSettingsScreenState extends State<TimerSettingsScreen> {
     await AppPreferences.setTimerSound(_timerSound);
     await AppPreferences.setTimerHaptic(_timerHaptic);
     await AppPreferences.setTimerKeepAwake(_timerKeepAwake);
+    await AppPreferences.setTimerGetReadyChimes(_timerGetReadyChimes);
     WorkoutForegroundService.updateCueSettings(
       sound: _timerSound,
       haptic: _timerHaptic,
+      getReadyChimes: _timerGetReadyChimes,
     );
 
     _initTimerEnabled = _timerEnabled;
     _initTimerSound = _timerSound;
     _initTimerHaptic = _timerHaptic;
     _initTimerKeepAwake = _timerKeepAwake;
+    _initTimerGetReadyChimes = _timerGetReadyChimes;
     _initTimerDefaultSeconds = _timerDefaultSeconds;
   }
 
@@ -249,8 +259,9 @@ class _TimerSettingsScreenState extends State<TimerSettingsScreen> {
                                   Expanded(
                                     child: Text(
                                       'No text-to-speech engine found. The '
-                                      'timer alert will be silent. Tap for '
-                                      'details.',
+                                      'final timer alert will be silent. '
+                                      'Built-in get-ready chimes do not '
+                                      'require TTS. Tap for details.',
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodySmall,
@@ -281,6 +292,16 @@ class _TimerSettingsScreenState extends State<TimerSettingsScreen> {
                           ),
                         ],
                       ),
+                    ),
+                    SwitchListTile(
+                      title: const Text('Get-ready chimes'),
+                      subtitle: const Text(
+                        'Low tone at 10 seconds, then a higher tone at 5. '
+                        'Suppressed when alert sound is Silent.',
+                      ),
+                      value: _timerGetReadyChimes,
+                      onChanged: (v) =>
+                          setState(() => _timerGetReadyChimes = v),
                     ),
                     const Divider(height: 1),
                     SwitchListTile(

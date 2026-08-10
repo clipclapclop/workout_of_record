@@ -68,6 +68,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   void initState() {
     super.initState();
     _timerController = RestTimerController(durationSeconds: 0);
+    _timerController.addListener(_onTimerControllerChanged);
     unawaited(_initialize());
   }
 
@@ -105,6 +106,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     for (final s in _setStates.values) {
       s.dispose();
     }
+    _timerController.removeListener(_onTimerControllerChanged);
     _timerController.dispose();
     WakelockPlus.disable();
     WorkoutForegroundService.stop();
@@ -224,6 +226,10 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     }
   }
 
+  void _onTimerControllerChanged() {
+    _pushTimerToService();
+  }
+
   void _pushTimerToService() {
     if (_timerActiveExId == null || _data == null) {
       WorkoutForegroundService.clearTimer();
@@ -247,6 +253,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       setInfo: _setInfoText(activeEx),
       sound: AppPreferences.getTimerSound(),
       haptic: AppPreferences.getTimerHaptic(),
+      getReadyChimes: AppPreferences.getTimerGetReadyChimes(),
       timerEndsAt: DateTime.now()
           .add(Duration(milliseconds: _timerController.remainingMs)),
     );
