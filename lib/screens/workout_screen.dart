@@ -80,6 +80,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       return;
     }
     if (!serviceReady) {
+      // Keep the latest timer state queued; a late task heartbeat replays it.
+      _pushTimerToService();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(

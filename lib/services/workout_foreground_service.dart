@@ -34,6 +34,7 @@ class WorkoutForegroundService {
   static bool _cuedByBackground = false;
   static bool _taskReady = false;
   static DateTime? _lastTaskSignalAt;
+  static Map<String, dynamic>? _latestTaskState;
 
   static bool get cuedByBackground => _cuedByBackground;
   static bool get taskReady {
@@ -79,11 +80,13 @@ class WorkoutForegroundService {
     switch (map['type'] as String?) {
       case 'ready':
       case 'heartbeat':
+        final wasReady = taskReady;
         _taskReady = true;
         final sentAtMs = map['sentAtMs'] as int?;
         _lastTaskSignalAt = sentAtMs == null
             ? DateTime.now()
             : DateTime.fromMillisecondsSinceEpoch(sentAtMs);
+        if (!wasReady && taskReady) _sendLatestTaskState();
         return;
       case 'stopped':
         _taskReady = false;
@@ -133,6 +136,7 @@ class WorkoutForegroundService {
     _cuedByBackground = false;
     _taskReady = false;
     _lastTaskSignalAt = null;
+    _latestTaskState = null;
     await FlutterForegroundTask.stopService();
   }
 
@@ -148,7 +152,7 @@ class WorkoutForegroundService {
     required bool haptic,
     DateTime? timerEndsAt,
   }) {
-    FlutterForegroundTask.sendDataToTask({
+    _latestTaskState = {
       'type': 'update',
       'exerciseName': exerciseName,
       'cueText': cueText,
@@ -156,18 +160,26 @@ class WorkoutForegroundService {
       'sound': sound.name,
       'haptic': haptic,
       'timerEndsAtMs': timerEndsAt?.millisecondsSinceEpoch,
-    });
+    };
+    _sendLatestTaskState();
   }
 
   /// Tell the background that there is no active timer (e.g., between exercises).
   static void clearTimer() {
     _cuedByBackground = false;
-    FlutterForegroundTask.sendDataToTask({'type': 'clearTimer'});
+    _latestTaskState = {'type': 'clearTimer'};
+    _sendLatestTaskState();
+  }
+
+  static void _sendLatestTaskState() {
+    final state = _latestTaskState;
+    if (state != null) FlutterForegroundTask.sendDataToTask(state);
   }
 
   /// Called by the widget after it fires the cue, so the background task skips.
   static void notifyWidgetCued() {
-    FlutterForegroundTask.sendDataToTask({'type': 'widgetCued'});
+    _latestTaskState = {'type': 'widgetCued'};
+    _sendLatestTaskState();
   }
 
   /// Clear the "background cued" flag. Call whenever a new timer starts.
