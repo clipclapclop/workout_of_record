@@ -33,6 +33,7 @@ class RestTimerWidget extends StatefulWidget {
 
 class _RestTimerWidgetState extends State<RestTimerWidget> {
   Timer? _ticker;
+  DateTime? _zeroObservedAt;
 
   @override
   void initState() {
@@ -64,13 +65,27 @@ class _RestTimerWidgetState extends State<RestTimerWidget> {
   void _tick(Timer _) {
     if (!mounted) return;
     final ctrl = widget.controller;
-    // Fire cue once when the running timer first hits zero.
+    if (ctrl.remainingMs > 0 || !ctrl.isRunning) _zeroObservedAt = null;
+
+    // The foreground task owns cue delivery once it is ready. This avoids a
+    // race where both isolates speak at zero. Keep a short UI fallback for a
+    // task that was stopped unexpectedly while the app remains visible.
     if (ctrl.isRunning && ctrl.remainingMs <= 0 && !ctrl.cued) {
-      ctrl.markCued(); // stops ticking, sets cued=true, notifies
       if (WorkoutForegroundService.cuedByBackground) {
-        // Background already fired the cue — skip TTS/haptic but still stop the ticker.
+        ctrl.markCued();
         WorkoutForegroundService.clearCued();
+        _zeroObservedAt = null;
+      } else if (WorkoutForegroundService.taskReady) {
+        _zeroObservedAt ??= DateTime.now();
+        if (DateTime.now().difference(_zeroObservedAt!) >=
+            const Duration(seconds: 3)) {
+          ctrl.markCued();
+          WorkoutCueService.fire(widget.cueText);
+          WorkoutForegroundService.notifyWidgetCued();
+          _zeroObservedAt = null;
+        }
       } else {
+        ctrl.markCued();
         WorkoutCueService.fire(widget.cueText);
         WorkoutForegroundService.notifyWidgetCued();
       }

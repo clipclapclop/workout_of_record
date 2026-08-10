@@ -12,7 +12,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <application
         android:label="Workout of Record"
-        android:name="${applicationName}"
+        android:name=".WorkoutApplication"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
@@ -56,6 +56,9 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE"/>
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

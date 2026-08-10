@@ -1,0 +1,12 @@
+{
+  "id": "reliable-background-timer-cues",
+  "summary": "Deliver Android rest-timer speech and vibration from the foreground workout task instead of depending on the backgrounded UI isolate.",
+  "audience": "user",
+  "releaseNote": "Rest-timer speech and vibration now fire on Android while another app is in front, rather than waiting for Workout of Record to become visible again.",
+  "docs": {
+    "impact": "updated",
+    "paths": ["docs/guides/workouts.md"],
+    "reason": ""
+  },
+  "screenshots": []
+}

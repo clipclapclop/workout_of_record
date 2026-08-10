@@ -68,8 +68,20 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   void initState() {
     super.initState();
     _timerController = RestTimerController(durationSeconds: 0);
-    _load();
-    WorkoutForegroundService.start();
+    unawaited(_initialize());
+  }
+
+  Future<void> _initialize() async {
+    final serviceStarted = WorkoutForegroundService.start();
+    await _load();
+    await serviceStarted;
+    if (!mounted) {
+      await WorkoutForegroundService.stop();
+      return;
+    }
+    // The initial update may have raced the foreground task's Dart engine.
+    // Resend after its readiness handshake completes.
+    _pushTimerToService();
   }
 
   @override
@@ -217,6 +229,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       exerciseName: activeEx.movement.name,
       cueText: _timerCueText,
       setInfo: _setInfoText(activeEx),
+      sound: AppPreferences.getTimerSound(),
+      haptic: AppPreferences.getTimerHaptic(),
       timerEndsAt: DateTime.now()
           .add(Duration(milliseconds: _timerController.remainingMs)),
     );
