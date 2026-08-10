@@ -131,7 +131,7 @@ class WorkoutForegroundService {
     // fails safely on devices that impose restrictions beyond notification
     // permission handling.
     var running = false;
-    for (var attempt = 0; attempt < 10 && !running; attempt++) {
+    for (var attempt = 0; attempt < 100 && !running; attempt++) {
       running = await FlutterForegroundTask.isRunningService;
       if (!running) {
         await Future<void>.delayed(const Duration(milliseconds: 100));
