@@ -12,6 +12,7 @@ import '../db/planning.dart';
 import '../db/tables/enums.dart';
 import '../db/workout_data.dart';
 import '../services/backup_service.dart';
+import '../services/workout_cue_text.dart';
 import '../services/workout_foreground_service.dart';
 import '../widgets/app_nav_menu.dart';
 import 'chat_screen.dart';
@@ -142,24 +143,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       }
     }
     if (next?.planned == null) return null;
-    final ps = next!.planned!;
-    final m = exercise.movement;
-    final metric = AppPreferences.getUnitsMetric();
-    if (m.isRequiredReps && ps.reps != null) {
-      return '${ps.reps} reps';
-    }
-    if (m.isRequiredDistance && ps.distance != null) {
-      final unit = metric ? 'kilometers' : 'miles';
-      return '${_fmt(ps.distance!)} $unit';
-    }
-    if (m.isRequiredTime && ps.time != null) {
-      return '${_fmt(ps.time!)} seconds';
-    }
-    if (m.isRequiredWeight && ps.weight != null) {
-      final unit = metric ? 'kilograms' : 'pounds';
-      return '${_fmt(ps.weight!)} $unit';
-    }
-    return null;
+    return buildWorkoutCueText(
+      exercise.movement,
+      next!.planned!,
+      metric: AppPreferences.getUnitsMetric(),
+    );
   }
 
   void _syncTimer() {
@@ -552,7 +540,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                 onSelectionChanged: (v) {
                   setSheet(() => effort = v.first);
                   effortSet = true;
-                  if (pumpSet && volumeSet) Navigator.pop(ctx, (effort!, pump!, volume!));
+                  if (pumpSet && volumeSet) {
+                    Navigator.pop(ctx, (effort!, pump!, volume!));
+                  }
                 },
                 showSelectedIcon: false,
               ),
@@ -573,7 +563,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                 onSelectionChanged: (v) {
                   setSheet(() => pump = v.first);
                   pumpSet = true;
-                  if (effortSet && volumeSet) Navigator.pop(ctx, (effort!, pump!, volume!));
+                  if (effortSet && volumeSet) {
+                    Navigator.pop(ctx, (effort!, pump!, volume!));
+                  }
                 },
                 showSelectedIcon: false,
               ),
@@ -594,7 +586,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                 onSelectionChanged: (v) {
                   setSheet(() => volume = v.first);
                   volumeSet = true;
-                  if (effortSet && pumpSet) Navigator.pop(ctx, (effort!, pump!, volume!));
+                  if (effortSet && pumpSet) {
+                    Navigator.pop(ctx, (effort!, pump!, volume!));
+                  }
                 },
                 showSelectedIcon: false,
               ),
@@ -984,7 +978,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     }
 
     String setLine(CompletedSet s, Movement m) {
-      if (s.skipReason != null) return 'Skipped — ${_skipReasonLabel(s.skipReason!)}';
+      if (s.skipReason != null) {
+        return 'Skipped — ${_skipReasonLabel(s.skipReason!)}';
+      }
       final parts = <String>[];
       if (m.isRequiredWeight) {
         parts.add(s.weight != null ? '${fmt(s.weight)} $weightUnit' : '—');

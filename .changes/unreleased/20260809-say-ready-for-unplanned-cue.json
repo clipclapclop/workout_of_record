@@ -1,0 +1,12 @@
+{
+  "id": "say-ready-for-unplanned-cue",
+  "summary": "Make rest-timer speech follow the rightmost planned set field without falling back to an earlier value when that field is empty.",
+  "audience": "user",
+  "releaseNote": "The rest timer now says “ready” when the next set’s rightmost value was not pre-filled, rather than announcing an earlier value.",
+  "docs": {
+    "impact": "updated",
+    "paths": ["docs/guides/workouts.md"],
+    "reason": ""
+  },
+  "screenshots": []
+}

@@ -19,6 +19,8 @@ Each set displays the fields required by its movement, such as reps, weight, or 
 
 Changing a set's weight carries that weight into its later unchecked sets. Repetition changes apply only to the edited set.
 
+When the rest timer ends, its spoken cue uses the rightmost planned value shown for the next set. If the planner left that value empty, the cue says “ready” instead of announcing an earlier value from the row.
+
 Exercises and prescribed sets can be skipped when the app requests a reason. Skipping clears completed values so the history does not imply the work was performed. The skip reason remains in history, and later planning falls back to earlier completed values instead of treating a skipped exercise as a new exercise. User-added sets can be removed. Required exercise and muscle-group feedback must be completed before the workout can advance or finish.
 
 ## Finish safely
