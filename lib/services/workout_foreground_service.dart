@@ -122,13 +122,10 @@ class WorkoutForegroundService {
     }
 
     // Starting the Android service and creating its Dart task are separate
-    // asynchronous steps. Ping until the task confirms it can receive state,
-    // preventing the first timer update from being dropped during startup.
-    for (var attempt = 0; attempt < 30 && !taskReady; attempt++) {
-      FlutterForegroundTask.sendDataToTask({'type': 'ping'});
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    }
-    return taskReady;
+    // asynchronous steps. Prompt an existing task to identify itself; whether
+    // it starts immediately or later, its first signal replays the latest state.
+    FlutterForegroundTask.sendDataToTask({'type': 'ping'});
+    return true;
   }
 
   /// Stop the foreground service (removes the persistent notification).

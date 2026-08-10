@@ -72,14 +72,14 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   }
 
   Future<void> _initialize() async {
-    final serviceStarted = WorkoutForegroundService.start();
+    final serviceStart = WorkoutForegroundService.start();
     await _load();
-    final serviceReady = await serviceStarted;
+    final serviceStarted = await serviceStart;
     if (!mounted) {
       await WorkoutForegroundService.stop();
       return;
     }
-    if (!serviceReady) {
+    if (!serviceStarted) {
       // Keep the latest timer state queued; a late task heartbeat replays it.
       _pushTimerToService();
       ScaffoldMessenger.of(context).showSnackBar(
