@@ -139,11 +139,13 @@ private class WorkoutCueChannel(
         engine.setAudioAttributes(speechAttributes)
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
-                completeUtterance(utteranceId, null)
+                // Confirm native delivery to Dart, but retain transient audio
+                // focus until speech completes.
+                completeUtterance(utteranceId, null, releaseAudioFocus = false)
             }
 
             override fun onDone(utteranceId: String?) {
-                completeUtterance(utteranceId, null)
+                completeUtterance(utteranceId, null, releaseAudioFocus = true)
             }
 
             @Deprecated("Deprecated in Java")
@@ -197,7 +199,11 @@ private class WorkoutCueChannel(
         }
     }
 
-    private fun completeUtterance(utteranceId: String?, error: String?) {
+    private fun completeUtterance(
+        utteranceId: String?,
+        error: String?,
+        releaseAudioFocus: Boolean = true,
+    ) {
         if (utteranceId == null) return
         mainHandler.post {
             val result = utteranceResults.remove(utteranceId)
@@ -208,7 +214,7 @@ private class WorkoutCueChannel(
                     result.error("tts_utterance_failed", error, null)
                 }
             }
-            abandonAudioFocus()
+            if (releaseAudioFocus) abandonAudioFocus()
         }
     }
 

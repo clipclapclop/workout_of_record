@@ -33,9 +33,15 @@ class WorkoutForegroundService {
   /// background. The timer widget checks this to avoid double-speaking.
   static bool _cuedByBackground = false;
   static bool _taskReady = false;
+  static DateTime? _lastTaskSignalAt;
 
   static bool get cuedByBackground => _cuedByBackground;
-  static bool get taskReady => _taskReady;
+  static bool get taskReady {
+    final signalAt = _lastTaskSignalAt;
+    return _taskReady &&
+        signalAt != null &&
+        DateTime.now().difference(signalAt) <= const Duration(seconds: 3);
+  }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -72,7 +78,16 @@ class WorkoutForegroundService {
     final map = Map<String, dynamic>.from(data);
     switch (map['type'] as String?) {
       case 'ready':
+      case 'heartbeat':
         _taskReady = true;
+        final sentAtMs = map['sentAtMs'] as int?;
+        _lastTaskSignalAt = sentAtMs == null
+            ? DateTime.now()
+            : DateTime.fromMillisecondsSinceEpoch(sentAtMs);
+        return;
+      case 'stopped':
+        _taskReady = false;
+        _lastTaskSignalAt = null;
         return;
       case 'cue':
         _cuedByBackground = true;
@@ -106,17 +121,18 @@ class WorkoutForegroundService {
     // Starting the Android service and creating its Dart task are separate
     // asynchronous steps. Ping until the task confirms it can receive state,
     // preventing the first timer update from being dropped during startup.
-    for (var attempt = 0; attempt < 30 && !_taskReady; attempt++) {
+    for (var attempt = 0; attempt < 30 && !taskReady; attempt++) {
       FlutterForegroundTask.sendDataToTask({'type': 'ping'});
       await Future<void>.delayed(const Duration(milliseconds: 100));
     }
-    return _taskReady;
+    return taskReady;
   }
 
   /// Stop the foreground service (removes the persistent notification).
   static Future<void> stop() async {
     _cuedByBackground = false;
     _taskReady = false;
+    _lastTaskSignalAt = null;
     await FlutterForegroundTask.stopService();
   }
 
@@ -167,11 +183,12 @@ class _WorkoutTaskHandler implements TaskHandler {
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
-    FlutterForegroundTask.sendDataToMain({'type': 'ready'});
+    _sendTaskSignal('ready', timestamp);
   }
 
   @override
   Future<void> onRepeatEvent(DateTime timestamp) async {
+    _sendTaskSignal('heartbeat', timestamp);
     final tick = _state.tick(timestamp);
     if (tick.shouldCue) {
       final delivered = await WorkoutBackgroundCue.instance.fire(
@@ -205,14 +222,23 @@ class _WorkoutTaskHandler implements TaskHandler {
     if (data is! Map) return;
     final map = Map<String, dynamic>.from(data);
     if (map['type'] == 'ping') {
-      FlutterForegroundTask.sendDataToMain({'type': 'ready'});
+      _sendTaskSignal('ready', DateTime.now());
       return;
     }
     _state.receive(map);
   }
 
+  void _sendTaskSignal(String type, DateTime timestamp) {
+    FlutterForegroundTask.sendDataToMain({
+      'type': type,
+      'sentAtMs': timestamp.millisecondsSinceEpoch,
+    });
+  }
+
   @override
-  Future<void> onDestroy(DateTime timestamp) async {}
+  Future<void> onDestroy(DateTime timestamp) async {
+    _sendTaskSignal('stopped', timestamp);
+  }
 }
 
 /// Testable timer state owned by the foreground task isolate.
