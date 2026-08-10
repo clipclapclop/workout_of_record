@@ -1,0 +1,166 @@
+{
+  "version": "1.0.6",
+  "versionCode": 7,
+  "releaseNotes": "docs/releases/1.0.6.md",
+  "docsImpact": "updated",
+  "updatedGuidePaths": [
+    "README.md",
+    "docs/guides/installation.md",
+    "docs/guides/settings-backups.md",
+    "docs/guides/workouts.md",
+    "docs/maintainer/release-validation-1.0.5.md",
+    "docs/maintainer/releasing.md",
+    "docs/releases/index.md",
+    "docs/screenshot-backlog.md"
+  ],
+  "noDocsReason": "",
+  "changeFragments": [
+    "release/fragments/1.0.6/20260807-forgejo-first-releases.json",
+    "release/fragments/1.0.6/20260808-repflow-release-adapter.json",
+    "release/fragments/1.0.6/20260809-active-mesocycle-history.json",
+    "release/fragments/1.0.6/20260809-get-ready-chimes.json",
+    "release/fragments/1.0.6/20260809-preserve-workout-timer-navigation.json",
+    "release/fragments/1.0.6/20260809-reliable-background-timer-cues.json",
+    "release/fragments/1.0.6/20260809-say-ready-for-unplanned-cue.json"
+  ],
+  "commitAuditExceptions": [
+    {
+      "commit": "3270851220664602a12bed6a61651f659e6e8119",
+      "originatingCommit": "266d99bc0e49a40ebe21487c0b3ca8d56cd423ed",
+      "fragment": "release/fragments/1.0.6/20260809-preserve-workout-timer-navigation.json",
+      "reason": "Follow-up navigation fix in the same implementation after its release fragment was recorded."
+    },
+    {
+      "commit": "2490e9a1949cfd066fd160d1ba87573f5eb29174",
+      "originatingCommit": "266d99bc0e49a40ebe21487c0b3ca8d56cd423ed",
+      "fragment": "release/fragments/1.0.6/20260809-preserve-workout-timer-navigation.json",
+      "reason": "Follow-up navigation regression coverage in the same implementation after its release fragment was recorded."
+    },
+    {
+      "commit": "a9a260e52475f373d0fb70d70f8d397779a2d6dc",
+      "originatingCommit": "83e7494905b9ab308e94afc201a1fa099a7fc84b",
+      "fragment": "release/fragments/1.0.6/20260809-reliable-background-timer-cues.json",
+      "reason": "Follow-up foreground-task lifecycle fix in the same timer-cue implementation."
+    },
+    {
+      "commit": "00c1b46af5dc837b16d66f246dc3be742df4c83a",
+      "originatingCommit": "83e7494905b9ab308e94afc201a1fa099a7fc84b",
+      "fragment": "release/fragments/1.0.6/20260809-reliable-background-timer-cues.json",
+      "reason": "Follow-up spoken-cue compatibility fix in the same timer-cue implementation."
+    },
+    {
+      "commit": "c248323c9ee6ddd27fe48584c0daed3ee2d94cc9",
+      "originatingCommit": "83e7494905b9ab308e94afc201a1fa099a7fc84b",
+      "fragment": "release/fragments/1.0.6/20260809-reliable-background-timer-cues.json",
+      "reason": "Follow-up Android package-path fix required by the same timer-cue implementation."
+    },
+    {
+      "commit": "2b3a0e5a7f03c72b82f41cad00bf1b1035890437",
+      "originatingCommit": "83e7494905b9ab308e94afc201a1fa099a7fc84b",
+      "fragment": "release/fragments/1.0.6/20260809-reliable-background-timer-cues.json",
+      "reason": "Follow-up native delivery reporting fix in the same timer-cue implementation."
+    },
+    {
+      "commit": "a2acd25bbd4527fa4ded41a92a2b90c0aa29c4fd",
+      "originatingCommit": "83e7494905b9ab308e94afc201a1fa099a7fc84b",
+      "fragment": "release/fragments/1.0.6/20260809-reliable-background-timer-cues.json",
+      "reason": "Follow-up foreground-task health tracking in the same timer-cue implementation."
+    },
+    {
+      "commit": "a011e85528af25dab6f649964a9482b501007e26",
+      "originatingCommit": "83e7494905b9ab308e94afc201a1fa099a7fc84b",
+      "fragment": "release/fragments/1.0.6/20260809-reliable-background-timer-cues.json",
+      "reason": "Follow-up safe setup failure handling in the same timer-cue implementation."
+    },
+    {
+      "commit": "af7729d853271414e73ad2e3d5592b3177e28454",
+      "originatingCommit": "83e7494905b9ab308e94afc201a1fa099a7fc84b",
+      "fragment": "release/fragments/1.0.6/20260809-reliable-background-timer-cues.json",
+      "reason": "Follow-up late-state replay fix in the same timer-cue implementation."
+    },
+    {
+      "commit": "d93b9d91b021737dd3d774e3ddc898aad9929c10",
+      "originatingCommit": "83e7494905b9ab308e94afc201a1fa099a7fc84b",
+      "fragment": "release/fragments/1.0.6/20260809-reliable-background-timer-cues.json",
+      "reason": "Follow-up delayed task-readiness fix in the same timer-cue implementation."
+    },
+    {
+      "commit": "3b7906692be7f54ffa76408747094c476e71b0a4",
+      "originatingCommit": "83e7494905b9ab308e94afc201a1fa099a7fc84b",
+      "fragment": "release/fragments/1.0.6/20260809-reliable-background-timer-cues.json",
+      "reason": "Follow-up Android service startup verification in the same timer-cue implementation."
+    },
+    {
+      "commit": "8f25b335fd5b3452d3fc4fb56e0eb31b0741edb0",
+      "originatingCommit": "83e7494905b9ab308e94afc201a1fa099a7fc84b",
+      "fragment": "release/fragments/1.0.6/20260809-reliable-background-timer-cues.json",
+      "reason": "Follow-up workout-load startup fix in the same timer-cue implementation."
+    },
+    {
+      "commit": "05bd9a81ac073790f01e6a837a860e5f1b1d7b8c",
+      "originatingCommit": "83e7494905b9ab308e94afc201a1fa099a7fc84b",
+      "fragment": "release/fragments/1.0.6/20260809-reliable-background-timer-cues.json",
+      "reason": "Follow-up slow startup handling in the same timer-cue implementation."
+    },
+    {
+      "commit": "58aeee676ea015e61b8bff3ab0c180aa0ed51695",
+      "originatingCommit": "83e7494905b9ab308e94afc201a1fa099a7fc84b",
+      "fragment": "release/fragments/1.0.6/20260809-reliable-background-timer-cues.json",
+      "reason": "Follow-up task restart state replay in the same timer-cue implementation."
+    },
+    {
+      "commit": "92f101f1756773db1b9b3dd9142396623a254ccc",
+      "originatingCommit": "83e7494905b9ab308e94afc201a1fa099a7fc84b",
+      "fragment": "release/fragments/1.0.6/20260809-reliable-background-timer-cues.json",
+      "reason": "Follow-up fallback ownership fix in the same timer-cue implementation."
+    },
+    {
+      "commit": "7c1f3703ca4b07df89cfa4e9bf86b60ee1de2347",
+      "originatingCommit": "83e7494905b9ab308e94afc201a1fa099a7fc84b",
+      "fragment": "release/fragments/1.0.6/20260809-reliable-background-timer-cues.json",
+      "reason": "Follow-up fallback delivery confirmation in the same timer-cue implementation."
+    },
+    {
+      "commit": "058d4a5a6aa41277e65e805d88b483a3708a4259",
+      "originatingCommit": "83e7494905b9ab308e94afc201a1fa099a7fc84b",
+      "fragment": "release/fragments/1.0.6/20260809-reliable-background-timer-cues.json",
+      "reason": "Follow-up active setting refresh in the same timer-cue implementation."
+    },
+    {
+      "commit": "f4d19b2255e4446512ea2e36293ebbf4cacf4487",
+      "originatingCommit": "83e7494905b9ab308e94afc201a1fa099a7fc84b",
+      "fragment": "release/fragments/1.0.6/20260809-reliable-background-timer-cues.json",
+      "reason": "Follow-up retry and duplicate-haptic fix in the same timer-cue implementation."
+    },
+    {
+      "commit": "45c4b7d4839a69a92f64e3817d4a1baad03e36c1",
+      "originatingCommit": "83e7494905b9ab308e94afc201a1fa099a7fc84b",
+      "fragment": "release/fragments/1.0.6/20260809-reliable-background-timer-cues.json",
+      "reason": "Follow-up haptic delivery-state fix in the same timer-cue implementation."
+    },
+    {
+      "commit": "0df5b3f577c1a09e258ffe26493d0d3495b49da0",
+      "originatingCommit": "83e7494905b9ab308e94afc201a1fa099a7fc84b",
+      "fragment": "release/fragments/1.0.6/20260809-reliable-background-timer-cues.json",
+      "reason": "Follow-up fallback and task lifecycle fix in the same timer-cue implementation."
+    },
+    {
+      "commit": "09d18824b8dc32262df2da1be0a7c86d773839fc",
+      "originatingCommit": "58328f7dc73ffb35e5c19e90e9ac7727b691a4a1",
+      "fragment": "release/fragments/1.0.6/20260809-get-ready-chimes.json",
+      "reason": "Follow-up Android entry-point path fix in the same get-ready chime implementation."
+    },
+    {
+      "commit": "3bddfd3a4faca9b1990a77ac1bd2f977f360d68e",
+      "originatingCommit": "58328f7dc73ffb35e5c19e90e9ac7727b691a4a1",
+      "fragment": "release/fragments/1.0.6/20260809-get-ready-chimes.json",
+      "reason": "Follow-up audio-loading queue fix in the same get-ready chime implementation."
+    }
+  ],
+  "outstandingScreenshots": [
+    "workout-home",
+    "mesocycle-calendar",
+    "workout-history",
+    "backup-settings"
+  ]
+}

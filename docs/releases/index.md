@@ -1,5 +1,6 @@
 # Release history
 
+- [1.0.6](1.0.6.md) — improved rest-timer alerts, workout navigation, and active-mesocycle history.
 - [1.0.5](1.0.5.md) — made backup restoration safer and active-workout recovery more reliable.
 - [1.0.4](1.0.4.md) — made built-in hard-week weights follow the load selected during the prior workout.
 - [1.0.3](1.0.3.md) — improved mesocycle-template reuse and equipment-aware deload recommendations.

@@ -38,6 +38,7 @@ nav:
       - Settings, backups, and recovery: guides/settings-backups.md
   - Releases:
       - Release history: releases/index.md
+      - 1.0.6: releases/1.0.6.md
       - 1.0.5: releases/1.0.5.md
       - 1.0.4: releases/1.0.4.md
       - 1.0.3: releases/1.0.3.md
