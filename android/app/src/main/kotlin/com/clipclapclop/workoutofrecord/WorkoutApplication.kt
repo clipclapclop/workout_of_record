@@ -82,6 +82,7 @@ private class WorkoutCueChannel(
 
     private var tts: TextToSpeech? = null
     private var ttsReady = false
+    private var ttsFailure: Pair<String, String>? = null
     private var pendingSpeech: Pair<String, MethodChannel.Result>? = null
     private val utteranceResults = mutableMapOf<String, MethodChannel.Result>()
     private var disposed = false
@@ -120,19 +121,19 @@ private class WorkoutCueChannel(
     override fun onInit(status: Int) {
         if (disposed) return
         if (status != TextToSpeech.SUCCESS) {
-            failPendingSpeech("tts_init_failed", "The text-to-speech engine did not initialize")
+            markTtsFailure("tts_init_failed", "The text-to-speech engine did not initialize")
             return
         }
         val engine = tts
         if (engine == null) {
-            failPendingSpeech("tts_unavailable", "The text-to-speech engine is unavailable")
+            markTtsFailure("tts_unavailable", "The text-to-speech engine is unavailable")
             return
         }
         val languageStatus = engine.setLanguage(Locale.US)
         if (languageStatus == TextToSpeech.LANG_MISSING_DATA ||
             languageStatus == TextToSpeech.LANG_NOT_SUPPORTED
         ) {
-            failPendingSpeech("tts_language_unavailable", "English speech data is unavailable")
+            markTtsFailure("tts_language_unavailable", "English speech data is unavailable")
             return
         }
         engine.setSpeechRate(1.0f)
@@ -168,8 +169,11 @@ private class WorkoutCueChannel(
     }
 
     private fun speakOrQueue(text: String, result: MethodChannel.Result) {
+        val failure = ttsFailure
         if (disposed) {
             result.error("cue_channel_closed", "The foreground cue channel is closed", null)
+        } else if (failure != null) {
+            result.error(failure.first, failure.second, null)
         } else if (ttsReady) {
             speak(text, result)
         } else {
@@ -216,6 +220,11 @@ private class WorkoutCueChannel(
             }
             if (releaseAudioFocus) abandonAudioFocus()
         }
+    }
+
+    private fun markTtsFailure(code: String, message: String) {
+        ttsFailure = code to message
+        failPendingSpeech(code, message)
     }
 
     private fun failPendingSpeech(code: String, message: String) {

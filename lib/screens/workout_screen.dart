@@ -74,9 +74,21 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   Future<void> _initialize() async {
     final serviceStarted = WorkoutForegroundService.start();
     await _load();
-    await serviceStarted;
+    final serviceReady = await serviceStarted;
     if (!mounted) {
       await WorkoutForegroundService.stop();
+      return;
+    }
+    if (!serviceReady) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Background timer alerts are unavailable. Keep Workout of Record '
+            'visible for timer cues.',
+          ),
+          duration: Duration(seconds: 8),
+        ),
+      );
       return;
     }
     // The initial update may have raced the foreground task's Dart engine.
