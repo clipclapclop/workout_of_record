@@ -48,7 +48,7 @@ Do not rewrite shared release history merely to repair missing metadata. For an 
 
 ## Prepare
 
-Ask Codex to **prepare a release**. It will inspect all fragments and the complete diff since the latest version tag, update documentation, increment `pubspec.yaml`, write the version manifest and release notes, and run validation without publishing.
+Ask Codex to **prepare a release**. It will inspect all fragments and the complete diff since the latest version tag, update documentation, increment `pubspec.yaml`, write the version manifest and release notes, and run validation without publishing. The manifest's `updatedGuidePaths` is the aggregate documentation set for that complete tag-to-release range, so a listed guide may have changed before the release-preparation pull request.
 
 Review and commit the preparation. The resulting working tree must be clean.
 
