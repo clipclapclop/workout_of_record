@@ -180,6 +180,22 @@ class WorkoutForegroundService {
     _sendLatestTaskState();
   }
 
+  /// Update cue preferences without resetting the active timer deadline.
+  static void updateCueSettings({
+    required TimerSound sound,
+    required bool haptic,
+  }) {
+    final latest = _latestTaskState;
+    if (latest?['type'] == 'update') {
+      _latestTaskState = {...latest!, 'sound': sound.name, 'haptic': haptic};
+    }
+    FlutterForegroundTask.sendDataToTask({
+      'type': 'cueSettings',
+      'sound': sound.name,
+      'haptic': haptic,
+    });
+  }
+
   /// Tell the background that there is no active timer (e.g., between exercises).
   static void clearTimer() {
     _cuedByBackground = false;
@@ -312,6 +328,10 @@ class WorkoutTimerTaskState {
             : DateTime.fromMillisecondsSinceEpoch(ms);
         _cuedByWidget = false;
         _ready = false;
+        return;
+      case 'cueSettings':
+        _sound = _parseSound(map['sound']);
+        _haptic = map['haptic'] as bool? ?? true;
         return;
       case 'clearTimer':
         _timerEndsAt = null;

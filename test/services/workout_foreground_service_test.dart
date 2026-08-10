@@ -51,6 +51,18 @@ void main() {
     expect(tick.notificationText, 'Set 2/4  |  Ready!');
   });
 
+  test('cue setting changes apply without resetting the deadline', () {
+    final state = WorkoutTimerTaskState()
+      ..receive(update(endsAt: now.add(const Duration(seconds: 5))))
+      ..receive({'type': 'cueSettings', 'sound': 'chime', 'haptic': false});
+
+    final tick = state.tick(now.add(const Duration(seconds: 5)));
+
+    expect(tick.shouldCue, isTrue);
+    expect(tick.sound, TimerSound.chime);
+    expect(tick.haptic, isFalse);
+  });
+
   test('invalid persisted sound data safely falls back to speech', () {
     final state = WorkoutTimerTaskState()
       ..receive(update(endsAt: now, sound: 'unknown', haptic: false));

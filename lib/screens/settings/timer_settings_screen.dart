@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../app_preferences.dart';
 import '../../db/tables/enums.dart';
 import '../../services/workout_cue_service.dart';
+import '../../services/workout_foreground_service.dart';
 
 class TimerSettingsScreen extends StatefulWidget {
   const TimerSettingsScreen({super.key});
@@ -96,6 +97,10 @@ class _TimerSettingsScreenState extends State<TimerSettingsScreen> {
     await AppPreferences.setTimerSound(_timerSound);
     await AppPreferences.setTimerHaptic(_timerHaptic);
     await AppPreferences.setTimerKeepAwake(_timerKeepAwake);
+    WorkoutForegroundService.updateCueSettings(
+      sound: _timerSound,
+      haptic: _timerHaptic,
+    );
 
     _initTimerEnabled = _timerEnabled;
     _initTimerSound = _timerSound;
