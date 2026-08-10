@@ -73,11 +73,14 @@ class WorkoutForegroundService {
     switch (map['type'] as String?) {
       case 'ready':
         _taskReady = true;
+        return;
       case 'cue':
         _cuedByBackground = true;
+        return;
       case 'cueFallback':
         _cuedByBackground = true;
         WorkoutCueService.fire(map['cueText'] as String?);
+        return;
     }
   }
 
@@ -237,14 +240,17 @@ class WorkoutTimerTaskState {
             : DateTime.fromMillisecondsSinceEpoch(ms);
         _cuedByWidget = false;
         _ready = false;
+        return;
       case 'clearTimer':
         _timerEndsAt = null;
         _cuedByWidget = false;
         _ready = false;
+        return;
       case 'widgetCued':
         _cuedByWidget = true;
         _timerEndsAt = null;
         _ready = true;
+        return;
     }
   }
 
