@@ -79,13 +79,14 @@ class WorkoutForegroundService {
     final map = Map<String, dynamic>.from(data);
     switch (map['type'] as String?) {
       case 'ready':
+        _recordTaskSignal(map);
+        // A newly created task has no in-memory timer state even if it replaced
+        // another task inside the readiness lease.
+        _sendLatestTaskState();
+        return;
       case 'heartbeat':
         final wasReady = taskReady;
-        _taskReady = true;
-        final sentAtMs = map['sentAtMs'] as int?;
-        _lastTaskSignalAt = sentAtMs == null
-            ? DateTime.now()
-            : DateTime.fromMillisecondsSinceEpoch(sentAtMs);
+        _recordTaskSignal(map);
         if (!wasReady && taskReady) _sendLatestTaskState();
         return;
       case 'stopped':
@@ -184,6 +185,14 @@ class WorkoutForegroundService {
     _cuedByBackground = false;
     _latestTaskState = {'type': 'clearTimer'};
     _sendLatestTaskState();
+  }
+
+  static void _recordTaskSignal(Map<String, dynamic> map) {
+    _taskReady = true;
+    final sentAtMs = map['sentAtMs'] as int?;
+    _lastTaskSignalAt = sentAtMs == null
+        ? DateTime.now()
+        : DateTime.fromMillisecondsSinceEpoch(sentAtMs);
   }
 
   static void _sendLatestTaskState() {
