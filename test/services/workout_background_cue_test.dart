@@ -49,10 +49,12 @@ void main() {
   );
 
   test('explicit settings do not require UI-isolate preferences', () async {
-    await WorkoutCueService.fire(
+    final delivered = await WorkoutCueService.fire(
       null,
       soundOverride: TimerSound.silent,
       hapticOverride: false,
     );
+
+    expect(delivered, isTrue);
   });
 }

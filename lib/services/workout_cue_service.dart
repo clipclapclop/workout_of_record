@@ -66,7 +66,7 @@ class WorkoutCueService {
   /// All TTS calls are wrapped in try/catch so a missing engine (e.g. on
   /// GrapheneOS without Google TTS) degrades to haptic-only instead of
   /// crashing the workout.
-  static Future<void> fire(
+  static Future<bool> fire(
     String? cueText, {
     TimerSound? soundOverride,
     bool? hapticOverride,
@@ -80,10 +80,10 @@ class WorkoutCueService {
       } catch (_) {}
     }
 
-    if (sound == TimerSound.silent) return;
+    if (sound == TimerSound.silent) return true;
 
     final ok = await _init();
-    if (!ok) return;
+    if (!ok) return false;
 
     try {
       final text = (sound == TimerSound.tts && cueText != null)
@@ -91,9 +91,11 @@ class WorkoutCueService {
           : 'ready';
       // focus: true requests audio focus before speaking, ensuring TTS is
       // audible even when another app holds focus or the device is idle.
-      await _tts.speak(text, focus: true);
+      final result = await _tts.speak(text, focus: true);
+      return result == 1;
     } catch (_) {
       // No engine, language unsupported, or platform error — silently degrade.
+      return false;
     }
   }
 
