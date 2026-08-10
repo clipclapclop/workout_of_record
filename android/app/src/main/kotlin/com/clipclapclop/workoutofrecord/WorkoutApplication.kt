@@ -7,6 +7,8 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -63,6 +65,7 @@ private class WorkoutCueChannel(
 ) : MethodChannel.MethodCallHandler, TextToSpeech.OnInitListener {
     private val appContext = context.applicationContext
     private val channel = MethodChannel(messenger, CHANNEL_NAME)
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val audioManager = appContext.getSystemService(AudioManager::class.java)
     private val speechAttributes = AudioAttributes.Builder()
         .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
@@ -79,7 +82,8 @@ private class WorkoutCueChannel(
 
     private var tts: TextToSpeech? = null
     private var ttsReady = false
-    private var pendingSpeech: String? = null
+    private var pendingSpeech: Pair<String, MethodChannel.Result>? = null
+    private val utteranceResults = mutableMapOf<String, MethodChannel.Result>()
     private var disposed = false
 
     init {
@@ -101,60 +105,117 @@ private class WorkoutCueChannel(
         val sound = call.argument<String>("sound") ?: "tts"
         val cueText = call.argument<String>("cueText")
         when (sound) {
-            "silent" -> Unit
-            "tts" -> speakOrQueue(cueText?.takeIf { it.isNotBlank() } ?: "ready")
+            "silent" -> result.success(null)
+            "tts" -> speakOrQueue(
+                cueText?.takeIf { it.isNotBlank() } ?: "ready",
+                result,
+            )
             // TimerSound.chime has always meant spoken "ready"; the settings
             // screen explains that the app does not bundle an audio file.
-            "chime" -> speakOrQueue("ready")
-            else -> speakOrQueue("ready")
+            "chime" -> speakOrQueue("ready", result)
+            else -> speakOrQueue("ready", result)
         }
-
-        result.success(null)
     }
 
     override fun onInit(status: Int) {
-        if (disposed || status != TextToSpeech.SUCCESS) return
-        val engine = tts ?: return
-        engine.language = Locale.US
+        if (disposed) return
+        if (status != TextToSpeech.SUCCESS) {
+            failPendingSpeech("tts_init_failed", "The text-to-speech engine did not initialize")
+            return
+        }
+        val engine = tts
+        if (engine == null) {
+            failPendingSpeech("tts_unavailable", "The text-to-speech engine is unavailable")
+            return
+        }
+        val languageStatus = engine.setLanguage(Locale.US)
+        if (languageStatus == TextToSpeech.LANG_MISSING_DATA ||
+            languageStatus == TextToSpeech.LANG_NOT_SUPPORTED
+        ) {
+            failPendingSpeech("tts_language_unavailable", "English speech data is unavailable")
+            return
+        }
         engine.setSpeechRate(1.0f)
         engine.setAudioAttributes(speechAttributes)
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String?) {}
+            override fun onStart(utteranceId: String?) {
+                completeUtterance(utteranceId, null)
+            }
 
             override fun onDone(utteranceId: String?) {
-                abandonAudioFocus()
+                completeUtterance(utteranceId, null)
             }
 
             @Deprecated("Deprecated in Java")
             override fun onError(utteranceId: String?) {
-                abandonAudioFocus()
+                completeUtterance(utteranceId, "The text-to-speech engine rejected the cue")
             }
 
             override fun onError(utteranceId: String?, errorCode: Int) {
-                abandonAudioFocus()
+                completeUtterance(
+                    utteranceId,
+                    "The text-to-speech engine rejected the cue ($errorCode)",
+                )
             }
         })
         ttsReady = true
-        pendingSpeech?.let {
+        pendingSpeech?.let { (text, result) ->
             pendingSpeech = null
-            speak(it)
+            speak(text, result)
         }
     }
 
-    private fun speakOrQueue(text: String) {
-        if (ttsReady) {
-            speak(text)
+    private fun speakOrQueue(text: String, result: MethodChannel.Result) {
+        if (disposed) {
+            result.error("cue_channel_closed", "The foreground cue channel is closed", null)
+        } else if (ttsReady) {
+            speak(text, result)
         } else {
-            // Keep only the latest one-shot cue while the engine binds.
-            pendingSpeech = text
+            pendingSpeech?.second?.error(
+                "cue_superseded",
+                "A newer workout cue replaced this cue",
+                null,
+            )
+            pendingSpeech = text to result
         }
     }
 
-    private fun speak(text: String) {
+    private fun speak(text: String, methodResult: MethodChannel.Result) {
         requestAudioFocus()
         val utteranceId = "workout-cue-${UUID.randomUUID()}"
-        val result = tts?.speak(text, TextToSpeech.QUEUE_FLUSH, Bundle(), utteranceId)
-        if (result != TextToSpeech.SUCCESS) abandonAudioFocus()
+        utteranceResults[utteranceId] = methodResult
+        val speechResult =
+            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, Bundle(), utteranceId)
+        if (speechResult != TextToSpeech.SUCCESS) {
+            utteranceResults.remove(utteranceId)
+            abandonAudioFocus()
+            methodResult.error(
+                "tts_speak_failed",
+                "The text-to-speech engine did not accept the cue",
+                null,
+            )
+        }
+    }
+
+    private fun completeUtterance(utteranceId: String?, error: String?) {
+        if (utteranceId == null) return
+        mainHandler.post {
+            val result = utteranceResults.remove(utteranceId)
+            if (result != null) {
+                if (error == null) {
+                    result.success(null)
+                } else {
+                    result.error("tts_utterance_failed", error, null)
+                }
+            }
+            abandonAudioFocus()
+        }
+    }
+
+    private fun failPendingSpeech(code: String, message: String) {
+        val result = pendingSpeech?.second
+        pendingSpeech = null
+        result?.error(code, message, null)
     }
 
     private fun requestAudioFocus() {
@@ -202,7 +263,11 @@ private class WorkoutCueChannel(
 
     fun dispose() {
         disposed = true
-        pendingSpeech = null
+        failPendingSpeech("cue_channel_closed", "The foreground cue channel closed")
+        for (result in utteranceResults.values) {
+            result.error("cue_channel_closed", "The foreground cue channel closed", null)
+        }
+        utteranceResults.clear()
         channel.setMethodCallHandler(null)
         abandonAudioFocus()
         tts?.stop()
