@@ -72,9 +72,12 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   }
 
   Future<void> _initialize() async {
-    final serviceStart = WorkoutForegroundService.start();
+    // Load first so a database failure cannot leave an orphaned foreground
+    // service. Timer updates are retained and replayed when the task starts.
     await _load();
-    final serviceStarted = await serviceStart;
+    if (!mounted) return;
+
+    final serviceStarted = await WorkoutForegroundService.start();
     if (!mounted) {
       await WorkoutForegroundService.stop();
       return;
