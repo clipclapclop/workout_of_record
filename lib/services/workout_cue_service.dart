@@ -74,16 +74,18 @@ class WorkoutCueService {
     final haptic = hapticOverride ?? AppPreferences.getTimerHaptic();
     final sound = soundOverride ?? AppPreferences.getTimerSound();
 
+    var hapticDelivered = false;
     if (haptic) {
       try {
         await HapticFeedback.heavyImpact();
+        hapticDelivered = true;
       } catch (_) {}
     }
 
     if (sound == TimerSound.silent) return true;
 
     final ok = await _init();
-    if (!ok) return false;
+    if (!ok) return hapticDelivered;
 
     try {
       final text = (sound == TimerSound.tts && cueText != null)
@@ -92,10 +94,10 @@ class WorkoutCueService {
       // focus: true requests audio focus before speaking, ensuring TTS is
       // audible even when another app holds focus or the device is idle.
       final result = await _tts.speak(text, focus: true);
-      return result == 1;
+      return result == 1 || hapticDelivered;
     } catch (_) {
       // No engine, language unsupported, or platform error — silently degrade.
-      return false;
+      return hapticDelivered;
     }
   }
 

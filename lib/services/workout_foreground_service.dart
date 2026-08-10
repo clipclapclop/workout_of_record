@@ -97,13 +97,22 @@ class WorkoutForegroundService {
         _cuedByBackground = true;
         return;
       case 'cueFallback':
-        _deliverUiFallback(map['cueText'] as String?);
+        _deliverUiFallback(
+          map['cueText'] as String?,
+          hapticAlreadyDelivered: map['hapticDelivered'] as bool? ?? false,
+        );
         return;
     }
   }
 
-  static Future<void> _deliverUiFallback(String? cueText) async {
-    final delivered = await WorkoutCueService.fire(cueText);
+  static Future<void> _deliverUiFallback(
+    String? cueText, {
+    required bool hapticAlreadyDelivered,
+  }) async {
+    final delivered = await WorkoutCueService.fire(
+      cueText,
+      hapticOverride: hapticAlreadyDelivered ? false : null,
+    );
     if (delivered) _cuedByBackground = true;
   }
 
@@ -265,6 +274,7 @@ class _WorkoutTaskHandler implements TaskHandler {
       FlutterForegroundTask.sendDataToMain({
         'type': cueDelivered ? 'cue' : 'cueFallback',
         'cueText': tick.cueText,
+        'hapticDelivered': nativeDelivery.hapticDelivered,
       });
     }
 
