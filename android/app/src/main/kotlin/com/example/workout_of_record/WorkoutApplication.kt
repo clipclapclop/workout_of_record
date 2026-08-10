@@ -99,14 +99,14 @@ private class WorkoutCueChannel(
         if (haptic) vibrate()
 
         val sound = call.argument<String>("sound") ?: "tts"
-        if (sound != "silent") {
-            val cueText = call.argument<String>("cueText")
-            val speech = if (sound == "tts" && !cueText.isNullOrBlank()) {
-                cueText
-            } else {
-                "ready"
-            }
-            speakOrQueue(speech)
+        val cueText = call.argument<String>("cueText")
+        when (sound) {
+            "silent" -> Unit
+            "tts" -> speakOrQueue(cueText?.takeIf { it.isNotBlank() } ?: "ready")
+            // TimerSound.chime has always meant spoken "ready"; the settings
+            // screen explains that the app does not bundle an audio file.
+            "chime" -> speakOrQueue("ready")
+            else -> speakOrQueue("ready")
         }
 
         result.success(null)
