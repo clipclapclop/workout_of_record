@@ -25,7 +25,10 @@ import java.util.UUID
 
 /** Registers cue delivery on the foreground task's Flutter engine. */
 class WorkoutApplication : Application(), FlutterForegroundTaskLifecycleListener {
-    private var cueChannel: WorkoutCueChannel? = null
+    // These callbacks belong only to flutter_foreground_task's private engine;
+    // the activity/UI engine does not invoke this listener. The plugin destroys
+    // the current task engine before creating its replacement.
+    private var foregroundTaskCueChannel: WorkoutCueChannel? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -34,14 +37,14 @@ class WorkoutApplication : Application(), FlutterForegroundTaskLifecycleListener
 
     override fun onTerminate() {
         FlutterForegroundTaskPlugin.removeTaskLifecycleListener(this)
-        cueChannel?.dispose()
-        cueChannel = null
+        foregroundTaskCueChannel?.dispose()
+        foregroundTaskCueChannel = null
         super.onTerminate()
     }
 
     override fun onEngineCreate(flutterEngine: FlutterEngine?) {
-        cueChannel?.dispose()
-        cueChannel = flutterEngine?.let {
+        foregroundTaskCueChannel?.dispose()
+        foregroundTaskCueChannel = flutterEngine?.let {
             WorkoutCueChannel(applicationContext, it.dartExecutor.binaryMessenger)
         }
     }
@@ -53,8 +56,8 @@ class WorkoutApplication : Application(), FlutterForegroundTaskLifecycleListener
     override fun onTaskDestroy() {}
 
     override fun onEngineWillDestroy() {
-        cueChannel?.dispose()
-        cueChannel = null
+        foregroundTaskCueChannel?.dispose()
+        foregroundTaskCueChannel = null
     }
 }
 

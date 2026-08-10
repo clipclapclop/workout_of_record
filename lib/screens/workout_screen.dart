@@ -96,9 +96,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       );
       return;
     }
-    // The initial update may have raced the foreground task's Dart engine.
-    // Resend after its readiness handshake completes.
-    _pushTimerToService();
+    // The task's readiness signal replays the latest timer or widget-cued
+    // state retained while the service was starting.
   }
 
   @override
