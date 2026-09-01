@@ -19,6 +19,8 @@ class AppPreferences {
     if (!_prefs.containsKey(_kProfileWeight)) {
       final legacyWeight = _prefs.getDouble(_kLegacyProfileWeightKg);
       if (legacyWeight != null) {
+        // The retired unit toggle changed labels only; it never converted or
+        // tagged stored values. Copying exactly preserves the user's numbers.
         await _prefs.setDouble(_kProfileWeight, legacyWeight);
       }
     }

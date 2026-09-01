@@ -1,6 +1,6 @@
 {
   "id": "imperial-units",
-  "summary": "Removed the misleading metric toggle and standardized workout, profile, history, cue, and AI unit labels on pounds and miles without changing stored values.",
+  "summary": "Removed the label-only metric toggle and standardized workout, profile, history, cue, and AI unit labels on pounds and miles. Stored values remain unchanged because the old toggle never converted or tagged them.",
   "audience": "user",
   "releaseNote": "Workout weights are now consistently shown in pounds and distances in miles; the non-converting metric toggle was removed.",
   "docs": {

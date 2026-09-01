@@ -29,7 +29,7 @@ The ZIP may be at most 256 MiB, and `settings.json` may be at most 1 MiB. `setti
 - `aiEnabled` and `hasSeenProfilePrompt`: booleans; and
 - `notes`: a string.
 
-Fields may be omitted for compatibility with earlier released backups, in which case the app default is restored. The retired `unitsMetric` field is accepted from older backups when it contains a boolean, but its value is ignored and numeric values are left unchanged. Unknown fields are rejected. API credentials, backup-folder access, and other device-specific values are not included.
+Fields may be omitted for compatibility with earlier released backups, in which case the app default is restored. The retired `unitsMetric` field is accepted from older backups when it contains a boolean, but its value is ignored. That preference changed labels only and never converted or tagged stored values, so numeric values are deliberately left unchanged rather than being converted during restore. Unknown fields are rejected. API credentials, backup-folder access, and other device-specific values are not included.
 
 The database schema must be within the restore range supported by the installed app. The current app supports schemas 8 through 13 and migrates older supported backups on a staged copy before restore. A database at schema 7 or older, or a backup from a newer unsupported schema, is rejected rather than being opened unsafely.
 
