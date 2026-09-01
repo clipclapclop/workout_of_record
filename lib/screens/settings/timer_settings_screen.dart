@@ -3,6 +3,7 @@ import '../../app_preferences.dart';
 import '../../db/tables/enums.dart';
 import '../../services/workout_cue_service.dart';
 import '../../services/workout_foreground_service.dart';
+import 'unsaved_settings_dialog.dart';
 
 class TimerSettingsScreen extends StatefulWidget {
   const TimerSettingsScreen({super.key});
@@ -121,45 +122,12 @@ class _TimerSettingsScreenState extends State<TimerSettingsScreen> {
 
   Future<bool> _onPop() async {
     if (!_hasUnsavedChanges) return true;
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Unsaved changes'),
-        content: const Text('You have unsaved settings.'),
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        actions: [
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(ctx, 'cancel'),
-                  child: const Text('Cancel'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(ctx, 'dismiss'),
-                  child: const Text('Dismiss'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () => Navigator.pop(ctx, 'save'),
-                  child: const Text('Save'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-    if (result == 'save') {
+    final result = await showUnsavedSettingsDialog(context);
+    if (result == UnsavedSettingsAction.save) {
       await _save();
       return true;
     }
-    return result == 'dismiss';
+    return result == UnsavedSettingsAction.discard;
   }
 
   @override

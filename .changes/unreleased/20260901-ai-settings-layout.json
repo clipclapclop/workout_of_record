@@ -1,0 +1,12 @@
+{
+  "id": "ai-settings-layout",
+  "summary": "Fixed the AI settings layout failure and made settings discard prompts readable at larger text sizes.",
+  "audience": "user",
+  "releaseNote": "AI settings now open reliably, and unsaved-settings prompts use clearer, readable actions.",
+  "docs": {
+    "impact": "none",
+    "paths": [],
+    "reason": "The corrected settings behavior and button labels are self-explanatory and do not change the documented workflow."
+  },
+  "screenshots": []
+}
