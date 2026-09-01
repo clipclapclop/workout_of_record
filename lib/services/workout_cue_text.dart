@@ -1,4 +1,5 @@
 import '../db/app_database.dart';
+import '../workout_units.dart';
 
 /// Builds the spoken rest-timer cue from the rightmost field shown for a set.
 ///
@@ -6,9 +7,8 @@ import '../db/app_database.dart';
 /// empty rightmost planned value must not fall back to an earlier field.
 String? buildWorkoutCueText(
   Movement movement,
-  PlannedSet plannedSet, {
-  required bool metric,
-}) {
+  PlannedSet plannedSet,
+) {
   if (movement.isRequiredTime) {
     final time = plannedSet.time;
     return time == null ? null : '${_formatValue(time)} seconds';
@@ -16,7 +16,7 @@ String? buildWorkoutCueText(
   if (movement.isRequiredDistance) {
     final distance = plannedSet.distance;
     if (distance == null) return null;
-    return '${_formatValue(distance)} ${metric ? 'kilometers' : 'miles'}';
+    return '${_formatValue(distance)} ${WorkoutUnits.spokenDistance}';
   }
   if (movement.isRequiredReps) {
     final reps = plannedSet.reps;
@@ -25,7 +25,7 @@ String? buildWorkoutCueText(
   if (movement.isRequiredWeight) {
     final weight = plannedSet.weight;
     if (weight == null) return null;
-    return '${_formatValue(weight)} ${metric ? 'kilograms' : 'pounds'}';
+    return '${_formatValue(weight)} ${WorkoutUnits.spokenWeight}';
   }
   return null;
 }

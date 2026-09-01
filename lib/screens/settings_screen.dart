@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../widgets/app_nav_menu.dart';
 import 'settings/ai_settings_screen.dart';
 import 'settings/backup_settings_screen.dart';
-import 'settings/general_settings_screen.dart';
 import 'settings/timer_settings_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -32,12 +31,6 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
-          _SettingsTile(
-            icon: Icons.tune,
-            title: 'General',
-            subtitle: 'Units and display preferences',
-            onTap: () => _push(context, const GeneralSettingsScreen()),
-          ),
           _SettingsTile(
             icon: Icons.timer,
             title: 'Rest Timer',

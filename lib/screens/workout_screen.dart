@@ -14,6 +14,7 @@ import '../db/workout_data.dart';
 import '../services/backup_service.dart';
 import '../services/workout_cue_text.dart';
 import '../services/workout_foreground_service.dart';
+import '../workout_units.dart';
 import '../widgets/app_nav_menu.dart';
 import 'chat_screen.dart';
 import '../widgets/exercise_widget.dart';
@@ -138,7 +139,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     return AppPreferences.getTimerDefaultSeconds();
   }
 
-  /// Notification set info line, e.g. "Set 2/4 · 10 reps · 80 kg".
+  /// Notification set info line, e.g. "Set 2/4 · 10 reps · 80 lbs".
   String? _setInfoText(ExerciseData exercise) {
     final sets = exercise.sets;
     if (sets.isEmpty) return null;
@@ -148,14 +149,13 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     final setNum = nextIdx + 1;
     final ps = sets[nextIdx].planned;
     final m = exercise.movement;
-    final metric = AppPreferences.getUnitsMetric();
     final parts = <String>['Set $setNum/${sets.length}'];
     if (m.isRequiredReps && ps?.reps != null) parts.add('${ps!.reps} reps');
     if (m.isRequiredWeight && ps?.weight != null) {
-      parts.add('${_fmt(ps!.weight!)} ${metric ? 'kg' : 'lbs'}');
+      parts.add('${_fmt(ps!.weight!)} ${WorkoutUnits.weight}');
     }
     if (m.isRequiredDistance && ps?.distance != null) {
-      parts.add('${_fmt(ps!.distance!)} ${metric ? 'km' : 'mi'}');
+      parts.add('${_fmt(ps!.distance!)} ${WorkoutUnits.distance}');
     }
     if (m.isRequiredTime && ps?.time != null) {
       parts.add('${_fmt(ps!.time!)}s');
@@ -173,11 +173,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       }
     }
     if (next?.planned == null) return null;
-    return buildWorkoutCueText(
-      exercise.movement,
-      next!.planned!,
-      metric: AppPreferences.getUnitsMetric(),
-    );
+    return buildWorkoutCueText(exercise.movement, next!.planned!);
   }
 
   void _syncTimer() {
@@ -1007,7 +1003,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       byMeso[entry.mesoId]!.add(entry);
     }
 
-    final weightUnit = AppPreferences.getUnitsMetric() ? 'kg' : 'lbs';
+    const weightUnit = WorkoutUnits.weight;
 
     String fmt(double? v) {
       if (v == null) return '—';
@@ -1024,7 +1020,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       }
       if (m.isRequiredReps) parts.add(s.reps != null ? '${s.reps} reps' : '—');
       if (m.isRequiredDistance) {
-        final distUnit = AppPreferences.getUnitsMetric() ? 'km' : 'mi';
+        const distUnit = WorkoutUnits.distance;
         parts.add(s.distance != null ? '${fmt(s.distance)} $distUnit' : '—');
       }
       if (m.isRequiredTime) parts.add(s.time != null ? '${fmt(s.time)}s' : '—');

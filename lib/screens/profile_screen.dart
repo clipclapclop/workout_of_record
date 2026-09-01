@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_preferences.dart';
 import '../db/tables/enums.dart';
 import '../widgets/app_nav_menu.dart';
+import '../workout_units.dart';
 import 'home_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -181,7 +182,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             decoration: InputDecoration(
               labelText: 'Weight',
               border: const OutlineInputBorder(),
-              suffixText: AppPreferences.getUnitsMetric() ? 'kg' : 'lbs',
+              suffixText: WorkoutUnits.weight,
             ),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
           ),

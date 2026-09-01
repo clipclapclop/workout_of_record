@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:workout_of_record/app_preferences.dart';
-import 'package:workout_of_record/screens/settings/general_settings_screen.dart';
+import 'package:workout_of_record/screens/settings/unsaved_settings_dialog.dart';
 
 import 'support/test_app.dart';
 
@@ -12,8 +11,9 @@ void main() {
   testWidgets('unsaved dialog keeps edits or discards them as chosen', (
     tester,
   ) async {
+    final savedValues = <bool>[];
     _usePhoneSize(tester);
-    await _openGeneralSettings(tester);
+    await _openTestSettings(tester, onSave: savedValues.add);
 
     expect(
       tester.getSize(find.widgetWithText(FilledButton, 'Save')).width,
@@ -35,23 +35,24 @@ void main() {
 
     await tester.tap(find.text('Keep editing'));
     await tester.pumpAndSettle();
-    expect(find.byType(GeneralSettingsScreen), findsOneWidget);
+    expect(find.byType(_TestSettingsScreen), findsOneWidget);
     expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
-    expect(AppPreferences.getUnitsMetric(), isFalse);
+    expect(savedValues, isEmpty);
 
     await tester.pageBack();
     await tester.pumpAndSettle();
     await tester.tap(find.text('Discard'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(GeneralSettingsScreen), findsNothing);
+    expect(find.byType(_TestSettingsScreen), findsNothing);
     expect(find.text('Open settings'), findsOneWidget);
-    expect(AppPreferences.getUnitsMetric(), isFalse);
+    expect(savedValues, isEmpty);
   });
 
   testWidgets('unsaved dialog saves before leaving settings', (tester) async {
+    final savedValues = <bool>[];
     _usePhoneSize(tester);
-    await _openGeneralSettings(tester);
+    await _openTestSettings(tester, onSave: savedValues.add);
 
     await tester.tap(find.byType(Switch));
     await tester.pump();
@@ -62,15 +63,15 @@ void main() {
     await tester.tap(find.descendant(of: dialog, matching: find.text('Save')));
     await tester.pumpAndSettle();
 
-    expect(find.byType(GeneralSettingsScreen), findsNothing);
-    expect(AppPreferences.getUnitsMetric(), isTrue);
+    expect(find.byType(_TestSettingsScreen), findsNothing);
+    expect(savedValues, [true]);
   });
 
   testWidgets('unsaved dialog actions remain readable at large text', (
     tester,
   ) async {
     _usePhoneSize(tester);
-    await _openGeneralSettings(tester, textScale: 1.5);
+    await _openTestSettings(tester, textScale: 1.5, onSave: (_) {});
 
     await tester.tap(find.byType(Switch));
     await tester.pump();
@@ -82,6 +83,67 @@ void main() {
     expect(_lineCount(tester, 'Save'), 1);
     expect(tester.takeException(), isNull);
   });
+}
+
+class _TestSettingsScreen extends StatefulWidget {
+  const _TestSettingsScreen({required this.onSave});
+
+  final ValueChanged<bool> onSave;
+
+  @override
+  State<_TestSettingsScreen> createState() => _TestSettingsScreenState();
+}
+
+class _TestSettingsScreenState extends State<_TestSettingsScreen> {
+  bool _value = false;
+  bool _savedValue = false;
+
+  Future<bool> _onPop() async {
+    if (_value == _savedValue) return true;
+    final action = await showUnsavedSettingsDialog(context);
+    if (action == UnsavedSettingsAction.save) {
+      _save();
+      return true;
+    }
+    return action == UnsavedSettingsAction.discard;
+  }
+
+  void _save() {
+    _savedValue = _value;
+    widget.onSave(_value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final shouldLeave = await _onPop();
+        if (shouldLeave && context.mounted) Navigator.pop(context);
+      },
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Test settings')),
+        bottomNavigationBar: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+            child: FilledButton(
+              onPressed: () {
+                _save();
+                Navigator.pop(context);
+              },
+              child: const Text('Save'),
+            ),
+          ),
+        ),
+        body: SwitchListTile(
+          title: const Text('Test setting'),
+          value: _value,
+          onChanged: (value) => setState(() => _value = value),
+        ),
+      ),
+    );
+  }
 }
 
 int _lineCount(WidgetTester tester, String label) {
@@ -105,8 +167,9 @@ void _usePhoneSize(WidgetTester tester) {
   addTearDown(tester.view.resetDevicePixelRatio);
 }
 
-Future<void> _openGeneralSettings(
+Future<void> _openTestSettings(
   WidgetTester tester, {
+  required ValueChanged<bool> onSave,
   double textScale = 1,
 }) async {
   await tester.pumpWidget(
@@ -119,7 +182,7 @@ Future<void> _openGeneralSettings(
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute<void>(
-                  builder: (_) => const GeneralSettingsScreen(),
+                  builder: (_) => _TestSettingsScreen(onSave: onSave),
                 ),
               ),
               child: const Text('Open settings'),

@@ -7,6 +7,54 @@ import 'package:workout_of_record/widgets/set_ui_state.dart';
 import 'package:workout_of_record/widgets/set_widget.dart';
 
 void main() {
+  testWidgets('set fields use pounds and miles', (tester) async {
+    final movement = Movement(
+      id: 1,
+      name: 'Loaded carry',
+      muscleGroup: MuscleGroup.other,
+      isRequiredReps: false,
+      isRequiredWeight: true,
+      isRequiredTime: false,
+      isRequiredDistance: true,
+      category: MovementCategory.resistance,
+      bodyweightLoadFraction: 0,
+    );
+    final state = SetUiState(
+      weight: '100',
+      distance: '1',
+      isChecked: false,
+      isSkipped: false,
+    );
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SetWidget(
+          setData: SetData(
+            completed: CompletedSet(id: 1, completedExerciseId: 1),
+          ),
+          movement: movement,
+          setNum: 1,
+          isLastSet: true,
+          isExSkipped: false,
+          isLocked: false,
+          isChecked: false,
+          isSkipped: false,
+          state: state,
+          onTimerReset: () {},
+          onToggle: (_) async {},
+          onSkip: () async {},
+          onDelete: () async {},
+        ),
+      ),
+    ));
+
+    expect(find.text('lbs'), findsOneWidget);
+    expect(find.text('mi'), findsOneWidget);
+    expect(find.text('kg'), findsNothing);
+    expect(find.text('km'), findsNothing);
+  });
+
   testWidgets('editing reps does not change following sets', (tester) async {
     final movement = Movement(
       id: 1,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../app_preferences.dart';
 import '../db/app_database.dart';
+import '../workout_units.dart';
 import '../db/workout_data.dart';
 import 'set_ui_state.dart';
 
@@ -140,7 +140,7 @@ class _SetWidgetState extends State<SetWidget> {
             const SizedBox(width: 8),
             _inputField(
               state.weightCtrl,
-              AppPreferences.getUnitsMetric() ? 'kg' : 'lbs',
+              WorkoutUnits.weight,
               enabled: !isChecked && !isLocked,
               onChanged: widget.onWeightChanged,
             ),
@@ -158,7 +158,7 @@ class _SetWidgetState extends State<SetWidget> {
             const SizedBox(width: 8),
             _inputField(
               state.distanceCtrl,
-              AppPreferences.getUnitsMetric() ? 'km' : 'mi',
+              WorkoutUnits.distance,
               enabled: !isChecked && !isLocked,
               onChanged: widget.onDistanceChanged,
             ),

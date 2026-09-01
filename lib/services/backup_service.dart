@@ -32,7 +32,6 @@ class BackupSettings {
     this.trainingGoal,
     this.calorieState,
     this.aiEnabled = true,
-    this.unitsMetric = false,
     this.hasSeenProfilePrompt = false,
     this.notes = '',
   });
@@ -44,7 +43,6 @@ class BackupSettings {
   final TrainingGoal? trainingGoal;
   final CalorieState? calorieState;
   final bool aiEnabled;
-  final bool unitsMetric;
   final bool hasSeenProfilePrompt;
   final String notes;
 
@@ -162,6 +160,9 @@ class BackupSettings {
       return value;
     }
 
+    // Validate the removed field so malformed legacy backups still fail safely.
+    boolean('unitsMetric', false);
+
     return BackupSettings(
       currentMesocycleId: positiveId('currentMesocycleId'),
       currentCompletedWorkoutId: positiveId('currentCompletedWorkoutId'),
@@ -170,7 +171,6 @@ class BackupSettings {
       trainingGoal: enumValue('trainingGoal', TrainingGoal.values),
       calorieState: enumValue('calorieState', CalorieState.values),
       aiEnabled: boolean('aiEnabled', true),
-      unitsMetric: boolean('unitsMetric', false),
       hasSeenProfilePrompt: boolean('hasSeenProfilePrompt', false),
       notes: string('notes', ''),
     );
@@ -184,7 +184,6 @@ class BackupSettings {
     'trainingGoal': trainingGoal?.name,
     'calorieState': calorieState?.name,
     'aiEnabled': aiEnabled,
-    'unitsMetric': unitsMetric,
     'hasSeenProfilePrompt': hasSeenProfilePrompt,
     'notes': notes,
   };
@@ -199,7 +198,6 @@ class BackupSettings {
       other.trainingGoal == trainingGoal &&
       other.calorieState == calorieState &&
       other.aiEnabled == aiEnabled &&
-      other.unitsMetric == unitsMetric &&
       other.hasSeenProfilePrompt == hasSeenProfilePrompt &&
       other.notes == notes;
 
@@ -212,7 +210,6 @@ class BackupSettings {
     trainingGoal,
     calorieState,
     aiEnabled,
-    unitsMetric,
     hasSeenProfilePrompt,
     notes,
   );
@@ -235,7 +232,6 @@ class AppPreferencesBackupSettingsStore implements BackupSettingsStore {
     trainingGoal: AppPreferences.getTrainingGoal(),
     calorieState: AppPreferences.getCalorieState(),
     aiEnabled: AppPreferences.getAiEnabled(),
-    unitsMetric: AppPreferences.getUnitsMetric(),
     hasSeenProfilePrompt: AppPreferences.hasSeenProfilePrompt(),
     notes: AppPreferences.getNotes(),
   );
@@ -251,7 +247,6 @@ class AppPreferencesBackupSettingsStore implements BackupSettingsStore {
     await AppPreferences.setTrainingGoal(settings.trainingGoal);
     await AppPreferences.setCalorieState(settings.calorieState);
     await AppPreferences.setAiEnabled(settings.aiEnabled);
-    await AppPreferences.setUnitsMetric(settings.unitsMetric);
     await AppPreferences.setHasSeenProfilePrompt(settings.hasSeenProfilePrompt);
     await AppPreferences.setNotes(settings.notes);
 

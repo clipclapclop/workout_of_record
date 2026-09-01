@@ -1,4 +1,5 @@
 import '../app_preferences.dart';
+import '../workout_units.dart';
 import '../db/db.dart';
 import '../db/tables/enums.dart';
 import '../db/workout_data.dart';
@@ -91,9 +92,9 @@ class AiContextBuilder {
     }
 
     final weight = AppPreferences.getWeight();
-    final metric = AppPreferences.getUnitsMetric();
     if (weight != null) {
-      buf.writeln('Body weight: ${weight.toStringAsFixed(1)} ${metric ? 'kg' : 'lbs'}');
+      buf.writeln(
+          'Body weight: ${weight.toStringAsFixed(1)} ${WorkoutUnits.weight}');
     }
 
     final goal = AppPreferences.getTrainingGoal();
@@ -108,7 +109,7 @@ class AiContextBuilder {
       buf.writeln('Training experience: ~$months months');
     }
 
-    buf.writeln('Units: ${metric ? 'metric (kg)' : 'imperial (lbs)'}');
+    buf.writeln('Units: ${WorkoutUnits.description}');
     buf.writeln();
   }
 
@@ -230,9 +231,13 @@ class AiContextBuilder {
         }
         final parts = <String>[];
         if (s.completed.reps != null) parts.add('${s.completed.reps} reps');
-        if (s.completed.weight != null) parts.add('${s.completed.weight} ${AppPreferences.getUnitsMetric() ? 'kg' : 'lbs'}');
+        if (s.completed.weight != null) {
+          parts.add('${s.completed.weight} ${WorkoutUnits.weight}');
+        }
         if (s.completed.time != null) parts.add('${s.completed.time}s');
-        if (s.completed.distance != null) parts.add('${s.completed.distance}m');
+        if (s.completed.distance != null) {
+          parts.add('${s.completed.distance} ${WorkoutUnits.distance}');
+        }
         setStrs.add(parts.isEmpty ? 'empty' : parts.join(' x '));
       }
       buf.writeln(' ${setStrs.join(' | ')}');

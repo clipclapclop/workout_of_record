@@ -10,6 +10,34 @@ void main() {
     await AppPreferences.init();
   });
 
+  test('migrates the legacy profile weight without converting it', () async {
+    SharedPreferences.setMockInitialValues({
+      'profile_weight_kg': 187.5,
+      'settings_units_metric': true,
+    });
+
+    await AppPreferences.init();
+
+    final preferences = await SharedPreferences.getInstance();
+    expect(AppPreferences.getWeight(), 187.5);
+    expect(preferences.getDouble('profile_weight_lbs'), 187.5);
+    expect(preferences.containsKey('profile_weight_kg'), isFalse);
+    expect(preferences.containsKey('settings_units_metric'), isFalse);
+  });
+
+  test('an existing pounds value wins over the legacy weight key', () async {
+    SharedPreferences.setMockInitialValues({
+      'profile_weight_kg': 187.5,
+      'profile_weight_lbs': 190.0,
+    });
+
+    await AppPreferences.init();
+
+    final preferences = await SharedPreferences.getInstance();
+    expect(AppPreferences.getWeight(), 190.0);
+    expect(preferences.containsKey('profile_weight_kg'), isFalse);
+  });
+
   test('get-ready chimes are opt-in and persist when enabled', () async {
     expect(AppPreferences.getTimerGetReadyChimes(), isFalse);
 

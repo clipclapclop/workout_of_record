@@ -396,7 +396,7 @@ void main() {
   );
 
   test(
-    'completed history values ignore later planning and preference changes',
+    'completed history values ignore later planning and profile changes',
     () async {
       final database = _openMemoryDatabase();
       addTearDown(database.close);
@@ -422,7 +422,6 @@ void main() {
       await (database.update(database.movements)
             ..where((row) => row.id.equals(exercise.movement.id)))
           .write(const MovementsCompanion(weightDelta: Value(7.5)));
-      await AppPreferences.setUnitsMetric(true);
       await AppPreferences.setWeight(82);
 
       final after = (await database.getMovementHistory(

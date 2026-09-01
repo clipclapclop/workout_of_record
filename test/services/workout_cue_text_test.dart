@@ -9,7 +9,6 @@ void main() {
       final cue = buildWorkoutCueText(
         _movement(reps: true, weight: true),
         _plannedSet(weight: 80),
-        metric: true,
       );
 
       expect(cue, isNull);
@@ -19,7 +18,6 @@ void main() {
       final cue = buildWorkoutCueText(
         _movement(reps: true, weight: true),
         _plannedSet(reps: 10, weight: 80),
-        metric: true,
       );
 
       expect(cue, '10 reps');
@@ -29,7 +27,6 @@ void main() {
       final cue = buildWorkoutCueText(
         _movement(distance: true, time: true),
         _plannedSet(distance: 5),
-        metric: true,
       );
 
       expect(cue, isNull);
@@ -39,20 +36,27 @@ void main() {
       final cue = buildWorkoutCueText(
         _movement(distance: true, time: true),
         _plannedSet(distance: 5, time: 45),
-        metric: true,
       );
 
       expect(cue, '45 seconds');
     });
 
-    test('still speaks the only required planned field', () {
+    test('speaks weight in pounds', () {
       final cue = buildWorkoutCueText(
         _movement(weight: true),
         _plannedSet(weight: 82.5),
-        metric: false,
       );
 
       expect(cue, '82.5 pounds');
+    });
+
+    test('speaks distance in miles', () {
+      final cue = buildWorkoutCueText(
+        _movement(distance: true),
+        _plannedSet(distance: 3.1),
+      );
+
+      expect(cue, '3.1 miles');
     });
   });
 }

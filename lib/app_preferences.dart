@@ -16,6 +16,14 @@ class AppPreferences {
 
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
+    if (!_prefs.containsKey(_kProfileWeight)) {
+      final legacyWeight = _prefs.getDouble(_kLegacyProfileWeightKg);
+      if (legacyWeight != null) {
+        await _prefs.setDouble(_kProfileWeight, legacyWeight);
+      }
+    }
+    await _prefs.remove(_kLegacyProfileWeightKg);
+    await _prefs.remove(_kLegacyUnitsMetric);
   }
 
   // ── Navigation state (acceleration pointers — ground truth is in the DB) ──
@@ -73,10 +81,6 @@ class AppPreferences {
 
   static bool getAiEnabled() => _prefs.getBool(_kSettingsAiEnabled) ?? true;
   static Future<void> setAiEnabled(bool v) => _prefs.setBool(_kSettingsAiEnabled, v);
-
-  /// True = metric (kg), false = imperial (lbs). Defaults to imperial.
-  static bool getUnitsMetric() => _prefs.getBool(_kSettingsUnitsMetric) ?? false;
-  static Future<void> setUnitsMetric(bool v) => _prefs.setBool(_kSettingsUnitsMetric, v);
 
   static Future<String?> getApiKey() =>
       _secure.read(key: _kSettingsCredential);
@@ -210,12 +214,13 @@ Keep answers focused and practical. When suggesting changes, be specific about e
   static const _kCurrentCompletedWorkoutId = 'current_completed_workout_id';
   static const _kHasSeenProfilePrompt = 'has_seen_profile_prompt';
   static const _kProfileDateOfBirth = 'profile_date_of_birth';
-  static const _kProfileWeight = 'profile_weight_kg';
+  static const _kProfileWeight = 'profile_weight_lbs';
+  static const _kLegacyProfileWeightKg = 'profile_weight_kg';
   static const _kProfileTrainingGoal = 'profile_training_goal';
   static const _kProfileCalorieState = 'profile_calorie_state';
   static const _kProfileTrainingStartDate = 'profile_training_start_date';
   static const _kSettingsAiEnabled = 'settings_ai_enabled';
-  static const _kSettingsUnitsMetric = 'settings_units_metric';
+  static const _kLegacyUnitsMetric = 'settings_units_metric';
   static const _kSettingsCredential = 'settings_api_key';
   static const _kAiModel = 'ai_model';
   static const _kAiCreditId = 'ai_credit_id';

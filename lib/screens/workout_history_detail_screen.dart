@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../app_preferences.dart';
 import '../db/app_database.dart';
 import '../db/db.dart';
 import '../db/tables/enums.dart';
 import '../db/workout_data.dart';
 import '../widgets/app_nav_menu.dart';
+import '../workout_units.dart';
 
 class WorkoutHistoryDetailScreen extends StatelessWidget {
   const WorkoutHistoryDetailScreen({
@@ -58,7 +58,7 @@ class WorkoutHistoryDetailScreen extends StatelessWidget {
             return const Center(child: Text('No exercises recorded.'));
           }
 
-          final weightUnit = AppPreferences.getUnitsMetric() ? 'kg' : 'lbs';
+          const weightUnit = WorkoutUnits.weight;
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -134,7 +134,7 @@ class WorkoutHistoryDetailScreen extends StatelessWidget {
       }
       if (m.isRequiredReps) parts.add(reps != null ? '$reps reps' : '—');
       if (m.isRequiredDistance) {
-        final distUnit = AppPreferences.getUnitsMetric() ? 'km' : 'mi';
+        const distUnit = WorkoutUnits.distance;
         parts.add(distance != null ? '${fmt(distance)} $distUnit' : '—');
       }
       if (m.isRequiredTime) parts.add(time != null ? '${fmt(time)}s' : '—');

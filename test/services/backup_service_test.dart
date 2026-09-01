@@ -322,7 +322,6 @@ void main() {
       trainingGoal: TrainingGoal.strength,
       calorieState: CalorieState.maintenance,
       aiEnabled: false,
-      unitsMetric: false,
       hasSeenProfilePrompt: false,
       notes: 'Original synthetic note',
     );
@@ -334,7 +333,6 @@ void main() {
       trainingGoal: TrainingGoal.hypertrophy,
       calorieState: CalorieState.surplus,
       aiEnabled: true,
-      unitsMetric: true,
       hasSeenProfilePrompt: true,
       notes: 'Restored synthetic note',
     );
@@ -454,6 +452,29 @@ void main() {
         expect(store.read(), restoredSettings);
       },
     );
+
+    for (final legacyMetricValue in [false, true]) {
+      test(
+        'restores legacy unitsMetric=$legacyMetricValue without conversion',
+        () async {
+          final legacySettings = {
+            ...restoredSettings.toJson(),
+            'unitsMetric': legacyMetricValue,
+          };
+
+          await service().restoreBytes(
+            _archiveBytes([
+              _databaseEntry(restoredDatabaseBytes),
+              _settingsEntry(legacySettings),
+            ]),
+          );
+
+          expect(settingsStore.current, restoredSettings);
+          expect(settingsStore.current.weight, 72.5);
+          expect(settingsStore.current.toJson(), isNot(contains('unitsMetric')));
+        },
+      );
+    }
 
     test('rejects malformed JSON', () async {
       final malformed = utf8.encode('{');

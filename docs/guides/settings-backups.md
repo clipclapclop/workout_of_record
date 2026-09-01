@@ -1,8 +1,8 @@
 # Settings, backups, and recovery
 
-## General, timer, and AI settings
+## Timer and AI settings
 
-Settings are divided into general display and unit preferences, rest-timer behavior, optional AI configuration, and backup/restore controls. Rest-timer settings include an optional get-ready sequence: a lower built-in tone at 10 seconds remaining followed by a higher tone at 5 seconds. The sequence does not change the visible countdown, does not require text-to-speech, and is suppressed when the alert sound is set to Silent. Core workout logging remains available when AI is disabled or unavailable.
+Workout weights are recorded in pounds and distances in miles. Settings cover rest-timer behavior, optional AI configuration, and backup/restore controls. Rest-timer settings include an optional get-ready sequence: a lower built-in tone at 10 seconds remaining followed by a higher tone at 5 seconds. The sequence does not change the visible countdown, does not require text-to-speech, and is suppressed when the alert sound is set to Silent. Core workout logging remains available when AI is disabled or unavailable.
 
 API credentials entered for optional AI features are device settings and must never be placed in release manifests, documentation, or the repository.
 
@@ -17,19 +17,19 @@ The backup screen reports the last successful backup and any current error. If A
 A supported backup is a ZIP containing exactly these two files at its root:
 
 - `workout_of_record.sqlite`, containing workout history and plans; and
-- `settings.json`, containing the active mesocycle and workout pointers, profile values, AI-enabled and unit choices, profile-prompt state, and notes.
+- `settings.json`, containing the active mesocycle and workout pointers, profile values, the AI-enabled choice, profile-prompt state, and notes.
 
 The ZIP may be at most 256 MiB, and `settings.json` may be at most 1 MiB. `settings.json` is a UTF-8 JSON object with these supported fields:
 
 - `currentMesocycleId` and `currentCompletedWorkoutId`: positive integers or `null`;
 - `dateOfBirth`: an ISO-8601 string or `null`;
-- `weight`: a finite non-negative number or `null`;
+- `weight`: a finite non-negative number of pounds or `null`;
 - `trainingGoal`: `strength`, `hypertrophy`, `endurance`, `general`, or `null`;
 - `calorieState`: `surplus`, `maintenance`, `deficit`, or `null`;
-- `aiEnabled`, `unitsMetric`, and `hasSeenProfilePrompt`: booleans; and
+- `aiEnabled` and `hasSeenProfilePrompt`: booleans; and
 - `notes`: a string.
 
-Fields may be omitted for compatibility with earlier released backups, in which case the app default is restored. Unknown fields are rejected. API credentials, backup-folder access, and other device-specific values are not included.
+Fields may be omitted for compatibility with earlier released backups, in which case the app default is restored. The retired `unitsMetric` field is accepted from older backups when it contains a boolean, but its value is ignored and numeric values are left unchanged. Unknown fields are rejected. API credentials, backup-folder access, and other device-specific values are not included.
 
 The database schema must be within the restore range supported by the installed app. The current app supports schemas 8 through 13 and migrates older supported backups on a staged copy before restore. A database at schema 7 or older, or a backup from a newer unsupported schema, is rejected rather than being opened unsafely.
 

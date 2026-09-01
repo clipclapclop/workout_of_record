@@ -60,7 +60,7 @@ class WorkoutCueService {
   /// Call when the timer reaches zero.
   ///
   /// [cueText] is the value to speak in TTS mode (e.g. "10 reps",
-  /// "45 seconds", "80 kg").  Pass null when there is no meaningful value —
+  /// "45 seconds", "80 pounds"). Pass null when there is no meaningful value —
   /// the service will fall back to saying "ready" or doing nothing.
   ///
   /// All TTS calls are wrapped in try/catch so a missing engine (e.g. on

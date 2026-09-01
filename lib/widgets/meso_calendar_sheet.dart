@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../app_preferences.dart';
 import '../db/app_database.dart';
 import '../db/calendar_data.dart';
 import '../db/db.dart';
 import '../db/tables/enums.dart';
 import '../db/workout_data.dart';
+import '../workout_units.dart';
 import 'calendar_cell_widget.dart';
 
 void showMesoCalendarSheet(
@@ -144,7 +144,7 @@ class _MesoCalendarSheet extends StatelessWidget {
   Widget _buildCompletedDetail(BuildContext context, CalendarCell cell,
       WorkoutData data, ScrollController scroll) {
     final cw = data.completedWorkout;
-    final weightUnit = AppPreferences.getUnitsMetric() ? 'kg' : 'lbs';
+    const weightUnit = WorkoutUnits.weight;
 
     Widget body;
     if (cw.status == WorkoutStatus.skipped) {
@@ -334,20 +334,28 @@ class _MesoCalendarSheet extends StatelessWidget {
       return v == v.truncateToDouble() ? v.toInt().toString() : v.toString();
     }
 
-    String setVal(int? reps, double? weight, double? time) {
+    String setVal(
+        int? reps, double? weight, double? distance, double? time) {
       final parts = <String>[];
       if (m.isRequiredReps) parts.add(reps != null ? '$reps reps' : '—');
       if (m.isRequiredWeight) {
         parts.add(weight != null ? '${fmt(weight)} $weightUnit' : '—');
       }
+      if (m.isRequiredDistance) {
+        parts.add(distance != null
+            ? '${fmt(distance)} ${WorkoutUnits.distance}'
+            : '—');
+      }
       if (m.isRequiredTime) parts.add(time != null ? '${fmt(time)}s' : '—');
       return parts.isEmpty ? '—' : parts.join(' × ');
     }
 
-    final plannedStr = ps != null ? setVal(ps.reps, ps.weight, ps.time) : '—';
+    final plannedStr = ps != null
+        ? setVal(ps.reps, ps.weight, ps.distance, ps.time)
+        : '—';
     final completedStr = isSkipped
         ? 'Skipped — ${_exSkipLabel(cs.skipReason!)}'
-        : setVal(cs.reps, cs.weight, cs.time);
+        : setVal(cs.reps, cs.weight, cs.distance, cs.time);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
