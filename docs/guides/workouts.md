@@ -15,7 +15,7 @@ History includes the current mesocycle as soon as its first workout starts. Its 
 
 ## Record sets
 
-Each set displays the fields required by its movement, such as reps, weight, distance, or time. Weight is recorded in pounds (`lbs`) and distance in miles (`mi`). The retired metric preference changed labels only: it did not convert or tag stored values. Existing numbers therefore remain unchanged rather than being converted during this correction. Planned values appear as defaults. Confirming a set saves its completed values immediately. Clearing a required value prevents confirmation, and unchecking a completed set removes its confirmed values from the completed workout while leaving the editable values on screen.
+Each set displays the fields required by its movement, such as reps, weight, distance, or time. Weight is recorded in pounds (`lbs`) and distance in miles (`mi`). The retired metric preference changed labels only: it did not convert or tag stored values. This app has one existing owner-controlled data set, and its values were confirmed to be pounds and miles despite that old label option. Existing numbers therefore remain unchanged; converting them would corrupt the user's records. Planned values appear as defaults. Confirming a set saves its completed values immediately. Clearing a required value prevents confirmation, and unchecking a completed set removes its confirmed values from the completed workout while leaving the editable values on screen.
 
 Changing a set's weight carries that weight into its later unchecked sets. Repetition changes apply only to the edited set.
 

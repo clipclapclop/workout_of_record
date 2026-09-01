@@ -20,7 +20,8 @@ class AppPreferences {
       final legacyWeight = _prefs.getDouble(_kLegacyProfileWeightKg);
       if (legacyWeight != null) {
         // The retired unit toggle changed labels only; it never converted or
-        // tagged stored values. Copying exactly preserves the user's numbers.
+        // tagged stored values. This app has one existing owner-controlled data
+        // set, confirmed as imperial. Copying exactly avoids corrupting it.
         await _prefs.setDouble(_kProfileWeight, legacyWeight);
       }
     }

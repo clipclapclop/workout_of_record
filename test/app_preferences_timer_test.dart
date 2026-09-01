@@ -10,7 +10,7 @@ void main() {
     await AppPreferences.init();
   });
 
-  test('preserves values from the label-only metric preference', () async {
+  test('preserves the owner-confirmed imperial legacy value', () async {
     SharedPreferences.setMockInitialValues({
       'profile_weight_kg': 187.5,
       'settings_units_metric': true,
