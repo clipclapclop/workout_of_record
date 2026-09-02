@@ -39,6 +39,7 @@ internal class FixedNameBackupWriter(
         const val FINAL_NAME = "workout_of_record.zip"
         const val PENDING_NAME = "workout_of_record.pending.zip"
         const val PREVIOUS_NAME = "workout_of_record.previous.zip"
+        const val FAILED_NAME = "workout_of_record.failed.zip"
         const val VERIFIED_NAME = "workout_of_record.verified"
         const val VERIFIED_PENDING_NAME = "workout_of_record.verified.pending"
     }
@@ -73,16 +74,26 @@ internal class FixedNameBackupWriter(
             promotedByThisOperation = true
             requireDigest(FINAL_NAME, expected)
         } catch (error: Exception) {
-            val rollbackError = rollbackPrevious(promotedByThisOperation)
+            val rollbackError = if (store.exists(PREVIOUS_NAME)) {
+                rollbackPrevious(
+                    if (promotedByThisOperation) expected else null,
+                )
+            } else if (promotedByThisOperation) {
+                quarantineFinal()
+            } else {
+                null
+            }
             if (rollbackError != null) {
                 throw BackupReplacementException(
-                    "Backup replacement failed and the previous backup could not be restored. " +
-                        "Keep $PREVIOUS_NAME; the app will retry recovery next time.",
+                    if (replacingExisting) {
+                        "Backup replacement failed and the previous backup could not be restored. " +
+                            "Both files were preserved for manual recovery."
+                    } else {
+                        "The first backup failed and its unverified final file could not be moved to " +
+                            "$FAILED_NAME. The file was preserved."
+                    },
                     rollbackError,
                 )
-            }
-            if (!replacingExisting && promotedByThisOperation) {
-                deleteBestEffort(FINAL_NAME)
             }
             deleteBestEffort(PENDING_NAME)
             deleteBestEffort(VERIFIED_NAME)
@@ -115,7 +126,7 @@ internal class FixedNameBackupWriter(
             if (hasValidVerificationMarker()) {
                 deleteRequired(PREVIOUS_NAME)
             } else {
-                val rollbackError = rollbackPrevious(allowDeleteFinal = false)
+                val rollbackError = rollbackPrevious(ownedFinalDigest = null)
                 if (rollbackError != null) {
                     throw BackupReplacementException(
                         "An interrupted backup could not be recovered. Keep $PREVIOUS_NAME and try again.",
@@ -130,20 +141,49 @@ internal class FixedNameBackupWriter(
         deleteRequired(VERIFIED_PENDING_NAME)
     }
 
-    private fun rollbackPrevious(allowDeleteFinal: Boolean): Exception? {
+    private fun rollbackPrevious(
+        ownedFinalDigest: BackupDocumentDigest?,
+    ): Exception? {
         if (!store.exists(PREVIOUS_NAME)) return null
         return try {
             if (store.exists(FINAL_NAME)) {
-                if (!allowDeleteFinal) {
+                if (ownedFinalDigest == null) {
                     throw BackupReplacementException(
                         "The fixed-name backup changed during replacement; both files were preserved.",
                     )
                 }
-                if (!store.delete(FINAL_NAME)) {
-                    throw BackupReplacementException("Could not remove the incomplete final backup.")
+                val stillOwned = try {
+                    store.digest(FINAL_NAME) == ownedFinalDigest
+                } catch (_: Exception) {
+                    false
+                }
+                if (stillOwned) {
+                    if (!store.delete(FINAL_NAME)) {
+                        throw BackupReplacementException(
+                            "Could not remove the incomplete final backup.",
+                        )
+                    }
+                } else {
+                    val quarantineError = quarantineFinal()
+                    if (quarantineError != null) throw quarantineError
                 }
             }
             renameRequired(PREVIOUS_NAME, FINAL_NAME)
+            null
+        } catch (error: Exception) {
+            error
+        }
+    }
+
+    private fun quarantineFinal(): Exception? {
+        if (!store.exists(FINAL_NAME)) return null
+        return try {
+            if (store.exists(FAILED_NAME)) {
+                throw BackupReplacementException(
+                    "The fixed-name backup changed during replacement; both files were preserved.",
+                )
+            }
+            renameRequired(FINAL_NAME, FAILED_NAME)
             null
         } catch (error: Exception) {
             error

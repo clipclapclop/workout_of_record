@@ -131,6 +131,10 @@ class FixedNameBackupWriterTest {
         }
 
         assertArrayEquals(old, store.files[FixedNameBackupWriter.FINAL_NAME])
+        assertArrayEquals(
+            byteArrayOf(9, 8, 7),
+            store.files[FixedNameBackupWriter.FAILED_NAME],
+        )
         assertFalse(store.exists(FixedNameBackupWriter.PREVIOUS_NAME))
     }
 
@@ -163,7 +167,7 @@ class FixedNameBackupWriterTest {
     }
 
     @Test
-    fun `failed first-backup verification removes its own invalid final file`() {
+    fun `failed first-backup verification quarantines its invalid final file`() {
         val store = FakeStore().apply {
             corruptFinalDigest = true
         }
@@ -173,6 +177,10 @@ class FixedNameBackupWriterTest {
         }
 
         assertFalse(store.exists(FixedNameBackupWriter.FINAL_NAME))
+        assertArrayEquals(
+            byteArrayOf(9, 8, 7),
+            store.files[FixedNameBackupWriter.FAILED_NAME],
+        )
         assertFalse(store.exists(FixedNameBackupWriter.PENDING_NAME))
         assertFalse(store.exists(FixedNameBackupWriter.PREVIOUS_NAME))
         assertFalse(store.exists(FixedNameBackupWriter.VERIFIED_NAME))
@@ -281,7 +289,7 @@ class FixedNameBackupWriterTest {
             FixedNameBackupWriter(store).replace(byteArrayOf(9, 8, 7))
         }
 
-        assertTrue(error.message!!.contains(FixedNameBackupWriter.PREVIOUS_NAME))
+        assertTrue(error.message!!.contains("preserved"))
         assertArrayEquals(old, store.files[FixedNameBackupWriter.PREVIOUS_NAME])
     }
 }
