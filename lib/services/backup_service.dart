@@ -1227,7 +1227,10 @@ class BackupWriteCoordinator {
       await writeFile(folderUri, bytes);
       await markSuccessful(now());
     });
-    _tail = operation.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    _tail = operation.then<void>(
+      (value) {},
+      onError: (Object error, StackTrace stackTrace) {},
+    );
     return operation;
   }
 }

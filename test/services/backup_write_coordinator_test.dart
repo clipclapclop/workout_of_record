@@ -12,7 +12,7 @@ void main() {
     final expectedTime = DateTime.utc(2026, 9, 3, 18, 30);
     final coordinator = BackupWriteCoordinator(
       buildBytes: () async => Uint8List.fromList([1, 2, 3]),
-      writeFile: (_, _) async {
+      writeFile: (folderUri, bytes) async {
         writeStarted.complete();
         await releaseWrite.future;
       },
@@ -33,7 +33,8 @@ void main() {
     final timestamps = <DateTime>[];
     final coordinator = BackupWriteCoordinator(
       buildBytes: () async => Uint8List.fromList([1]),
-      writeFile: (_, _) async => throw StateError('injected write failure'),
+      writeFile: (folderUri, bytes) async =>
+          throw StateError('injected write failure'),
       markSuccessful: (timestamp) async => timestamps.add(timestamp),
     );
 
