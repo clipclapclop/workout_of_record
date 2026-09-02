@@ -12,7 +12,7 @@ Open **Settings → Backup & Restore** to choose an Android document-tree locati
 
 The backup screen reports the last successful backup and any current error. If Android revokes access to the selected folder, choose the location again.
 
-A successful backup is always named `workout_of_record.zip`, allowing another storage application to copy that exact file and manage its own version history. Before replacing it, the app writes and verifies a temporary document, preserves the prior file during the rename, and verifies the final exact-name document. Temporary pending or previous documents are removed after success. If replacement is interrupted, the next backup attempt restores the preserved prior file before trying again. The app reports failure rather than falling back to truncating the existing backup when the selected Android storage provider cannot perform the safe rename.
+A successful backup is always named `workout_of_record.zip`, allowing another storage application to copy that exact file and manage its own version history. Before replacing it, the app writes and verifies a temporary document, preserves the prior file during the rename, and verifies the final exact-name document. Temporary pending or previous documents are removed after success. If replacement is interrupted, the next backup attempt keeps an already promoted final file or restores the preserved prior file when the final file is absent. The app reports failure rather than falling back to truncating the existing backup when the selected Android storage provider cannot perform the safe rename.
 
 ### Supported backup format
 

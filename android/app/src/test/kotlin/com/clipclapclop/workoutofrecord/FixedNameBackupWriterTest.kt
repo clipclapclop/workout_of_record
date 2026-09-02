@@ -121,7 +121,7 @@ class FixedNameBackupWriterTest {
     }
 
     @Test
-    fun `failed safety-file cleanup rolls the previous backup back into place`() {
+    fun `failed safety-file cleanup keeps verified final and previous`() {
         val old = byteArrayOf(1, 2, 3)
         val store = FakeStore(mapOf(FixedNameBackupWriter.FINAL_NAME to old)).apply {
             failDeleteName = FixedNameBackupWriter.PREVIOUS_NAME
@@ -131,8 +131,11 @@ class FixedNameBackupWriterTest {
             FixedNameBackupWriter(store).replace(byteArrayOf(9, 8, 7))
         }
 
-        assertArrayEquals(old, store.files[FixedNameBackupWriter.FINAL_NAME])
-        assertFalse(store.exists(FixedNameBackupWriter.PREVIOUS_NAME))
+        assertArrayEquals(
+            byteArrayOf(9, 8, 7),
+            store.files[FixedNameBackupWriter.FINAL_NAME],
+        )
+        assertArrayEquals(old, store.files[FixedNameBackupWriter.PREVIOUS_NAME])
     }
 
     @Test
@@ -151,12 +154,29 @@ class FixedNameBackupWriterTest {
     }
 
     @Test
-    fun `interrupted replacement restores previous before accepting new work`() {
+    fun `interrupted cleanup keeps the promoted final backup`() {
         val old = byteArrayOf(1, 2, 3)
-        val uncertain = byteArrayOf(4, 5, 6)
+        val promoted = byteArrayOf(4, 5, 6)
         val store = FakeStore(
             mapOf(
-                FixedNameBackupWriter.FINAL_NAME to uncertain,
+                FixedNameBackupWriter.FINAL_NAME to promoted,
+                FixedNameBackupWriter.PREVIOUS_NAME to old,
+                FixedNameBackupWriter.PENDING_NAME to byteArrayOf(7),
+            ),
+        )
+
+        FixedNameBackupWriter(store).recoverInterruptedReplacement()
+
+        assertArrayEquals(promoted, store.files[FixedNameBackupWriter.FINAL_NAME])
+        assertFalse(store.exists(FixedNameBackupWriter.PREVIOUS_NAME))
+        assertFalse(store.exists(FixedNameBackupWriter.PENDING_NAME))
+    }
+
+    @Test
+    fun `interrupted promotion restores previous when final is absent`() {
+        val old = byteArrayOf(1, 2, 3)
+        val store = FakeStore(
+            mapOf(
                 FixedNameBackupWriter.PREVIOUS_NAME to old,
                 FixedNameBackupWriter.PENDING_NAME to byteArrayOf(7),
             ),

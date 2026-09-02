@@ -63,7 +63,6 @@ internal class FixedNameBackupWriter(
             }
             renameRequired(PENDING_NAME, FINAL_NAME)
             requireDigest(FINAL_NAME, expected)
-            deleteRequired(PREVIOUS_NAME)
         } catch (error: Exception) {
             val rollbackError = rollbackPrevious()
             if (rollbackError != null) {
@@ -84,17 +83,32 @@ internal class FixedNameBackupWriter(
                 error,
             )
         }
+
+        try {
+            deleteRequired(PREVIOUS_NAME)
+        } catch (error: Exception) {
+            throw BackupReplacementException(
+                "The new backup was installed and verified, but $PREVIOUS_NAME could not be removed.",
+                error,
+            )
+        }
     }
 
-    /** Restores the previous fixed-name file after a process interruption. */
+    /** Reconciles safety files left by an interrupted replacement. */
     fun recoverInterruptedReplacement() {
         if (store.exists(PREVIOUS_NAME)) {
-            val rollbackError = rollbackPrevious()
-            if (rollbackError != null) {
-                throw BackupReplacementException(
-                    "An interrupted backup could not be recovered. Keep $PREVIOUS_NAME and try again.",
-                    rollbackError,
-                )
+            if (store.exists(FINAL_NAME)) {
+                // FINAL_NAME came from a pending file that was verified before
+                // promotion. Keep the newer final file and remove the old copy.
+                deleteRequired(PREVIOUS_NAME)
+            } else {
+                val rollbackError = rollbackPrevious()
+                if (rollbackError != null) {
+                    throw BackupReplacementException(
+                        "An interrupted backup could not be recovered. Keep $PREVIOUS_NAME and try again.",
+                        rollbackError,
+                    )
+                }
             }
         }
 
