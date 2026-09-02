@@ -17,6 +17,11 @@ void main() {
     expect(controller.isRunning, isTrue);
     expect(controller.hasBeenStarted, isTrue);
 
+    controller.stop();
+    expect(controller.isRunning, isFalse);
+    expect(controller.hasBeenStarted, isTrue);
+    controller.start();
+
     controller.markCued();
     expect(controller.isRunning, isFalse);
     expect(controller.hasBeenStarted, isTrue);

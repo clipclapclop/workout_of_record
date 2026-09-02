@@ -22,6 +22,7 @@ class RestTimerController extends ChangeNotifier {
   int get durationSeconds => _durationSeconds;
   bool get isRunning => _startedAt != null;
   bool get cued => _cued;
+  /// True after a set starts this rest, including while paused or completed.
   bool get hasBeenStarted => _hasBeenStarted;
 
   /// Milliseconds remaining.  Clamped to [0, durationSeconds * 1000].
@@ -48,7 +49,7 @@ class RestTimerController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Pause the countdown, preserving the remaining time.
+  /// Pause the countdown and preserve both its remaining time and set context.
   void stop() {
     _pausedRemainingMs = remainingMs;
     _startedAt = null;
