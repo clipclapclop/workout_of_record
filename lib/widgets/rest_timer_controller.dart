@@ -78,7 +78,8 @@ class RestTimerController extends ChangeNotifier {
     final restoredRemainingMs = endsAt
         .difference(now)
         .inMilliseconds
-        .clamp(0, fullDurationMs);
+        .clamp(0, fullDurationMs)
+        .toInt();
     _pausedRemainingMs = restoredRemainingMs;
     _cued = restoredRemainingMs <= 0;
     _startedAt = restoredRemainingMs <= 0
