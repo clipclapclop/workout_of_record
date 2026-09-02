@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../db/app_database.dart';
@@ -10,7 +12,7 @@ Future<void> showMovementPickerSheet({
   required BuildContext context,
   required List<Movement> allMovements,
   required Set<int> alreadyAdded,
-  required void Function(Movement) onAdd,
+  required FutureOr<void> Function(Movement) onAdd,
 }) {
   return showModalBottomSheet(
     context: context,
@@ -33,7 +35,7 @@ class _MovementPickerSheet extends StatefulWidget {
 
   final List<Movement> allMovements;
   final Set<int> alreadyAdded;
-  final void Function(Movement) onAdd;
+  final FutureOr<void> Function(Movement) onAdd;
 
   @override
   State<_MovementPickerSheet> createState() => _MovementPickerSheetState();
@@ -44,6 +46,7 @@ class _MovementPickerSheetState extends State<_MovementPickerSheet> {
   MovementCategory _filterCategory = MovementCategory.resistance;
   MuscleGroup? _filterMg;
   String _query = '';
+  bool _adding = false;
   late List<Movement> _movements;
 
   @override
@@ -64,8 +67,22 @@ class _MovementPickerSheetState extends State<_MovementPickerSheet> {
       MaterialPageRoute(builder: (_) => const MovementDetailScreen()),
     );
     if (!mounted || created == null) return;
-    widget.onAdd(created);
-    Navigator.pop(context);
+    await _selectMovement(created);
+  }
+
+  Future<void> _selectMovement(Movement movement) async {
+    if (_adding) return;
+    setState(() => _adding = true);
+    try {
+      await widget.onAdd(movement);
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _adding = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not update the workout. Try again.')),
+      );
+    }
   }
 
   List<Movement> get _filtered {
@@ -242,12 +259,9 @@ class _MovementPickerSheetState extends State<_MovementPickerSheet> {
                                       .withAlpha(80),
                                 )
                               : const Icon(Icons.add),
-                          onTap: added
+                          onTap: added || _adding
                               ? null
-                              : () {
-                                  widget.onAdd(m);
-                                  Navigator.pop(context);
-                                },
+                              : () => _selectMovement(m),
                         );
                       },
                     ),

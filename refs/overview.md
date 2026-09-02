@@ -47,6 +47,7 @@ For a single user, no multi-user, no accounts
 - Since all sets of an exercise are innately the same (they have the same movement, and while the values may be different, they'll have the same combination of rep count, weight, and or time) so the idea of reordering sets doesn't make sense
 - If the user adds a set, it inately gets appended to the end of the list of sets
 - If the user deletes or skips a set, it's inately the last one
+- The last unchecked set can be permanently deleted whether it came from the plan or was added during the workout
 - If the user enters data into the wrong set, it's their responsability to delete it from the wrong spot and reenter it in the correct spot
 
 ---
@@ -61,6 +62,7 @@ For a single user, no multi-user, no accounts
 - Check-in data is available to recommendation logic.
 
 ### 2. Active Workout
+- A scheduled workout may intentionally have no exercises; it remains distinct from a rest day and can be populated on the day or completed empty.
 - Each exercise has sets with reps, weights, and/or time:
   - AI on: prefilled by recommendation service
   - AI off: prefilled by deterministic heuristics
@@ -164,7 +166,8 @@ Output includes:
 - Crash after `completed_*` write but before `app_state` update -> app still resumes active workout.
 - Crash during active workout with partial nulls -> values persisted and resumable.
 - Planned-origin set skipped without reason -> blocked.
-- User-added set deleted -> allowed.
+- Last unchecked prescribed or user-added set deleted -> allowed.
+- Zero-exercise workout completed without exercise or muscle-group feedback -> allowed.
 
 ### Assumptions
 - Single local user only.

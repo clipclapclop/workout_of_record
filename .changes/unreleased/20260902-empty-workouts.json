@@ -1,0 +1,16 @@
+{
+  "id": "empty-workouts",
+  "summary": "Made intentionally empty workouts usable by allowing exercises to be added or the workout to be completed normally.",
+  "audience": "user",
+  "releaseNote": "Empty workouts can now be populated on the day or completed without getting stuck.",
+  "docs": {
+    "impact": "updated",
+    "paths": [
+      "docs/guides/workouts.md",
+      "docs/guides/mesocycles.md",
+      "refs/overview.md"
+    ],
+    "reason": ""
+  },
+  "screenshots": []
+}

@@ -6,7 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_of_record/app_preferences.dart';
 import 'package:workout_of_record/db/app_database.dart';
+import 'package:workout_of_record/db/planning.dart';
 import 'package:workout_of_record/db/tables/enums.dart';
+import 'package:workout_of_record/db/template_data.dart';
 import 'package:workout_of_record/services/workout_recovery_service.dart';
 
 AppDatabase _openMemoryDatabase() =>
@@ -268,6 +270,133 @@ void main() {
   );
 
   test(
+    'empty training day creates a completable workout and advances the cycle',
+    () async {
+      final database = _openMemoryDatabase();
+      addTearDown(database.close);
+      final templateId = await database.createMesoTemplate(
+        'Choose on the day',
+        const [
+          WorkoutDaySpec(name: 'Open workout', isRestDay: false, exercises: []),
+        ],
+      );
+      final mesocycleId = await database.createMesocycle(
+        templateId,
+        'Flexible Cycle',
+        2,
+      );
+      final workout = await database.getOrCreateNextWorkout(mesocycleId);
+      await database.generatePlannedWorkout(workout!.id);
+      final completedWorkoutId = await database.initializeWorkout(workout.id);
+
+      final active = await database.getWorkoutData(completedWorkoutId);
+      expect(active.exercises, isEmpty);
+
+      await database.finishWorkout(completedWorkoutId);
+
+      final completed = await (database.select(
+        database.completedWorkouts,
+      )..where((row) => row.id.equals(completedWorkoutId))).getSingle();
+      expect(completed.status, WorkoutStatus.completed);
+      expect(completed.completedAt, isNotNull);
+      final next = await database.getOrCreateNextWorkout(mesocycleId);
+      expect(next, isNotNull);
+      expect(next!.id, isNot(workout.id));
+    },
+  );
+
+  test(
+    'new movement can be added to an empty planned workout',
+    () async {
+      final database = _openMemoryDatabase();
+      addTearDown(database.close);
+      final templateId = await database.createMesoTemplate(
+        'Empty start',
+        const [
+          WorkoutDaySpec(name: 'Open workout', isRestDay: false, exercises: []),
+        ],
+      );
+      final mesocycleId = await database.createMesocycle(
+        templateId,
+        'Build on the Day',
+        2,
+      );
+      final workout = await database.getOrCreateNextWorkout(mesocycleId);
+      await database.generatePlannedWorkout(workout!.id);
+      final completedWorkoutId = await database.initializeWorkout(workout.id);
+      final movement = (await database.getMovements()).first;
+
+      await database.addExerciseAfter(
+        completedWorkoutId,
+        -1,
+        movement.id,
+        defaults: const [
+          PlannedSetValues(reps: 8, weight: 40),
+          PlannedSetValues(reps: 8, weight: 40),
+        ],
+      );
+
+      final reloaded = await database.getWorkoutData(completedWorkoutId);
+      expect(reloaded.exercises, hasLength(1));
+      expect(reloaded.exercises.single.movement.id, movement.id);
+      expect(reloaded.exercises.single.sets, hasLength(2));
+      expect(reloaded.exercises.single.sets.first.planned!.reps, 8);
+      expect(reloaded.exercises.single.sets.first.planned!.weight, 40);
+    },
+  );
+
+  test(
+    'deleted movement can be added to an empty workout without duplicating its plan',
+    () async {
+      final database = _openMemoryDatabase();
+      addTearDown(database.close);
+      final fixture = await _startWorkout(database);
+      final original = await database.getWorkoutData(
+        fixture.completedWorkoutId,
+      );
+      final movement = original.exercises.first.movement;
+      final originalSetCount = original.exercises.first.sets.length;
+      final plannedWorkout = await (database.select(
+        database.plannedWorkouts,
+      )..where((row) => row.workoutId.equals(fixture.workoutId))).getSingle();
+
+      for (final exercise in original.exercises) {
+        await database.deleteExercise(exercise.completed.id);
+      }
+      expect(
+        (await database.getWorkoutData(fixture.completedWorkoutId)).exercises,
+        isEmpty,
+      );
+
+      await database.addExerciseAfter(
+        fixture.completedWorkoutId,
+        -1,
+        movement.id,
+        defaults: const [PlannedSetValues(reps: 99, weight: 999)],
+      );
+
+      final reloaded = await database.getWorkoutData(
+        fixture.completedWorkoutId,
+      );
+      expect(reloaded.exercises, hasLength(1));
+      expect(reloaded.exercises.single.movement.id, movement.id);
+      expect(reloaded.exercises.single.sets, hasLength(originalSetCount));
+      expect(
+        reloaded.exercises.single.sets.every((set) => set.planned != null),
+        isTrue,
+      );
+      final matchingPlans =
+          await (database.select(database.plannedExercises)..where(
+                (row) =>
+                    row.plannedWorkoutId.equals(plannedWorkout.id) &
+                    row.movementId.equals(movement.id),
+              ))
+              .get();
+      expect(matchingPlans, hasLength(1));
+    },
+  );
+
+  test(
     'skipping a workout records its reason and selects the next workout',
     () async {
       final database = _openMemoryDatabase();
@@ -334,6 +463,45 @@ void main() {
       expect(AppPreferences.getCurrentMesocycleId(), isNull);
     },
   );
+
+  test('reopening the database reconstructs an empty active workout', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'empty_workout_recovery_',
+    );
+    final path = '${directory.path}/workouts.sqlite';
+    AppDatabase? database = AppDatabase.withExecutor(
+      NativeDatabase(File(path)),
+    );
+    AppDatabase? reopened;
+    try {
+      final fixture = await _startWorkout(database);
+      final active = await database.getWorkoutData(fixture.completedWorkoutId);
+      for (final exercise in active.exercises) {
+        await database.deleteExercise(exercise.completed.id);
+      }
+      await database.close();
+      database = null;
+
+      reopened = AppDatabase.withExecutor(NativeDatabase(File(path)));
+      await AppPreferences.setCurrentMesocycleId(null);
+      await AppPreferences.setCurrentCompletedWorkoutId(null);
+      await WorkoutRecoveryService.reconcileNavigationPointers(reopened);
+
+      expect(
+        AppPreferences.getCurrentCompletedWorkoutId(),
+        fixture.completedWorkoutId,
+      );
+      final recovered = await reopened.getWorkoutData(
+        fixture.completedWorkoutId,
+      );
+      expect(recovered.completedWorkout.status, WorkoutStatus.active);
+      expect(recovered.exercises, isEmpty);
+    } finally {
+      await database?.close();
+      await reopened?.close();
+      await directory.delete(recursive: true);
+    }
+  });
 
   test(
     'reopening the database reconstructs the persisted active workout',

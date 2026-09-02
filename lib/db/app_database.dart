@@ -1739,6 +1739,7 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
+  /// Adds an exercise after [afterOrderIndex]; use -1 for an empty workout.
   Future<void> addExerciseAfter(
     int completedWorkoutId,
     int afterOrderIndex,
@@ -1749,6 +1750,42 @@ class AppDatabase extends _$AppDatabase {
     ],
   }) =>
       transaction(() async {
+        final completedWorkout = await (select(completedWorkouts)
+              ..where((w) => w.id.equals(completedWorkoutId)))
+            .getSingle();
+        final plannedWorkout = await (select(plannedWorkouts)
+              ..where((p) => p.workoutId.equals(completedWorkout.workoutId)))
+            .getSingleOrNull();
+
+        PlannedExercise? existingPlannedExercise;
+        var setDefaults = defaults;
+        if (plannedWorkout != null) {
+          existingPlannedExercise = await (select(plannedExercises)
+                ..where((exercise) =>
+                    exercise.plannedWorkoutId.equals(plannedWorkout.id) &
+                    exercise.movementId.equals(movementId))
+                ..orderBy([(exercise) => OrderingTerm.asc(exercise.id)])
+                ..limit(1))
+              .getSingleOrNull();
+          if (existingPlannedExercise != null) {
+            final existingSets = await (select(plannedSets)
+                  ..where((set) => set.plannedExerciseId
+                      .equals(existingPlannedExercise!.id))
+                  ..orderBy([(set) => OrderingTerm.asc(set.id)]))
+                .get();
+            if (existingSets.isNotEmpty) {
+              setDefaults = [
+                for (final set in existingSets)
+                  PlannedSetValues(
+                    reps: set.reps,
+                    weight: set.weight,
+                    time: set.time,
+                  ),
+              ];
+            }
+          }
+        }
+
         await customUpdate(
           'UPDATE completed_exercises '
           'SET order_index = order_index + 1 '
@@ -1764,31 +1801,28 @@ class AppDatabase extends _$AppDatabase {
             completedWorkoutId: completedWorkoutId,
             movementId: movementId,
             orderIndex: afterOrderIndex + 1,
+            autoProgress: Value(existingPlannedExercise?.autoProgress ?? true),
           ),
         );
 
         // Create empty completed sets (user fills them in).
-        for (final _ in defaults) {
+        for (final _ in setDefaults) {
           await into(completedSets).insert(
             CompletedSetsCompanion.insert(completedExerciseId: newExId),
           );
         }
 
-        // Create planned sets so the UI shows suggestions.
-        final cw = await (select(completedWorkouts)
-              ..where((w) => w.id.equals(completedWorkoutId)))
-            .getSingle();
-        final pw = await (select(plannedWorkouts)
-              ..where((p) => p.workoutId.equals(cw.workoutId)))
-            .getSingleOrNull();
-        if (pw != null) {
+        // Reuse an original planned exercise when one exists. Inserting a
+        // duplicate for a movement that was deleted and re-added makes workout
+        // loading ambiguous because completed rows resolve plans by movement.
+        if (plannedWorkout != null && existingPlannedExercise == null) {
           final plannedExId = await into(plannedExercises).insert(
             PlannedExercisesCompanion.insert(
-              plannedWorkoutId: pw.id,
+              plannedWorkoutId: plannedWorkout.id,
               movementId: movementId,
             ),
           );
-          for (final sv in defaults) {
+          for (final sv in setDefaults) {
             await into(plannedSets).insert(
               PlannedSetsCompanion(
                 plannedExerciseId: Value(plannedExId),

@@ -21,8 +21,12 @@ Changing a set's weight carries that weight into its later unchecked sets. Repet
 
 When enabled in **Settings → Rest Timer**, get-ready chimes play a lower tone at 10 seconds remaining and a higher tone at 5 seconds without changing the displayed countdown. Silent alert mode suppresses both tones. When the rest timer ends, its spoken cue uses the rightmost planned value shown for the next set. If the planner left that value empty, the cue says “ready” instead of announcing an earlier value from the row. On Android, an active workout delivers the get-ready chimes, final cue, and optional vibration from its foreground workout service, so switching to another app does not postpone the alerts until Workout of Record is visible again.
 
-Exercises and prescribed sets can be skipped when the app requests a reason. Skipping clears completed values so the history does not imply the work was performed. The skip reason remains in history, and later planning falls back to earlier completed values instead of treating a skipped exercise as a new exercise. User-added sets can be removed. Required exercise and muscle-group feedback must be completed before the workout can advance or finish.
+Exercises and prescribed sets can be skipped when the app requests a reason. Skipping clears completed values so the history does not imply the work was performed. The skip reason remains in history, and later planning falls back to earlier completed values instead of treating a skipped exercise as a new exercise. The last unchecked set can be permanently removed whether it was prescribed or added during the workout. Required exercise and muscle-group feedback must be completed before a non-empty workout can advance or finish.
+
+## Empty workouts
+
+An empty workout is a scheduled training session with no exercises; it is different from a rest day. Empty workouts can come from a deliberately empty template day or from removing every exercise that would otherwise carry into a later week. From the empty workout screen, add an exercise or finish the workout without exercise or muscle-group feedback. An empty active workout remains available after restarting the app.
 
 ## Finish safely
 
-Finish the workout only after all exercises are completed or skipped and all required feedback is recorded. The app saves progress throughout the session, but completion performs the bookkeeping that advances the mesocycle and may trigger an automatic backup.
+Finish a non-empty workout only after all exercises are completed or skipped and all required feedback is recorded. The app saves progress throughout the session, but completion performs the bookkeeping that advances the mesocycle and may trigger an automatic backup.

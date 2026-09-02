@@ -17,6 +17,7 @@ import '../services/workout_foreground_service.dart';
 import '../workout_units.dart';
 import '../widgets/app_nav_menu.dart';
 import 'chat_screen.dart';
+import '../widgets/empty_workout_view.dart';
 import '../widgets/exercise_widget.dart';
 import '../widgets/rest_timer_controller.dart';
 import '../widgets/rest_timer_widget.dart';
@@ -877,7 +878,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     await _load();
   }
 
-  Future<void> _addExerciseAfter(ExerciseData exercise) async {
+  Future<void> _addExercise({ExerciseData? after}) async {
     final movs = await db.getMovements();
     if (!mounted) return;
     final mesoId = AppPreferences.getCurrentMesocycleId();
@@ -893,11 +894,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
             : const [PlannedSetValues(), PlannedSetValues()];
         await db.addExerciseAfter(
           widget.completedWorkoutId,
-          exercise.completed.orderIndex,
+          after?.completed.orderIndex ?? -1,
           m.id,
           defaults: defaults,
         );
-        if (mounted) _load();
+        if (mounted) await _load();
         // Fire AI refinement in the background so the user sees heuristic
         // values immediately and the refined values whenever the single AI
         // call returns.
@@ -973,17 +974,14 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         for (final ex in _data!.exercises)
           if (ex.completed.id != exercise.completed.id) ex.completed.movementId,
       },
-      onAdd: (m) {
-        db
-            .replaceExercise(
+      onAdd: (m) async {
+        await db.replaceExercise(
           exercise.completed.id,
           m.id,
           exercise.completed.orderIndex,
           widget.completedWorkoutId,
-        )
-            .then((_) {
-          if (mounted) _load();
-        });
+        );
+        if (mounted) await _load();
       },
     );
   }
@@ -1309,6 +1307,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
             child: ListView(
               padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + MediaQuery.of(context).padding.bottom),
               children: [
+                if (data.exercises.isEmpty)
+                  EmptyWorkoutView(
+                    onAddExercise: () => _addExercise(),
+                    onFinishWorkout: _finishWorkout,
+                  ),
                 for (var i = 0; i < data.exercises.length; i++)
                   _buildExerciseWidget(
                       data.exercises[i], i, lastExIndexForMg, activeExId),
@@ -1397,7 +1400,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       onDeleteSet: (setData) => _deleteSet(setData, exercise),
       onTogglePersistence: () => _togglePersistence(exercise),
       onReplace: () => _replaceExercise(exercise),
-      onAddExercise: isExCompleted ? null : () => _addExerciseAfter(exercise),
+      onAddExercise:
+          isExCompleted ? null : () => _addExercise(after: exercise),
       onMoveUp: canMoveUp ? () => _moveExerciseUp(index) : null,
       onMoveDown: canMoveDown ? () => _moveExerciseDown(index) : null,
       onDeleteExercise: isNotStarted ? () => _deleteExercise(exercise) : null,
