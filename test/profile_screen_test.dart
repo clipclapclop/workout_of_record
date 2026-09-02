@@ -43,6 +43,12 @@ void main() {
     expect(AppPreferences.getWeight(), 187.5);
   });
 
+  test('legacy zero profile weight is treated as blank', () async {
+    await initializeTestPreferences({'profile_weight_lbs': 0.0});
+
+    expect(AppPreferences.getWeight(), isNull);
+  });
+
   test(
     'profile persistence rejects non-positive and non-finite weight',
     () async {

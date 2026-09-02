@@ -2,7 +2,7 @@
 
 ## Timer and AI settings
 
-Workout weights are recorded in pounds and distances in miles. Profile weight must be blank or greater than zero, and training experience must be blank or zero years or more. Invalid, non-finite values are kept on screen with an explanation instead of being saved. Settings cover rest-timer behavior, optional AI configuration, and backup/restore controls. Rest-timer settings include an optional get-ready sequence: a lower built-in tone at 10 seconds remaining followed by a higher tone at 5 seconds. The sequence does not change the visible countdown, does not require text-to-speech, and is suppressed when the alert sound is set to Silent. Core workout logging remains available when AI is disabled or unavailable.
+Workout weights are recorded in pounds and distances in miles. Profile weight must be blank or greater than zero, and training experience must be blank or zero years or more. A zero or otherwise unusable weight saved by an earlier version is treated as blank. Invalid, non-finite values are kept on screen with an explanation instead of being saved. Settings cover rest-timer behavior, optional AI configuration, and backup/restore controls. Rest-timer settings include an optional get-ready sequence: a lower built-in tone at 10 seconds remaining followed by a higher tone at 5 seconds. The sequence does not change the visible countdown, does not require text-to-speech, and is suppressed when the alert sound is set to Silent. Core workout logging remains available when AI is disabled or unavailable.
 
 API credentials entered for optional AI features are device settings and must never be placed in release manifests, documentation, or the repository.
 
