@@ -68,7 +68,7 @@ class RestTimerController extends ChangeNotifier {
 
   /// Update an idle timer without disturbing a countdown already in progress.
   void setDurationWhenIdle(int seconds) {
-    if (isRunning || _durationSeconds == seconds) return;
+    if (isRunning) return;
     setDuration(seconds);
   }
 

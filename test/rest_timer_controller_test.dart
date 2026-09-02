@@ -13,9 +13,13 @@ void main() {
     expect(controller.isRunning, isTrue);
     expect(controller.durationSeconds, 60);
 
-    controller.stop();
-    controller.setDurationWhenIdle(90);
+    controller.markCued();
+    expect(controller.remainingMs, 0);
+    controller.setDurationWhenIdle(60);
     expect(controller.isRunning, isFalse);
+    expect(controller.remainingMs, 60000);
+
+    controller.setDurationWhenIdle(90);
     expect(controller.durationSeconds, 90);
     expect(controller.remainingMs, 90000);
   });

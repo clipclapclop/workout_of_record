@@ -241,7 +241,10 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         !AppPreferences.getTimerEnabled() ||
         !_timerWorkoutOn) {
       _timerController.stop();
+      _timerActiveExId = null;
+      _timerCueText = null;
       _pushTimerToService();
+      if (mounted) setState(() {});
       return;
     }
 
