@@ -19,6 +19,8 @@ internal data class BackupDocumentDigest(
 internal interface BackupDocumentStore {
     fun exists(name: String): Boolean
     fun write(name: String, bytes: ByteArray)
+    fun writeMarker(name: String, bytes: ByteArray)
+    fun readMarker(name: String): ByteArray
     fun digest(name: String): BackupDocumentDigest
     fun rename(from: String, to: String): Boolean
     fun delete(name: String): Boolean
@@ -37,6 +39,8 @@ internal class FixedNameBackupWriter(
         const val FINAL_NAME = "workout_of_record.zip"
         const val PENDING_NAME = "workout_of_record.pending.zip"
         const val PREVIOUS_NAME = "workout_of_record.previous.zip"
+        const val VERIFIED_NAME = "workout_of_record.verified"
+        const val VERIFIED_PENDING_NAME = "workout_of_record.verified.pending"
     }
 
     fun replace(bytes: ByteArray) {
@@ -63,6 +67,7 @@ internal class FixedNameBackupWriter(
             }
             renameRequired(PENDING_NAME, FINAL_NAME)
             requireDigest(FINAL_NAME, expected)
+            writeVerificationMarker(expected)
         } catch (error: Exception) {
             val rollbackError = rollbackPrevious()
             if (rollbackError != null) {
@@ -74,6 +79,8 @@ internal class FixedNameBackupWriter(
             }
             if (!replacingExisting) deleteBestEffort(FINAL_NAME)
             deleteBestEffort(PENDING_NAME)
+            deleteBestEffort(VERIFIED_NAME)
+            deleteBestEffort(VERIFIED_PENDING_NAME)
             throw BackupReplacementException(
                 if (replacingExisting) {
                     "Backup replacement failed. The previous backup was restored."
@@ -92,14 +99,14 @@ internal class FixedNameBackupWriter(
                 error,
             )
         }
+        deleteBestEffort(VERIFIED_NAME)
+        deleteBestEffort(VERIFIED_PENDING_NAME)
     }
 
     /** Reconciles safety files left by an interrupted replacement. */
     fun recoverInterruptedReplacement() {
         if (store.exists(PREVIOUS_NAME)) {
-            if (store.exists(FINAL_NAME)) {
-                // FINAL_NAME came from a pending file that was verified before
-                // promotion. Keep the newer final file and remove the old copy.
+            if (hasValidVerificationMarker()) {
                 deleteRequired(PREVIOUS_NAME)
             } else {
                 val rollbackError = rollbackPrevious()
@@ -112,9 +119,9 @@ internal class FixedNameBackupWriter(
             }
         }
 
-        if (store.exists(PENDING_NAME)) {
-            deleteRequired(PENDING_NAME)
-        }
+        deleteRequired(PENDING_NAME)
+        deleteRequired(VERIFIED_NAME)
+        deleteRequired(VERIFIED_PENDING_NAME)
     }
 
     private fun rollbackPrevious(): Exception? {
@@ -136,6 +143,34 @@ internal class FixedNameBackupWriter(
             throw BackupReplacementException("Backup verification failed for $name.")
         }
     }
+
+    private fun writeVerificationMarker(expected: BackupDocumentDigest) {
+        val bytes = verificationMarkerBytes(expected)
+        deleteRequired(VERIFIED_NAME)
+        deleteRequired(VERIFIED_PENDING_NAME)
+        store.writeMarker(VERIFIED_PENDING_NAME, bytes)
+        if (!store.readMarker(VERIFIED_PENDING_NAME).contentEquals(bytes)) {
+            throw BackupReplacementException("Backup verification marker could not be verified.")
+        }
+        renameRequired(VERIFIED_PENDING_NAME, VERIFIED_NAME)
+        if (!store.readMarker(VERIFIED_NAME).contentEquals(bytes)) {
+            throw BackupReplacementException("Backup verification marker could not be promoted.")
+        }
+    }
+
+    private fun hasValidVerificationMarker(): Boolean {
+        if (!store.exists(FINAL_NAME) || !store.exists(VERIFIED_NAME)) return false
+        return try {
+            store.readMarker(VERIFIED_NAME).contentEquals(
+                verificationMarkerBytes(store.digest(FINAL_NAME)),
+            )
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun verificationMarkerBytes(digest: BackupDocumentDigest): ByteArray =
+        "${digest.byteCount}:${digest.sha256}".toByteArray(Charsets.UTF_8)
 
     private fun renameRequired(from: String, to: String) {
         if (!store.rename(from, to)) {

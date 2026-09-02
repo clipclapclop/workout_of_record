@@ -26,6 +26,12 @@ class FixedNameBackupWriterTest {
             }
         }
 
+        override fun writeMarker(name: String, bytes: ByteArray) {
+            files[name] = bytes.copyOf()
+        }
+
+        override fun readMarker(name: String): ByteArray = files.getValue(name).copyOf()
+
         override fun digest(name: String): BackupDocumentDigest {
             val bytes = files.getValue(name)
             if (corruptFinalDigest && name == FixedNameBackupWriter.FINAL_NAME) {
@@ -136,6 +142,16 @@ class FixedNameBackupWriterTest {
             store.files[FixedNameBackupWriter.FINAL_NAME],
         )
         assertArrayEquals(old, store.files[FixedNameBackupWriter.PREVIOUS_NAME])
+        assertTrue(store.exists(FixedNameBackupWriter.VERIFIED_NAME))
+
+        store.failDeleteName = null
+        FixedNameBackupWriter(store).recoverInterruptedReplacement()
+        assertArrayEquals(
+            byteArrayOf(9, 8, 7),
+            store.files[FixedNameBackupWriter.FINAL_NAME],
+        )
+        assertFalse(store.exists(FixedNameBackupWriter.PREVIOUS_NAME))
+        assertFalse(store.exists(FixedNameBackupWriter.VERIFIED_NAME))
     }
 
     @Test
@@ -151,17 +167,22 @@ class FixedNameBackupWriterTest {
         assertFalse(store.exists(FixedNameBackupWriter.FINAL_NAME))
         assertFalse(store.exists(FixedNameBackupWriter.PENDING_NAME))
         assertFalse(store.exists(FixedNameBackupWriter.PREVIOUS_NAME))
+        assertFalse(store.exists(FixedNameBackupWriter.VERIFIED_NAME))
     }
 
     @Test
     fun `interrupted cleanup keeps the promoted final backup`() {
         val old = byteArrayOf(1, 2, 3)
         val promoted = byteArrayOf(4, 5, 6)
+        val promotedDigest = BackupDocumentDigest.fromBytes(promoted)
+        val marker = "${promotedDigest.byteCount}:${promotedDigest.sha256}"
+            .toByteArray(Charsets.UTF_8)
         val store = FakeStore(
             mapOf(
                 FixedNameBackupWriter.FINAL_NAME to promoted,
                 FixedNameBackupWriter.PREVIOUS_NAME to old,
                 FixedNameBackupWriter.PENDING_NAME to byteArrayOf(7),
+                FixedNameBackupWriter.VERIFIED_NAME to marker,
             ),
         )
 
@@ -170,6 +191,24 @@ class FixedNameBackupWriterTest {
         assertArrayEquals(promoted, store.files[FixedNameBackupWriter.FINAL_NAME])
         assertFalse(store.exists(FixedNameBackupWriter.PREVIOUS_NAME))
         assertFalse(store.exists(FixedNameBackupWriter.PENDING_NAME))
+        assertFalse(store.exists(FixedNameBackupWriter.VERIFIED_NAME))
+    }
+
+    @Test
+    fun `failed rollback state restores previous instead of trusting final`() {
+        val old = byteArrayOf(1, 2, 3)
+        val unverified = byteArrayOf(4, 5, 6)
+        val store = FakeStore(
+            mapOf(
+                FixedNameBackupWriter.FINAL_NAME to unverified,
+                FixedNameBackupWriter.PREVIOUS_NAME to old,
+            ),
+        )
+
+        FixedNameBackupWriter(store).recoverInterruptedReplacement()
+
+        assertArrayEquals(old, store.files[FixedNameBackupWriter.FINAL_NAME])
+        assertFalse(store.exists(FixedNameBackupWriter.PREVIOUS_NAME))
     }
 
     @Test

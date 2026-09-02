@@ -2,6 +2,7 @@ package com.clipclapclop.workoutofrecord
 
 import android.content.Context
 import androidx.documentfile.provider.DocumentFile
+import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 
 internal class SafBackupDocumentStore(
@@ -11,18 +12,30 @@ internal class SafBackupDocumentStore(
     override fun exists(name: String): Boolean = tree.findFile(name)?.exists() == true
 
     override fun write(name: String, bytes: ByteArray) {
-        if (exists(name)) throw Exception("Temporary backup file already exists: $name")
-        val document = tree.createFile("application/zip", name)
-            ?: throw Exception("Cannot create temporary backup file")
-        if (document.name != name) {
-            document.delete()
-            throw Exception("The selected folder changed the temporary backup filename")
-        }
-        val stream = context.contentResolver.openOutputStream(document.uri, "w")
-            ?: throw Exception("Cannot open temporary backup file")
-        stream.use {
-            it.write(bytes)
-            it.flush()
+        writeDocument(name, bytes, "application/zip")
+    }
+
+    override fun writeMarker(name: String, bytes: ByteArray) {
+        writeDocument(name, bytes, "application/octet-stream")
+    }
+
+    override fun readMarker(name: String): ByteArray {
+        val document = tree.findFile(name) ?: throw Exception("Backup marker is missing: $name")
+        val stream = context.contentResolver.openInputStream(document.uri)
+            ?: throw Exception("Cannot read backup marker: $name")
+        return stream.use {
+            val output = ByteArrayOutputStream()
+            val buffer = ByteArray(128)
+            while (true) {
+                val count = it.read(buffer)
+                if (count < 0) break
+                if (count == 0) continue
+                if (output.size() + count > 256) {
+                    throw Exception("Backup marker is unexpectedly large")
+                }
+                output.write(buffer, 0, count)
+            }
+            output.toByteArray()
         }
     }
 
@@ -46,6 +59,22 @@ internal class SafBackupDocumentStore(
             byteCount = byteCount,
             sha256 = digest.digest().joinToString("") { "%02x".format(it) },
         )
+    }
+
+    private fun writeDocument(name: String, bytes: ByteArray, mimeType: String) {
+        if (exists(name)) throw Exception("Temporary backup file already exists: $name")
+        val document = tree.createFile(mimeType, name)
+            ?: throw Exception("Cannot create temporary backup file")
+        if (document.name != name) {
+            document.delete()
+            throw Exception("The selected folder changed the temporary backup filename")
+        }
+        val stream = context.contentResolver.openOutputStream(document.uri, "w")
+            ?: throw Exception("Cannot open temporary backup file")
+        stream.use {
+            it.write(bytes)
+            it.flush()
+        }
     }
 
     override fun rename(from: String, to: String): Boolean {
