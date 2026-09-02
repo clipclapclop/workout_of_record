@@ -62,8 +62,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   // Per-workout timer kill-switch — always on (no UI to toggle).
   static const _timerWorkoutOn = true;
 
-  // This controller belongs to this WorkoutScreen instance and is never reused
-  // for a different workout.
   late RestTimerController _timerController;
   // Notification/cue context follows the next usable set; the controller
   // separately preserves the deadline established by the triggering set.
@@ -199,15 +197,15 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     }
     final activeEx =
         _data!.exercises.firstWhere((e) => e.completed.id == activeId);
+    final hadTimerContext = _timerActiveExId != null;
     // Keep the eventual alert aimed at the next usable set, including across
     // exercise boundaries, without changing the triggering set's countdown.
     _timerActiveExId = activeId;
     _timerCueText = _cueText(activeEx);
 
-    // Before any set has triggered the timer, keep its idle duration aligned
-    // with the active set. Once started, stopped, or completed, that rest
-    // belongs to its triggering set and survives exercise/feedback changes.
-    if (!_timerController.hasBeenStarted) {
+    // Initialize an untouched screen's idle timer. Once this screen has timer
+    // context, exercise and feedback changes do not alter its countdown.
+    if (!hadTimerContext) {
       _timerController.setDuration(_effectiveDuration(activeEx.movement));
     }
     _pushTimerToService();

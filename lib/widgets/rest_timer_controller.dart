@@ -15,17 +15,12 @@ class RestTimerController extends ChangeNotifier {
   int _pausedRemainingMs;
   DateTime? _startedAt;
   bool _cued = false; // whether the zero-cue has already fired this round
-  // Deliberately session-only: recreating the workout screen creates an idle
-  // timer. Workout data persists, but an in-progress rest countdown does not.
-  bool _hasBeenStarted = false;
 
   // ── Getters ────────────────────────────────────────────────────────────────
 
   int get durationSeconds => _durationSeconds;
   bool get isRunning => _startedAt != null;
   bool get cued => _cued;
-  /// True after a set starts this rest, including while paused or completed.
-  bool get hasBeenStarted => _hasBeenStarted;
 
   /// Milliseconds remaining.  Clamped to [0, durationSeconds * 1000].
   int get remainingMs {
@@ -47,7 +42,6 @@ class RestTimerController extends ChangeNotifier {
     // Backdate _startedAt so that remaining == startFrom immediately.
     _startedAt = DateTime.now()
         .subtract(Duration(milliseconds: _durationSeconds * 1000 - startFrom));
-    _hasBeenStarted = true;
     notifyListeners();
   }
 
@@ -63,7 +57,6 @@ class RestTimerController extends ChangeNotifier {
     _startedAt = null;
     _pausedRemainingMs = _durationSeconds * 1000;
     _cued = false;
-    _hasBeenStarted = false;
     notifyListeners();
   }
 

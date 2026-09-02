@@ -2,34 +2,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_of_record/widgets/rest_timer_controller.dart';
 
 void main() {
-  test('tracks whether a set has started the current timer', () {
+  test('cue completion stops the countdown at zero', () {
     final controller = RestTimerController(durationSeconds: 60);
     addTearDown(controller.dispose);
 
     expect(controller.isRunning, isFalse);
-    expect(controller.hasBeenStarted, isFalse);
-
-    controller.setDuration(90);
-    expect(controller.hasBeenStarted, isFalse);
-    expect(controller.remainingMs, 90000);
+    expect(controller.remainingMs, 60000);
 
     controller.start();
     expect(controller.isRunning, isTrue);
-    expect(controller.hasBeenStarted, isTrue);
-
-    controller.stop();
-    expect(controller.isRunning, isFalse);
-    expect(controller.hasBeenStarted, isTrue);
-    controller.start();
 
     controller.markCued();
     expect(controller.isRunning, isFalse);
-    expect(controller.hasBeenStarted, isTrue);
     expect(controller.remainingMs, 0);
 
     controller.reset();
-    expect(controller.hasBeenStarted, isFalse);
-    expect(controller.remainingMs, 90000);
+    expect(controller.isRunning, isFalse);
+    expect(controller.remainingMs, 60000);
   });
 
   test('final usable set ignores excluded sets in workout order', () {
