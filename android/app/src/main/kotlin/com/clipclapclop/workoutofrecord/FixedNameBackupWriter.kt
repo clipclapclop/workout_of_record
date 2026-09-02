@@ -79,7 +79,7 @@ internal class FixedNameBackupWriter(
                     rollbackError,
                 )
             }
-            if (!replacingExisting) deleteBestEffort(FINAL_NAME)
+            if (!replacingExisting) deleteIfDigestMatches(FINAL_NAME, expected)
             deleteBestEffort(PENDING_NAME)
             deleteBestEffort(VERIFIED_NAME)
             deleteBestEffort(VERIFIED_PENDING_NAME)
@@ -186,11 +186,24 @@ internal class FixedNameBackupWriter(
         }
     }
 
+    private fun deleteIfDigestMatches(
+        name: String,
+        expected: BackupDocumentDigest,
+    ) {
+        try {
+            if (store.exists(name) && store.digest(name) == expected) {
+                store.delete(name)
+            }
+        } catch (_: Exception) {
+            // Do not remove a file this operation cannot prove it created.
+        }
+    }
+
     private fun deleteBestEffort(name: String) {
         try {
             if (store.exists(name)) store.delete(name)
         } catch (_: Exception) {
-            // A stale pending file is safe to reconcile on the next attempt.
+            // A stale safety file is reconciled on the next attempt.
         }
     }
 }

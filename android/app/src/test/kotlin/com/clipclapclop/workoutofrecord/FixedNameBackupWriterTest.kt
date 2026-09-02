@@ -155,7 +155,7 @@ class FixedNameBackupWriterTest {
     }
 
     @Test
-    fun `failed verification of a first backup leaves no invalid final file`() {
+    fun `failed first-backup verification does not delete an unmatched final file`() {
         val store = FakeStore().apply {
             corruptFinalDigest = true
         }
@@ -164,7 +164,7 @@ class FixedNameBackupWriterTest {
             FixedNameBackupWriter(store).replace(byteArrayOf(9, 8, 7))
         }
 
-        assertFalse(store.exists(FixedNameBackupWriter.FINAL_NAME))
+        assertTrue(store.exists(FixedNameBackupWriter.FINAL_NAME))
         assertFalse(store.exists(FixedNameBackupWriter.PENDING_NAME))
         assertFalse(store.exists(FixedNameBackupWriter.PREVIOUS_NAME))
         assertFalse(store.exists(FixedNameBackupWriter.VERIFIED_NAME))
