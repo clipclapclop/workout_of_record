@@ -1,0 +1,15 @@
+{
+  "id": "safe-exercise-replacement",
+  "summary": "Limited replacement to untouched exercises while keeping Add Exercise available for mid-workout substitutions.",
+  "audience": "user",
+  "releaseNote": "Recorded exercise work is now preserved when changing movements mid-workout; add a substitute instead of replacing completed work.",
+  "docs": {
+    "impact": "updated",
+    "paths": [
+      "docs/guides/workouts.md",
+      "refs/overview.md"
+    ],
+    "reason": ""
+  },
+  "screenshots": []
+}

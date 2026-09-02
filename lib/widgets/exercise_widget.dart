@@ -67,7 +67,7 @@ class ExerciseWidget extends StatelessWidget {
   final Future<void> Function(SetData setData) onShowSetSkipSheet;
   final Future<void> Function(SetData setData) onDeleteSet;
   final VoidCallback onTogglePersistence;
-  final VoidCallback onReplace;
+  final VoidCallback? onReplace;
   final VoidCallback? onAddExercise;
   final VoidCallback? onMoveUp;
   final VoidCallback? onMoveDown;
@@ -96,8 +96,8 @@ class ExerciseWidget extends StatelessWidget {
             iconSize: 18,
             padding: EdgeInsets.zero,
             onSelected: (action) {
-              if (action == _ExMenuAction.replace) {
-                onReplace();
+              if (action == _ExMenuAction.addExercise) {
+                onAddExercise?.call();
               } else if (action == _ExMenuAction.moveUp) {
                 onMoveUp?.call();
               } else if (action == _ExMenuAction.moveDown) {
@@ -111,14 +111,15 @@ class ExerciseWidget extends StatelessWidget {
               }
             },
             itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: _ExMenuAction.replace,
-                child: ListTile(
-                  leading: Icon(Icons.swap_horiz),
-                  title: Text('Replace'),
-                  contentPadding: EdgeInsets.zero,
+              if (onAddExercise != null)
+                const PopupMenuItem(
+                  value: _ExMenuAction.addExercise,
+                  child: ListTile(
+                    leading: Icon(Icons.fitness_center),
+                    title: Text('Add Exercise'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 ),
-              ),
               if (onMoveUp != null)
                 const PopupMenuItem(
                   value: _ExMenuAction.moveUp,
@@ -196,7 +197,7 @@ class ExerciseWidget extends StatelessWidget {
               } else if (action == _ExMenuAction.addSet) {
                 onAddSet();
               } else if (action == _ExMenuAction.replace) {
-                onReplace();
+                onReplace?.call();
               } else if (action == _ExMenuAction.addExercise) {
                 onAddExercise?.call();
               } else if (action == _ExMenuAction.moveUp) {
@@ -214,7 +215,6 @@ class ExerciseWidget extends StatelessWidget {
               }
             },
             itemBuilder: (_) {
-              final isExCompleted = allSetsDone && !showPostExReopen;
               return [
                 PopupMenuItem(
                   value: _ExMenuAction.skipExercise,
@@ -233,15 +233,16 @@ class ExerciseWidget extends StatelessWidget {
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
-                const PopupMenuItem(
-                  value: _ExMenuAction.replace,
-                  child: ListTile(
-                    leading: Icon(Icons.swap_horiz),
-                    title: Text('Replace'),
-                    contentPadding: EdgeInsets.zero,
+                if (onReplace != null)
+                  const PopupMenuItem(
+                    value: _ExMenuAction.replace,
+                    child: ListTile(
+                      leading: Icon(Icons.swap_horiz),
+                      title: Text('Replace'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
-                ),
-                if (!isExCompleted && onAddExercise != null)
+                if (onAddExercise != null)
                   const PopupMenuItem(
                     value: _ExMenuAction.addExercise,
                     child: ListTile(

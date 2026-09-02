@@ -32,6 +32,10 @@ part 'app_database.g.dart';
 const minimumRestorableSchemaVersion = 8;
 const currentDatabaseSchemaVersion = 13;
 
+class ExerciseReplacementBlockedException implements Exception {
+  const ExerciseReplacementBlockedException();
+}
+
 @DriftDatabase(tables: [
   Movements,
   MesoTemplates,
@@ -1833,6 +1837,10 @@ class AppDatabase extends _$AppDatabase {
             );
           }
         }
+        await _clearMuscleGroupCheckinForMovement(
+          completedWorkoutId,
+          movementId,
+        );
       });
 
   Future<void> swapExerciseOrder(
@@ -1861,6 +1869,32 @@ class AppDatabase extends _$AppDatabase {
     int completedWorkoutId,
   ) =>
       transaction(() async {
+        final oldExercise = await (select(completedExercises)
+              ..where((exercise) =>
+                  exercise.id.equals(oldExId) &
+                  exercise.completedWorkoutId.equals(completedWorkoutId)))
+            .getSingle();
+        final sets = await (select(completedSets)
+              ..where((set) => set.completedExerciseId.equals(oldExId)))
+            .get();
+        final feedback = await (select(postExerciseCheckins)
+              ..where((checkin) =>
+                  checkin.completedExerciseId.equals(oldExId)))
+            .getSingleOrNull();
+        final hasRecordedActivity =
+            oldExercise.persistence == Persistence.dropped ||
+            oldExercise.skipReason != null ||
+            feedback != null ||
+            sets.any((set) =>
+                set.reps != null ||
+                set.weight != null ||
+                set.distance != null ||
+                set.time != null ||
+                set.skipReason != null);
+        if (hasRecordedActivity) {
+          throw const ExerciseReplacementBlockedException();
+        }
+
         await (update(completedExercises)
               ..where((e) => e.id.equals(oldExId)))
             .write(CompletedExercisesCompanion(
@@ -1875,7 +1909,25 @@ class AppDatabase extends _$AppDatabase {
         await into(completedSets).insert(
           CompletedSetsCompanion.insert(completedExerciseId: newExId),
         );
+        await _clearMuscleGroupCheckinForMovement(
+          completedWorkoutId,
+          movementId,
+        );
       });
+
+  Future<void> _clearMuscleGroupCheckinForMovement(
+    int completedWorkoutId,
+    int movementId,
+  ) async {
+    final movement = await (select(movements)
+          ..where((row) => row.id.equals(movementId)))
+        .getSingle();
+    await (delete(postMuscleGroupCheckins)
+          ..where((checkin) =>
+              checkin.completedWorkoutId.equals(completedWorkoutId) &
+              checkin.muscleGroup.equals(movement.muscleGroup.name)))
+        .go();
+  }
 
   /// Returns mesocycle IDs that have at least one started non-rest workout.
   ///

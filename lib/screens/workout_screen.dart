@@ -287,10 +287,18 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           ex.completed.id, () => ex.completed.skipReason);
       _persistence.putIfAbsent(
           ex.completed.id, () => ex.completed.persistence);
-      _postMgDone.putIfAbsent(ex.movement.muscleGroup, () => false);
+    }
+    final currentMuscleGroups = {
+      for (final exercise in data.exercises) exercise.movement.muscleGroup,
+    };
+    _postMgDone.removeWhere((group, _) => !currentMuscleGroups.contains(group));
+    for (final group in currentMuscleGroups) {
+      _postMgDone[group] = false;
     }
     for (final mgCheckin in data.postMuscleGroupCheckins) {
-      _postMgDone[mgCheckin.muscleGroup] = true;
+      if (currentMuscleGroups.contains(mgCheckin.muscleGroup)) {
+        _postMgDone[mgCheckin.muscleGroup] = true;
+      }
     }
 
     // Check for AI recommendation failures.
@@ -1353,8 +1361,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     final anySetChecked = exercise.sets
         .any((s) => _setStates[s.completed.id]?.isChecked ?? false);
 
-    final isExCompleted = isExSkipped || (allSetsDone && postExDone);
     final isNotStarted = !isExSkipped && !anySetChecked;
+    final canReplace = isNotStarted && !postExDone;
     final exercises = _data!.exercises;
     final canMoveUp = isNotStarted &&
         index > 0 &&
@@ -1399,9 +1407,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       onShowSetSkipSheet: (setData) => _showSkipReasonSheet(setData, exercise),
       onDeleteSet: (setData) => _deleteSet(setData, exercise),
       onTogglePersistence: () => _togglePersistence(exercise),
-      onReplace: () => _replaceExercise(exercise),
-      onAddExercise:
-          isExCompleted ? null : () => _addExercise(after: exercise),
+      onReplace: canReplace ? () => _replaceExercise(exercise) : null,
+      onAddExercise: () => _addExercise(after: exercise),
       onMoveUp: canMoveUp ? () => _moveExerciseUp(index) : null,
       onMoveDown: canMoveDown ? () => _moveExerciseDown(index) : null,
       onDeleteExercise: isNotStarted ? () => _deleteExercise(exercise) : null,

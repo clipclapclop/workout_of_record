@@ -53,6 +53,16 @@ Future<int> _completeWorkout(AppDatabase database, int workoutId) async {
   return completedWorkoutId;
 }
 
+Future<Movement> _unusedMovement(
+  AppDatabase database,
+  Iterable<int> usedMovementIds,
+) async {
+  final used = usedMovementIds.toSet();
+  return (await database.getMovements()).firstWhere(
+    (movement) => !used.contains(movement.id),
+  );
+}
+
 void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
@@ -268,6 +278,229 @@ void main() {
       );
     },
   );
+
+  test('untouched exercise can be replaced', () async {
+    final database = _openMemoryDatabase();
+    addTearDown(database.close);
+    final fixture = await _startWorkout(database);
+    final before = await database.getWorkoutData(fixture.completedWorkoutId);
+    final oldExercise = before.exercises.first;
+    final replacement = await _unusedMovement(
+      database,
+      before.exercises.map((exercise) => exercise.movement.id),
+    );
+
+    await database.replaceExercise(
+      oldExercise.completed.id,
+      replacement.id,
+      oldExercise.completed.orderIndex,
+      fixture.completedWorkoutId,
+    );
+
+    final after = await database.getWorkoutData(fixture.completedWorkoutId);
+    expect(
+      after.exercises.any((exercise) => exercise.movement.id == replacement.id),
+      isTrue,
+    );
+    expect(
+      after.exercises.any((exercise) => exercise.completed.id == oldExercise.completed.id),
+      isFalse,
+    );
+  });
+
+  test('completed set prevents replacement and remains unchanged', () async {
+    final database = _openMemoryDatabase();
+    addTearDown(database.close);
+    final fixture = await _startWorkout(database);
+    final before = await database.getWorkoutData(fixture.completedWorkoutId);
+    final oldExercise = before.exercises.first;
+    final completedSet = oldExercise.sets.first.completed;
+    final replacement = await _unusedMovement(
+      database,
+      before.exercises.map((exercise) => exercise.movement.id),
+    );
+    await database.saveCompletedSet(completedSet.id, reps: 8, weight: 40);
+
+    await expectLater(
+      database.replaceExercise(
+        oldExercise.completed.id,
+        replacement.id,
+        oldExercise.completed.orderIndex,
+        fixture.completedWorkoutId,
+      ),
+      throwsA(isA<ExerciseReplacementBlockedException>()),
+    );
+
+    final after = await database.getWorkoutData(fixture.completedWorkoutId);
+    final preserved = after.exercises.singleWhere(
+      (exercise) => exercise.completed.id == oldExercise.completed.id,
+    );
+    expect(preserved.sets.first.completed.reps, 8);
+    expect(preserved.sets.first.completed.weight, 40);
+  });
+
+  test('set skip and exercise skip each prevent replacement', () async {
+    final database = _openMemoryDatabase();
+    addTearDown(database.close);
+    final fixture = await _startWorkout(database);
+    var data = await database.getWorkoutData(fixture.completedWorkoutId);
+    final exerciseCount = data.exercises.length;
+    final setSkippedExercise = data.exercises.first;
+    final exerciseSkippedExercise = data.exercises.last;
+    final replacement = await _unusedMovement(
+      database,
+      data.exercises.map((exercise) => exercise.movement.id),
+    );
+    await database.skipSet(
+      setSkippedExercise.sets.last.completed.id,
+      SkipReason.time,
+    );
+    await database.skipExercise(
+      exerciseSkippedExercise.completed.id,
+      SkipReason.jointPain,
+    );
+
+    for (final exercise in [setSkippedExercise, exerciseSkippedExercise]) {
+      await expectLater(
+        database.replaceExercise(
+          exercise.completed.id,
+          replacement.id,
+          exercise.completed.orderIndex,
+          fixture.completedWorkoutId,
+        ),
+        throwsA(isA<ExerciseReplacementBlockedException>()),
+      );
+    }
+    data = await database.getWorkoutData(fixture.completedWorkoutId);
+    expect(data.exercises, hasLength(exerciseCount));
+  });
+
+  test('exercise feedback prevents replacement', () async {
+    final database = _openMemoryDatabase();
+    addTearDown(database.close);
+    final fixture = await _startWorkout(database);
+    final data = await database.getWorkoutData(fixture.completedWorkoutId);
+    final exercise = data.exercises.first;
+    final replacement = await _unusedMovement(
+      database,
+      data.exercises.map((item) => item.movement.id),
+    );
+    await database.savePostExerciseCheckin(
+      PostExerciseCheckinsCompanion.insert(
+        completedExerciseId: exercise.completed.id,
+        jointPain: Soreness.none,
+      ),
+    );
+
+    await expectLater(
+      database.replaceExercise(
+        exercise.completed.id,
+        replacement.id,
+        exercise.completed.orderIndex,
+        fixture.completedWorkoutId,
+      ),
+      throwsA(isA<ExerciseReplacementBlockedException>()),
+    );
+  });
+
+  test('fully undone set work permits replacement again', () async {
+    final database = _openMemoryDatabase();
+    addTearDown(database.close);
+    final fixture = await _startWorkout(database);
+    final data = await database.getWorkoutData(fixture.completedWorkoutId);
+    final exercise = data.exercises.first;
+    final setId = exercise.sets.first.completed.id;
+    final replacement = await _unusedMovement(
+      database,
+      data.exercises.map((item) => item.movement.id),
+    );
+    await database.saveCompletedSet(setId, reps: 8, weight: 40);
+    await database.clearCompletedSet(setId);
+
+    await database.replaceExercise(
+      exercise.completed.id,
+      replacement.id,
+      exercise.completed.orderIndex,
+      fixture.completedWorkoutId,
+    );
+
+    final after = await database.getWorkoutData(fixture.completedWorkoutId);
+    expect(
+      after.exercises.any((item) => item.movement.id == replacement.id),
+      isTrue,
+    );
+  });
+
+  test('adding exercise clears an earlier rating for its muscle group', () async {
+    final database = _openMemoryDatabase();
+    addTearDown(database.close);
+    final fixture = await _startWorkout(database);
+    final data = await database.getWorkoutData(fixture.completedWorkoutId);
+    final incoming = await _unusedMovement(
+      database,
+      data.exercises.map((item) => item.movement.id),
+    );
+    await database.savePostMuscleGroupCheckin(
+      PostMuscleGroupCheckinsCompanion.insert(
+        completedWorkoutId: fixture.completedWorkoutId,
+        muscleGroup: incoming.muscleGroup,
+        effortLevel: Effort.good,
+        volumeLevel: Volume.good,
+        pumpLevel: Pump.good,
+      ),
+    );
+
+    await database.addExerciseAfter(
+      fixture.completedWorkoutId,
+      data.exercises.first.completed.orderIndex,
+      incoming.id,
+    );
+
+    final after = await database.getWorkoutData(fixture.completedWorkoutId);
+    expect(
+      after.postMuscleGroupCheckins.any(
+        (checkin) => checkin.muscleGroup == incoming.muscleGroup,
+      ),
+      isFalse,
+    );
+  });
+
+  test('replacing exercise clears an earlier rating for its new muscle group',
+      () async {
+    final database = _openMemoryDatabase();
+    addTearDown(database.close);
+    final fixture = await _startWorkout(database);
+    final data = await database.getWorkoutData(fixture.completedWorkoutId);
+    final exercise = data.exercises.first;
+    final incoming = await _unusedMovement(
+      database,
+      data.exercises.map((item) => item.movement.id),
+    );
+    await database.savePostMuscleGroupCheckin(
+      PostMuscleGroupCheckinsCompanion.insert(
+        completedWorkoutId: fixture.completedWorkoutId,
+        muscleGroup: incoming.muscleGroup,
+        effortLevel: Effort.good,
+        volumeLevel: Volume.good,
+        pumpLevel: Pump.good,
+      ),
+    );
+
+    await database.replaceExercise(
+      exercise.completed.id,
+      incoming.id,
+      exercise.completed.orderIndex,
+      fixture.completedWorkoutId,
+    );
+
+    final after = await database.getWorkoutData(fixture.completedWorkoutId);
+    expect(
+      after.postMuscleGroupCheckins.any(
+        (checkin) => checkin.muscleGroup == incoming.muscleGroup,
+      ),
+      isFalse,
+    );
+  });
 
   test(
     'empty training day creates a completable workout and advances the cycle',

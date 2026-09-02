@@ -67,6 +67,8 @@ For a single user, no multi-user, no accounts
   - AI on: prefilled by recommendation service
   - AI off: prefilled by deterministic heuristics
 - User can edit freely; add/remove sets.
+- An untouched exercise can be replaced. After completed/skipped work or feedback exists, preserve it and add the substitute as another exercise instead.
+- Adding work for an already-rated muscle group clears its old rating so feedback is collected again after the new work.
 - Per-exercise, post exercise required feedback before progressing:
   - Joint pain (none|little|some|a lot)
 - Per muscle group, post muscle group required feedback before progressing:
@@ -168,6 +170,7 @@ Output includes:
 - Planned-origin set skipped without reason -> blocked.
 - Last unchecked prescribed or user-added set deleted -> allowed.
 - Zero-exercise workout completed without exercise or muscle-group feedback -> allowed.
+- Started or skipped exercise replaced -> blocked; adding a substitute remains allowed.
 
 ### Assumptions
 - Single local user only.
