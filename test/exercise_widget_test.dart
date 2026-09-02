@@ -25,6 +25,7 @@ void main() {
     required bool started,
     required VoidCallback? onReplace,
     required VoidCallback onAdd,
+    void Function(SetData)? onTimerReset,
   }) {
     final movement = Movement(
       id: 1,
@@ -66,7 +67,7 @@ void main() {
       mgLabel: 'Biceps',
       persistence: Persistence.persistent,
       setStates: {1: setState},
-      onTimerReset: () {},
+      onTimerReset: onTimerReset ?? (_) {},
       onShowPostExerciseSheet: () async {},
       onShowPostMuscleGroupSheet: () async {},
       onShowExerciseSkipSheet: () async {},
@@ -91,6 +92,7 @@ void main() {
     required bool started,
     required VoidCallback? onReplace,
     required VoidCallback onAdd,
+    void Function(SetData)? onTimerReset,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -100,11 +102,30 @@ void main() {
             started: started,
             onReplace: onReplace,
             onAdd: onAdd,
+            onTimerReset: onTimerReset,
           ),
         ),
       ),
     );
   }
+
+  testWidgets('timer reset identifies the interacted set', (tester) async {
+    int? interactedSetId;
+    await pumpExercise(
+      tester,
+      skipped: false,
+      started: false,
+      onReplace: () {},
+      onAdd: () {},
+      onTimerReset: (setData) => interactedSetId = setData.completed.id,
+    );
+
+    final checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
+    expect(checkbox.onChanged, isNotNull);
+    checkbox.onChanged!(true);
+
+    expect(interactedSetId, 1);
+  });
 
   testWidgets('completed exercise offers add but not replace', (tester) async {
     var added = false;

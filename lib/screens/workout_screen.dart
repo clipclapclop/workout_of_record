@@ -180,6 +180,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   void _syncTimer() {
     if (!AppPreferences.getTimerEnabled() || !_timerWorkoutOn || _data == null) {
       _timerController.stop();
+      _timerActiveExId = null;
+      _timerCueText = null;
       _pushTimerToService();
       return;
     }
@@ -187,40 +189,68 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     if (activeId == null) {
       _timerController.stop();
       _timerActiveExId = null;
+      _timerCueText = null;
       _pushTimerToService();
       return;
     }
-    final activeEx = _data!.exercises.firstWhere((e) => e.completed.id == activeId);
-    final duration = _effectiveDuration(activeEx.movement);
-    _timerCueText = _cueText(activeEx);
-    if (duration <= 0) {
-      _timerController.stop();
-      _timerActiveExId = activeId;
-      _pushTimerToService();
-      return;
-    }
-    if (_timerActiveExId == activeId) {
-      // Same exercise — cue text may have changed after a set was completed.
-      _pushTimerToService();
-      return;
-    }
-    // New active exercise — update duration and restart.
+    final activeEx =
+        _data!.exercises.firstWhere((e) => e.completed.id == activeId);
     _timerActiveExId = activeId;
-    _timerController.setDuration(duration);
-    _timerController.start();
+    _timerCueText = _cueText(activeEx);
+
+    // Loading a workout or moving between exercises only updates the idle
+    // duration and next-set context. A running rest belongs to the set that
+    // triggered it and must continue through post-exercise questions.
+    _timerController.setDurationWhenIdle(_effectiveDuration(activeEx.movement));
     _pushTimerToService();
   }
 
-  void _onTimerReset() {
-    final activeId = _activeExerciseId;
-    if (activeId == null) return;
-    final activeEx = _data!.exercises.firstWhere((e) => e.completed.id == activeId);
-    final duration = _effectiveDuration(activeEx.movement);
-    if (duration > 0 && AppPreferences.getTimerEnabled() && _timerWorkoutOn) {
-      _timerController.reset();
-      _timerController.start();
-      _pushTimerToService();
+  bool _isFinalUsableSet(SetData interactedSet) {
+    final excludedSetIds = <int>{};
+    final orderedSetIds = <int>[];
+    for (final exercise in _data!.exercises) {
+      final exerciseSkipped =
+          _exerciseSkipReasons[exercise.completed.id] != null;
+      for (final set in exercise.sets) {
+        orderedSetIds.add(set.completed.id);
+        if (exerciseSkipped ||
+            (_setStates[set.completed.id]?.isSkipped ?? false)) {
+          excludedSetIds.add(set.completed.id);
+        }
+      }
     }
+    return isFinalUsableWorkoutSet(
+      interactedSetId: interactedSet.completed.id,
+      orderedSetIds: orderedSetIds,
+      excludedSetIds: excludedSetIds,
+    );
+  }
+
+  void _onTimerReset(SetData interactedSet, ExerciseData exercise) {
+    if (_isFinalUsableSet(interactedSet)) {
+      _timerController.stop();
+      _timerActiveExId = null;
+      _timerCueText = null;
+      _pushTimerToService();
+      if (mounted) setState(() {});
+      return;
+    }
+
+    final duration = _effectiveDuration(exercise.movement);
+    if (duration <= 0 ||
+        !AppPreferences.getTimerEnabled() ||
+        !_timerWorkoutOn) {
+      _timerController.stop();
+      _pushTimerToService();
+      return;
+    }
+
+    _timerActiveExId = exercise.completed.id;
+    _timerCueText = _cueText(exercise);
+    _timerController.setDuration(duration);
+    _timerController.start();
+    _pushTimerToService();
+    if (mounted) setState(() {});
   }
 
   void _onTimerControllerChanged() {
@@ -1406,7 +1436,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       mgLabel: _mgLabel(mg),
       persistence: _persistence[exercise.completed.id] ?? Persistence.persistent,
       setStates: _setStates,
-      onTimerReset: _onTimerReset,
+      onTimerReset: (setData) => _onTimerReset(setData, exercise),
       onShowPostExerciseSheet: () => _showPostExerciseSheet(exercise),
       onShowPostMuscleGroupSheet: () => _showPostMuscleGroupSheet(mg),
       onShowExerciseSkipSheet: () => _showExerciseSkipSheet(exercise),

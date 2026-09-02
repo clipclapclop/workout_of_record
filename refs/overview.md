@@ -77,6 +77,7 @@ For a single user, no multi-user, no accounts
   - Difficulty (too easy|easy|hard|too hard)
   - Volume (too little|just right|a lot|way too much)
 - Every user action persists immediately (crash/kill-safe).
+- The first interaction with each set resets the rest timer once, regardless of exercise boundaries. Feedback questions do not reset it, and the final usable set clears it.
 
 ### 3. Sets / Exercises Completion Semantics
 - Set can be:

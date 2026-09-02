@@ -60,10 +60,16 @@ class RestTimerController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Update the duration (e.g. when the active exercise changes) and reset.
+  /// Update the duration and reset.
   void setDuration(int seconds) {
     _durationSeconds = seconds;
     reset(); // reset() already calls notifyListeners
+  }
+
+  /// Update an idle timer without disturbing a countdown already in progress.
+  void setDurationWhenIdle(int seconds) {
+    if (isRunning || _durationSeconds == seconds) return;
+    setDuration(seconds);
   }
 
   /// Called by the widget after it has fired the cue so we don't fire twice.
@@ -74,4 +80,17 @@ class RestTimerController extends ChangeNotifier {
     _startedAt = null;
     notifyListeners();
   }
+}
+
+/// Whether [interactedSetId] is the final usable set in workout order.
+bool isFinalUsableWorkoutSet({
+  required int interactedSetId,
+  required Iterable<int> orderedSetIds,
+  Set<int> excludedSetIds = const {},
+}) {
+  int? finalUsableSetId;
+  for (final setId in orderedSetIds) {
+    if (!excludedSetIds.contains(setId)) finalUsableSetId = setId;
+  }
+  return finalUsableSetId == interactedSetId;
 }

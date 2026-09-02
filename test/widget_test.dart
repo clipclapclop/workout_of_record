@@ -95,6 +95,76 @@ void main() {
     expect(state.canCheck(movement), isFalse);
   });
 
+  testWidgets('only the first interaction with a set resets the timer',
+      (tester) async {
+    const movement = Movement(
+      id: 1,
+      name: 'Curl',
+      muscleGroup: MuscleGroup.biceps,
+      isRequiredReps: true,
+      isRequiredWeight: false,
+      isRequiredTime: false,
+      isRequiredDistance: false,
+      category: MovementCategory.resistance,
+      bodyweightLoadFraction: 0,
+    );
+    var resets = 0;
+
+    Future<void> pumpSet(SetUiState state, Key key) => tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SetWidget(
+                key: key,
+                setData: SetData(
+                  completed: const CompletedSet(
+                    id: 1,
+                    completedExerciseId: 1,
+                  ),
+                ),
+                movement: movement,
+                setNum: 1,
+                isLastSet: true,
+                isExSkipped: false,
+                isLocked: false,
+                isChecked: false,
+                isSkipped: false,
+                state: state,
+                onTimerReset: () => resets++,
+                onToggle: (_) async {},
+                onSkip: () async {},
+                onDelete: () async {},
+              ),
+            ),
+          ),
+        );
+
+    final fieldFirstState = SetUiState(
+      reps: '10',
+      isChecked: false,
+      isSkipped: false,
+    );
+    addTearDown(fieldFirstState.dispose);
+    await pumpSet(fieldFirstState, const ValueKey('field-first'));
+
+    await tester.tap(find.byType(TextField));
+    await tester.enterText(find.byType(TextField), '8');
+    await tester.tap(find.byType(Checkbox));
+    expect(resets, 1);
+
+    final checkboxFirstState = SetUiState(
+      reps: '10',
+      isChecked: false,
+      isSkipped: false,
+    );
+    addTearDown(checkboxFirstState.dispose);
+    resets = 0;
+    await pumpSet(checkboxFirstState, const ValueKey('checkbox-first'));
+
+    await tester.tap(find.byType(Checkbox));
+    await tester.tap(find.byType(Checkbox));
+    expect(resets, 1);
+  });
+
   testWidgets('editing reps does not change following sets', (tester) async {
     final movement = Movement(
       id: 1,

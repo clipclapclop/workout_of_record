@@ -57,7 +57,7 @@ class ExerciseWidget extends StatelessWidget {
   final Persistence persistence;
   final Map<int, SetUiState> setStates;
 
-  final VoidCallback onTimerReset;
+  final void Function(SetData setData) onTimerReset;
   final Future<void> Function() onShowPostExerciseSheet;
   final Future<void> Function() onShowPostMuscleGroupSheet;
   final Future<void> Function() onShowExerciseSkipSheet;
@@ -375,7 +375,7 @@ class ExerciseWidget extends StatelessWidget {
           isSkipped:
               setStates[exercise.sets[i].completed.id]?.isSkipped ?? false,
           state: setStates[exercise.sets[i].completed.id]!,
-          onTimerReset: onTimerReset,
+          onTimerReset: () => onTimerReset(exercise.sets[i]),
           onToggle: (checked) => onToggleSet(exercise.sets[i], checked),
           onSkip: () => onShowSetSkipSheet(exercise.sets[i]),
           onDelete: () => onDeleteSet(exercise.sets[i]),
