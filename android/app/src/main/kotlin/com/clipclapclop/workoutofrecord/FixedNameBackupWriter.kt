@@ -63,12 +63,14 @@ internal class FixedNameBackupWriter(
         }
 
         val replacingExisting = store.exists(FINAL_NAME)
+        var promotedByThisOperation = false
         try {
             if (replacingExisting) {
                 deleteRequired(PREVIOUS_NAME)
                 renameRequired(FINAL_NAME, PREVIOUS_NAME)
             }
             renameRequired(PENDING_NAME, FINAL_NAME)
+            promotedByThisOperation = true
             requireDigest(FINAL_NAME, expected)
         } catch (error: Exception) {
             val rollbackError = rollbackPrevious()
@@ -79,7 +81,9 @@ internal class FixedNameBackupWriter(
                     rollbackError,
                 )
             }
-            if (!replacingExisting) deleteIfDigestMatches(FINAL_NAME, expected)
+            if (!replacingExisting && promotedByThisOperation) {
+                deleteBestEffort(FINAL_NAME)
+            }
             deleteBestEffort(PENDING_NAME)
             deleteBestEffort(VERIFIED_NAME)
             deleteBestEffort(VERIFIED_PENDING_NAME)
@@ -183,19 +187,6 @@ internal class FixedNameBackupWriter(
     private fun deleteRequired(name: String) {
         if (store.exists(name) && !store.delete(name)) {
             throw BackupReplacementException("The selected folder could not remove stale $name.")
-        }
-    }
-
-    private fun deleteIfDigestMatches(
-        name: String,
-        expected: BackupDocumentDigest,
-    ) {
-        try {
-            if (store.exists(name) && store.digest(name) == expected) {
-                store.delete(name)
-            }
-        } catch (_: Exception) {
-            // Do not remove a file this operation cannot prove it created.
         }
     }
 

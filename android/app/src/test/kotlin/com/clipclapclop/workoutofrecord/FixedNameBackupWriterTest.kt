@@ -14,6 +14,7 @@ class FixedNameBackupWriterTest {
         var corruptPendingWrite = false
         var corruptFinalDigest = false
         val failRenames = mutableSetOf<String>()
+        var externalFinalOnPendingRename: ByteArray? = null
         var failDeleteName: String? = null
 
         override fun exists(name: String) = files.containsKey(name)
@@ -41,6 +42,13 @@ class FixedNameBackupWriterTest {
         }
 
         override fun rename(from: String, to: String): Boolean {
+            if (from == FixedNameBackupWriter.PENDING_NAME &&
+                externalFinalOnPendingRename != null
+            ) {
+                files[FixedNameBackupWriter.FINAL_NAME] =
+                    externalFinalOnPendingRename!!.copyOf()
+                return false
+            }
             if (from in failRenames) return false
             val bytes = files.remove(from) ?: return false
             files[to] = bytes
@@ -155,7 +163,7 @@ class FixedNameBackupWriterTest {
     }
 
     @Test
-    fun `failed first-backup verification does not delete an unmatched final file`() {
+    fun `failed first-backup verification removes its own invalid final file`() {
         val store = FakeStore().apply {
             corruptFinalDigest = true
         }
@@ -164,10 +172,25 @@ class FixedNameBackupWriterTest {
             FixedNameBackupWriter(store).replace(byteArrayOf(9, 8, 7))
         }
 
-        assertTrue(store.exists(FixedNameBackupWriter.FINAL_NAME))
+        assertFalse(store.exists(FixedNameBackupWriter.FINAL_NAME))
         assertFalse(store.exists(FixedNameBackupWriter.PENDING_NAME))
         assertFalse(store.exists(FixedNameBackupWriter.PREVIOUS_NAME))
         assertFalse(store.exists(FixedNameBackupWriter.VERIFIED_NAME))
+    }
+
+    @Test
+    fun `file that appears before promotion is not removed on failure`() {
+        val external = byteArrayOf(4, 5, 6)
+        val store = FakeStore().apply {
+            externalFinalOnPendingRename = external
+        }
+
+        assertThrows(BackupReplacementException::class.java) {
+            FixedNameBackupWriter(store).replace(byteArrayOf(9, 8, 7))
+        }
+
+        assertArrayEquals(external, store.files[FixedNameBackupWriter.FINAL_NAME])
+        assertFalse(store.exists(FixedNameBackupWriter.PENDING_NAME))
     }
 
     @Test
