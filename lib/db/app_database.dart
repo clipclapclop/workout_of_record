@@ -1882,7 +1882,6 @@ class AppDatabase extends _$AppDatabase {
                   checkin.completedExerciseId.equals(oldExId)))
             .getSingleOrNull();
         final hasRecordedActivity =
-            oldExercise.persistence == Persistence.dropped ||
             oldExercise.skipReason != null ||
             feedback != null ||
             sets.any((set) =>
