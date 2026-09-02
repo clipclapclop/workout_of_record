@@ -59,6 +59,10 @@ class FixedNameBackupWriterTest {
             if (failDeleteName == name) return false
             return files.remove(name) != null
         }
+
+        fun failedBytes(): ByteArray = files.entries.single {
+            it.key.startsWith(FixedNameBackupWriter.FAILED_PREFIX)
+        }.value
     }
 
     @Test
@@ -133,7 +137,7 @@ class FixedNameBackupWriterTest {
         assertArrayEquals(old, store.files[FixedNameBackupWriter.FINAL_NAME])
         assertArrayEquals(
             byteArrayOf(9, 8, 7),
-            store.files[FixedNameBackupWriter.FAILED_NAME],
+            store.failedBytes(),
         )
         assertFalse(store.exists(FixedNameBackupWriter.PREVIOUS_NAME))
     }
@@ -179,11 +183,30 @@ class FixedNameBackupWriterTest {
         assertFalse(store.exists(FixedNameBackupWriter.FINAL_NAME))
         assertArrayEquals(
             byteArrayOf(9, 8, 7),
-            store.files[FixedNameBackupWriter.FAILED_NAME],
+            store.failedBytes(),
         )
         assertFalse(store.exists(FixedNameBackupWriter.PENDING_NAME))
         assertFalse(store.exists(FixedNameBackupWriter.PREVIOUS_NAME))
         assertFalse(store.exists(FixedNameBackupWriter.VERIFIED_NAME))
+    }
+
+    @Test
+    fun `existing quarantine file does not block a new quarantine`() {
+        val priorFailedName = "${FixedNameBackupWriter.FAILED_PREFIX}prior.zip"
+        val store = FakeStore(mapOf(priorFailedName to byteArrayOf(1))).apply {
+            corruptFinalDigest = true
+        }
+
+        assertThrows(BackupReplacementException::class.java) {
+            FixedNameBackupWriter(store).replace(byteArrayOf(9, 8, 7))
+        }
+
+        assertFalse(store.exists(FixedNameBackupWriter.FINAL_NAME))
+        val quarantines = store.files.filterKeys {
+            it.startsWith(FixedNameBackupWriter.FAILED_PREFIX)
+        }
+        assertTrue(quarantines.containsKey(priorFailedName))
+        assertTrue(quarantines.values.any { it.contentEquals(byteArrayOf(9, 8, 7)) })
     }
 
     @Test

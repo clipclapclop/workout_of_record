@@ -1,6 +1,7 @@
 package com.clipclapclop.workoutofrecord
 
 import java.security.MessageDigest
+import java.util.UUID
 
 internal data class BackupDocumentDigest(
     val byteCount: Long,
@@ -39,7 +40,7 @@ internal class FixedNameBackupWriter(
         const val FINAL_NAME = "workout_of_record.zip"
         const val PENDING_NAME = "workout_of_record.pending.zip"
         const val PREVIOUS_NAME = "workout_of_record.previous.zip"
-        const val FAILED_NAME = "workout_of_record.failed.zip"
+        const val FAILED_PREFIX = "workout_of_record.failed-"
         const val VERIFIED_NAME = "workout_of_record.verified"
         const val VERIFIED_PENDING_NAME = "workout_of_record.verified.pending"
     }
@@ -89,8 +90,8 @@ internal class FixedNameBackupWriter(
                         "Backup replacement failed and the previous backup could not be restored. " +
                             "Both files were preserved for manual recovery."
                     } else {
-                        "The first backup failed and its unverified final file could not be moved to " +
-                            "$FAILED_NAME. The file was preserved."
+                        "The first backup failed and its unverified final file could not be " +
+                            "quarantined. The file was preserved."
                     },
                     rollbackError,
                 )
@@ -178,13 +179,15 @@ internal class FixedNameBackupWriter(
     private fun quarantineFinal(): Exception? {
         if (!store.exists(FINAL_NAME)) return null
         return try {
-            if (store.exists(FAILED_NAME)) {
-                throw BackupReplacementException(
-                    "The fixed-name backup changed during replacement; both files were preserved.",
-                )
+            repeat(3) {
+                val failedName = "$FAILED_PREFIX${UUID.randomUUID()}.zip"
+                if (store.exists(failedName)) return@repeat
+                if (store.rename(FINAL_NAME, failedName)) return null
+                if (!store.exists(FINAL_NAME)) return null
             }
-            renameRequired(FINAL_NAME, FAILED_NAME)
-            null
+            throw BackupReplacementException(
+                "The unverified final backup could not be quarantined; it was preserved.",
+            )
         } catch (error: Exception) {
             error
         }
