@@ -27,7 +27,7 @@ The ZIP may be at most 256 MiB, and `settings.json` may be at most 1 MiB. `setti
 
 - `currentMesocycleId` and `currentCompletedWorkoutId`: positive integers or `null`;
 - `dateOfBirth`: an ISO-8601 string or `null`;
-- `weight`: a finite number of pounds greater than zero or `null`;
+- `weight`: a finite number of pounds greater than zero or `null`; an older backup value of `0` is restored as blank;
 - `trainingGoal`: `strength`, `hypertrophy`, `endurance`, `general`, or `null`;
 - `calorieState`: `surplus`, `maintenance`, `deficit`, or `null`;
 - `trainingStartDate`: an ISO-8601 string or `null`;
@@ -39,7 +39,7 @@ The ZIP may be at most 256 MiB, and `settings.json` may be at most 1 MiB. `setti
 - `aiCreditId`: a string or `null`; and
 - `aiHistoryWeeks`: an integer from 1 through 12.
 
-Fields may be omitted for compatibility with earlier released backups, in which case the app default is restored. The retired `unitsMetric` field is accepted from older backups when it contains a boolean, but its value is ignored. That preference changed labels only and never converted or tagged stored values. The app's sole existing data set was confirmed to contain pounds and miles, so numeric values are deliberately left unchanged; converting them during restore would corrupt those records. Unknown fields are rejected. The API key, backup and AI-log folder permissions, AI logging state, and backup status/error bookkeeping are not included. Those credentials and device-specific locations remain unchanged on the current device and must be configured again after restoring to another installation.
+Fields may be omitted for compatibility with earlier released backups, in which case the app default is restored. Zero-rep completed sets accepted by an earlier version remain restorable as historical records, although new completed sets require positive reps. The retired `unitsMetric` field is accepted from older backups when it contains a boolean, but its value is ignored. That preference changed labels only and never converted or tagged stored values. The app's sole existing data set was confirmed to contain pounds and miles, so numeric values are deliberately left unchanged; converting them during restore would corrupt those records. Unknown fields are rejected. The API key, backup and AI-log folder permissions, AI logging state, and backup status/error bookkeeping are not included. Those credentials and device-specific locations remain unchanged on the current device and must be configured again after restoring to another installation.
 
 The database schema must be within the restore range supported by the installed app. The current app supports schemas 8 through 13 and migrates older supported backups on a staged copy before restore. A database at schema 7 or older, or a backup from a newer unsupported schema, is rejected rather than being opened unsafely.
 

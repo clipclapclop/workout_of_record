@@ -140,7 +140,7 @@ class BackupSettings {
       return parsed;
     }
 
-    double? positiveFiniteNumber(String key) {
+    double? profileWeight(String key) {
       final value = json[key];
       if (value == null) {
         return null;
@@ -151,12 +151,14 @@ class BackupSettings {
         );
       }
       final converted = value.toDouble();
-      if (!converted.isFinite || converted <= 0) {
+      if (!converted.isFinite || converted < 0) {
         throw BackupRestoreException(
-          'Invalid backup settings: $key must be a finite number greater than 0.',
+          'Invalid backup settings: $key must be a finite, non-negative number.',
         );
       }
-      return converted;
+      // Earlier versions allowed 0. It carries no useful profile meaning, so
+      // restore it as the current blank value instead of rejecting the backup.
+      return converted == 0 ? null : converted;
     }
 
     int boundedInt(
@@ -260,7 +262,7 @@ class BackupSettings {
       currentMesocycleId: positiveId('currentMesocycleId'),
       currentCompletedWorkoutId: positiveId('currentCompletedWorkoutId'),
       dateOfBirth: date('dateOfBirth'),
-      weight: positiveFiniteNumber('weight'),
+      weight: profileWeight('weight'),
       trainingGoal: enumValue('trainingGoal', TrainingGoal.values),
       calorieState: enumValue('calorieState', CalorieState.values),
       trainingStartDate: date('trainingStartDate'),
@@ -941,7 +943,9 @@ class BackupRestoreService {
     for (final row in completedSetRows) {
       final values = row.data;
       final reps = values['reps'];
-      if (reps != null && (reps is! int || reps < 1)) invalid();
+      // New completed sets require positive reps, but preserve zero-rep rows
+      // accepted by earlier versions so they do not block history restoration.
+      if (reps != null && (reps is! int || reps < 0)) invalid();
 
       final weight = values['weight'];
       if (weight != null && !isFiniteNumber(weight)) invalid();

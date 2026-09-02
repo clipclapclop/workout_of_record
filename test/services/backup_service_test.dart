@@ -506,6 +506,22 @@ void main() {
       );
     }
 
+    test('restores legacy zero profile weight as blank', () async {
+      final legacySettings = {
+        ...restoredSettings.toJson(),
+        'weight': 0,
+      };
+
+      await service().restoreBytes(
+        _archiveBytes([
+          _databaseEntry(restoredDatabaseBytes),
+          _settingsEntry(legacySettings),
+        ]),
+      );
+
+      expect(settingsStore.current.weight, isNull);
+    });
+
     test('rejects malformed JSON', () async {
       final malformed = utf8.encode('{');
       await expectRejectedWithoutMutation(
@@ -527,7 +543,6 @@ void main() {
       'wrong legacy boolean type': {'unitsMetric': 1},
       'invalid profile date': {'dateOfBirth': 'not-a-date'},
       'invalid training date': {'trainingStartDate': 'not-a-date'},
-      'zero weight': {'weight': 0},
       'negative weight': {'weight': -1},
       'wrong timer boolean type': {'timerEnabled': 1},
       'non-positive timer duration': {'timerDefaultSeconds': 0},
@@ -670,13 +685,33 @@ void main() {
       },
     );
 
+    test('preserves legacy zero-rep completed sets', () async {
+      final legacyPath = '${tempDirectory.path}/legacy-zero-reps.sqlite';
+      await File(restoredPath).copy(legacyPath);
+      final database = AppDatabase.withExecutor(
+        NativeDatabase(File(legacyPath), enableMigrations: false),
+      );
+      await database.customStatement('UPDATE completed_sets SET reps = 0');
+      await database.close();
+
+      await expectLater(
+        service().restoreBytes(
+          _validArchive(
+            await File(legacyPath).readAsBytes(),
+            restoredSettings,
+          ),
+        ),
+        completes,
+      );
+    });
+
     test('rejects unusable persisted numeric values', () async {
       final invalidPath = '${tempDirectory.path}/invalid-numbers.sqlite';
       await File(restoredPath).copy(invalidPath);
       final database = AppDatabase.withExecutor(
         NativeDatabase(File(invalidPath), enableMigrations: false),
       );
-      await database.customStatement('UPDATE completed_sets SET reps = 0');
+      await database.customStatement('UPDATE completed_sets SET reps = -1');
       await database.close();
 
       await expectRejectedWithoutMutation(
