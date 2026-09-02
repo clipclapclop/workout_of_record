@@ -8,6 +8,8 @@ API credentials entered for optional AI features are device settings and must ne
 
 ## Backups
 
+Android's automatic app backup is disabled. Workout data is not intentionally copied to or restored from Android's cloud-backup service; recovery after uninstalling or moving to another phone depends on a current Workout of Record backup. Manufacturer-specific phone-transfer tools may behave differently outside the app's control.
+
 Open **Settings → Backup & Restore** to choose an Android document-tree location, enable backups, and control whether a backup runs after workout completion. The selected location can be a directory synchronized or exposed by another storage application.
 
 The backup screen reports the last successful backup and any current error. If Android revokes access to the selected folder, choose the location again.

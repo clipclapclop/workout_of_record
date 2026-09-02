@@ -1,0 +1,15 @@
+{
+  "id": "disable-android-backup",
+  "summary": "Disabled Android's automatic app backup so recovery uses the explicit verified Workout of Record backup instead of an uncontrolled second path.",
+  "audience": "user",
+  "releaseNote": "Android automatic cloud backup is now disabled; keep a current Workout of Record backup for reinstall or phone recovery.",
+  "docs": {
+    "impact": "updated",
+    "paths": [
+      "docs/guides/settings-backups.md",
+      "docs/guides/installation.md"
+    ],
+    "reason": ""
+  },
+  "screenshots": []
+}

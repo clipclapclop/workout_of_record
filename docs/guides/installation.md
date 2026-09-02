@@ -9,7 +9,7 @@ Workout of Record is distributed as a signed Android APK through canonical [Forg
 3. Open the APK and allow installation from the app Android identifies as the source, if prompted.
 4. Confirm the installation.
 
-The package and signing key remain stable across releases, so installing a newer APK updates the existing app without intentionally clearing its local database.
+The package and signing key remain stable across releases, so installing a newer APK updates the existing app without intentionally clearing its local database. Android automatic cloud backup is disabled, so uninstalling the app or moving to another phone requires restoring a separately saved Workout of Record backup.
 
 ## Updates with Obtainium
 
