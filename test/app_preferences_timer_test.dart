@@ -45,4 +45,22 @@ void main() {
 
     expect(AppPreferences.getTimerGetReadyChimes(), isTrue);
   });
+
+  test('active rest timer state can be restored and cleared', () async {
+    final endsAt = DateTime.fromMillisecondsSinceEpoch(2000000000000);
+
+    await AppPreferences.setActiveRestTimer(
+      workoutId: 42,
+      durationSeconds: 90,
+      endsAt: endsAt,
+    );
+
+    final restored = AppPreferences.getActiveRestTimer();
+    expect(restored?.workoutId, 42);
+    expect(restored?.durationSeconds, 90);
+    expect(restored?.endsAt, endsAt);
+
+    await AppPreferences.clearActiveRestTimer();
+    expect(AppPreferences.getActiveRestTimer(), isNull);
+  });
 }

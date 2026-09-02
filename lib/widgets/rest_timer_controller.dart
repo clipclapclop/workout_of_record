@@ -8,8 +8,8 @@ import 'package:flutter/foundation.dart';
 /// backgrounding/foregrounding correctly.
 class RestTimerController extends ChangeNotifier {
   RestTimerController({required int durationSeconds})
-      : _durationSeconds = durationSeconds,
-        _pausedRemainingMs = durationSeconds * 1000;
+    : _durationSeconds = durationSeconds,
+      _pausedRemainingMs = durationSeconds * 1000;
 
   int _durationSeconds;
   int _pausedRemainingMs;
@@ -40,8 +40,9 @@ class RestTimerController extends ChangeNotifier {
       _cued = false;
     }
     // Backdate _startedAt so that remaining == startFrom immediately.
-    _startedAt = DateTime.now()
-        .subtract(Duration(milliseconds: _durationSeconds * 1000 - startFrom));
+    _startedAt = DateTime.now().subtract(
+      Duration(milliseconds: _durationSeconds * 1000 - startFrom),
+    );
     notifyListeners();
   }
 
@@ -66,6 +67,27 @@ class RestTimerController extends ChangeNotifier {
     reset(); // reset() already calls notifyListeners
   }
 
+  /// Restore a persisted countdown without giving it a new deadline.
+  void restoreRunningTimer({
+    required int durationSeconds,
+    required DateTime endsAt,
+  }) {
+    _durationSeconds = durationSeconds;
+    final fullDurationMs = durationSeconds * 1000;
+    final now = DateTime.now();
+    final restoredRemainingMs = endsAt
+        .difference(now)
+        .inMilliseconds
+        .clamp(0, fullDurationMs);
+    _pausedRemainingMs = restoredRemainingMs;
+    _cued = restoredRemainingMs <= 0;
+    _startedAt = restoredRemainingMs <= 0
+        ? null
+        : now.subtract(
+            Duration(milliseconds: fullDurationMs - restoredRemainingMs),
+          );
+    notifyListeners();
+  }
 
   /// Called by the widget after it has fired the cue so we don't fire twice.
   void markCued() {

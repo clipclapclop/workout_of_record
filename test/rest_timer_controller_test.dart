@@ -21,6 +21,19 @@ void main() {
     expect(controller.remainingMs, 60000);
   });
 
+  test('restores a running timer without moving its deadline', () {
+    final controller = RestTimerController(durationSeconds: 0);
+    addTearDown(controller.dispose);
+    final endsAt = DateTime.now().add(const Duration(seconds: 30));
+
+    controller.restoreRunningTimer(durationSeconds: 60, endsAt: endsAt);
+
+    expect(controller.durationSeconds, 60);
+    expect(controller.isRunning, isTrue);
+    expect(controller.remainingMs, greaterThan(29000));
+    expect(controller.remainingMs, lessThanOrEqualTo(30000));
+  });
+
   test('final usable set ignores excluded sets in workout order', () {
     const orderedSetIds = [1, 2, 3, 4, 5];
 

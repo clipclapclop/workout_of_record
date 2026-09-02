@@ -2,7 +2,7 @@
   "id": "set-based-rest-timer",
   "summary": "Made rest-timer resets depend only on the first interaction with each set, preventing workout loading, exercise changes, and feedback questions from restarting the countdown.",
   "audience": "user",
-  "releaseNote": "The rest timer now resets once per set, continues through exercise feedback, and clears on the final set of the workout.",
+  "releaseNote": "The rest timer now resets once per set, continues through exercise feedback or reopening the workout, and clears on the final set.",
   "docs": {
     "impact": "updated",
     "paths": [

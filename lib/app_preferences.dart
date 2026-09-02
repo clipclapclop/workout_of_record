@@ -3,6 +3,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'db/tables/enums.dart';
 
+class ActiveRestTimerState {
+  const ActiveRestTimerState({
+    required this.workoutId,
+    required this.durationSeconds,
+    required this.endsAt,
+  });
+
+  final int workoutId;
+  final int durationSeconds;
+  final DateTime endsAt;
+}
+
 /// Typed wrapper around SharedPreferences and FlutterSecureStorage.
 ///
 /// Call [AppPreferences.init] once in main() before runApp.
@@ -194,6 +206,45 @@ Keep answers focused and practical. When suggesting changes, be specific about e
   static Future<void> setTimerGetReadyChimes(bool v) =>
       _prefs.setBool(_timerGetReadyChimesPreference, v);
 
+  static ActiveRestTimerState? getActiveRestTimer() {
+    final encoded = _prefs.getString(_kActiveRestTimer);
+    if (encoded == null) return null;
+    final parts = encoded.split(':');
+    if (parts.length != 3) return null;
+    final workoutId = int.tryParse(parts[0]);
+    final durationSeconds = int.tryParse(parts[1]);
+    final endsAtMs = int.tryParse(parts[2]);
+    if (workoutId == null ||
+        workoutId <= 0 ||
+        durationSeconds == null ||
+        durationSeconds <= 0 ||
+        endsAtMs == null) {
+      return null;
+    }
+    return ActiveRestTimerState(
+      workoutId: workoutId,
+      durationSeconds: durationSeconds,
+      endsAt: DateTime.fromMillisecondsSinceEpoch(endsAtMs),
+    );
+  }
+
+  static Future<void> setActiveRestTimer({
+    required int workoutId,
+    required int durationSeconds,
+    required DateTime endsAt,
+  }) {
+    if (workoutId <= 0 || durationSeconds <= 0) {
+      throw ArgumentError('workoutId and durationSeconds must be positive');
+    }
+    return _prefs.setString(
+      _kActiveRestTimer,
+      '$workoutId:$durationSeconds:${endsAt.millisecondsSinceEpoch}',
+    );
+  }
+
+  static Future<void> clearActiveRestTimer() =>
+      _prefs.remove(_kActiveRestTimer);
+
   // ── Backup ─────────────────────────────────────────────────────────────────
 
   static bool getBackupEnabled() => _prefs.getBool(_kBackupEnabled) ?? false;
@@ -248,6 +299,7 @@ Keep answers focused and practical. When suggesting changes, be specific about e
   static const _kTimerHaptic = 'timer_haptic';
   static const _kTimerKeepAwake = 'timer_keep_awake';
   static const _timerGetReadyChimesPreference = 'timer_get_ready_chimes';
+  static const _kActiveRestTimer = 'active_rest_timer';
   static const _kBackupEnabled = 'backup_enabled';
   static const _kAutoBackupEnabled = 'auto_backup_enabled';
   static const _kBackupDirectoryPath = 'backup_directory_path';

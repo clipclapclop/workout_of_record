@@ -67,6 +67,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   // separately preserves the deadline established by the triggering set.
   int? _timerActiveExId;
   String? _timerCueText;
+  bool _timerRestoreAttempted = false;
+  Future<void> _timerStateWrite = Future<void>.value();
 
   @override
   void initState() {
@@ -179,9 +181,33 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     return buildWorkoutCueText(exercise.movement, next!.planned!);
   }
 
+  void _restorePersistedTimer() {
+    if (_timerRestoreAttempted) return;
+    _timerRestoreAttempted = true;
+
+    final saved = AppPreferences.getActiveRestTimer();
+    final activeId = _activeExerciseId;
+    if (saved == null ||
+        saved.workoutId != widget.completedWorkoutId ||
+        activeId == null ||
+        !saved.endsAt.isAfter(DateTime.now())) {
+      unawaited(AppPreferences.clearActiveRestTimer());
+      return;
+    }
+
+    final activeEx =
+        _data!.exercises.firstWhere((e) => e.completed.id == activeId);
+    _timerActiveExId = activeId;
+    _timerCueText = _cueText(activeEx);
+    _timerController.restoreRunningTimer(
+      durationSeconds: saved.durationSeconds,
+      endsAt: saved.endsAt,
+    );
+  }
+
   void _syncTimer() {
     if (!AppPreferences.getTimerEnabled() || !_timerWorkoutOn || _data == null) {
-      _timerController.stop();
+      _timerController.setDuration(0);
       _timerActiveExId = null;
       _timerCueText = null;
       _pushTimerToService();
@@ -189,7 +215,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     }
     final activeId = _activeExerciseId;
     if (activeId == null) {
-      _timerController.stop();
+      _timerController.setDuration(0);
       _timerActiveExId = null;
       _timerCueText = null;
       _pushTimerToService();
@@ -234,7 +260,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
   void _onTimerReset(SetData interactedSet, ExerciseData exercise) {
     if (_isFinalUsableSet(interactedSet)) {
-      _timerController.reset();
+      _timerController.setDuration(0);
       _timerActiveExId = null;
       _timerCueText = null;
       _pushTimerToService();
@@ -246,7 +272,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     if (duration <= 0 ||
         !AppPreferences.getTimerEnabled() ||
         !_timerWorkoutOn) {
-      _timerController.reset();
+      _timerController.setDuration(0);
       _timerActiveExId = null;
       _timerCueText = null;
       _pushTimerToService();
@@ -263,6 +289,29 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   }
 
   void _onTimerControllerChanged() {
+    final running = _timerController.isRunning;
+    final durationSeconds = _timerController.durationSeconds;
+    final endsAt = running
+        ? DateTime.now()
+            .add(Duration(milliseconds: _timerController.remainingMs))
+        : null;
+    final previousWrite = _timerStateWrite;
+    _timerStateWrite = (() async {
+      try {
+        await previousWrite;
+        if (endsAt == null || durationSeconds <= 0) {
+          await AppPreferences.clearActiveRestTimer();
+        } else {
+          await AppPreferences.setActiveRestTimer(
+            workoutId: widget.completedWorkoutId,
+            durationSeconds: durationSeconds,
+            endsAt: endsAt,
+          );
+        }
+      } catch (_) {
+        // Timer persistence is best-effort; the live timer remains usable.
+      }
+    })();
     _pushTimerToService();
   }
 
@@ -353,6 +402,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         if (aiErrors.isNotEmpty) _aiErrors = aiErrors;
       });
       _applyWakeLock();
+      _restorePersistedTimer();
       _syncTimer();
     }
   }
