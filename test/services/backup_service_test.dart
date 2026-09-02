@@ -527,6 +527,7 @@ void main() {
       'wrong legacy boolean type': {'unitsMetric': 1},
       'invalid profile date': {'dateOfBirth': 'not-a-date'},
       'invalid training date': {'trainingStartDate': 'not-a-date'},
+      'zero weight': {'weight': 0},
       'negative weight': {'weight': -1},
       'wrong timer boolean type': {'timerEnabled': 1},
       'non-positive timer duration': {'timerDefaultSeconds': 0},
@@ -668,6 +669,24 @@ void main() {
         );
       },
     );
+
+    test('rejects unusable persisted numeric values', () async {
+      final invalidPath = '${tempDirectory.path}/invalid-numbers.sqlite';
+      await File(restoredPath).copy(invalidPath);
+      final database = AppDatabase.withExecutor(
+        NativeDatabase(File(invalidPath), enableMigrations: false),
+      );
+      await database.customStatement('UPDATE completed_sets SET reps = 0');
+      await database.close();
+
+      await expectRejectedWithoutMutation(
+        _archiveBytes([
+          _databaseEntry(await File(invalidPath).readAsBytes()),
+          _settingsEntry({}),
+        ]),
+        'stored numeric values are unusable',
+      );
+    });
 
     test('rejects foreign-key violations', () async {
       final inconsistentPath = '${tempDirectory.path}/inconsistent.sqlite';

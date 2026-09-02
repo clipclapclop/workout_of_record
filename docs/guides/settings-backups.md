@@ -2,7 +2,7 @@
 
 ## Timer and AI settings
 
-Workout weights are recorded in pounds and distances in miles. Settings cover rest-timer behavior, optional AI configuration, and backup/restore controls. Rest-timer settings include an optional get-ready sequence: a lower built-in tone at 10 seconds remaining followed by a higher tone at 5 seconds. The sequence does not change the visible countdown, does not require text-to-speech, and is suppressed when the alert sound is set to Silent. Core workout logging remains available when AI is disabled or unavailable.
+Workout weights are recorded in pounds and distances in miles. Profile weight must be blank or greater than zero, and training experience must be blank or zero years or more. Invalid, non-finite values are kept on screen with an explanation instead of being saved. Settings cover rest-timer behavior, optional AI configuration, and backup/restore controls. Rest-timer settings include an optional get-ready sequence: a lower built-in tone at 10 seconds remaining followed by a higher tone at 5 seconds. The sequence does not change the visible countdown, does not require text-to-speech, and is suppressed when the alert sound is set to Silent. Core workout logging remains available when AI is disabled or unavailable.
 
 API credentials entered for optional AI features are device settings and must never be placed in release manifests, documentation, or the repository.
 
@@ -27,7 +27,7 @@ The ZIP may be at most 256 MiB, and `settings.json` may be at most 1 MiB. `setti
 
 - `currentMesocycleId` and `currentCompletedWorkoutId`: positive integers or `null`;
 - `dateOfBirth`: an ISO-8601 string or `null`;
-- `weight`: a finite non-negative number of pounds or `null`;
+- `weight`: a finite number of pounds greater than zero or `null`;
 - `trainingGoal`: `strength`, `hypertrophy`, `endurance`, `general`, or `null`;
 - `calorieState`: `surplus`, `maintenance`, `deficit`, or `null`;
 - `trainingStartDate`: an ISO-8601 string or `null`;
@@ -47,7 +47,7 @@ The database schema must be within the restore range supported by the installed 
 
 Use restore from the backup screen and select the intended archive. Restoring replaces application data, so verify the selected file before confirming.
 
-Before replacing anything, the app verifies the ZIP and its checksums, settings value types and enum names, SQLite integrity and relationships, schema compatibility, and active pointers. An active-workout pointer must identify an unfinished workout in the selected active mesocycle. Missing, duplicate, malformed, corrupt, incompatible, or mismatched content is rejected with an error and does not change current data.
+Before replacing anything, the app verifies the ZIP and its checksums, settings value types and enum names, SQLite integrity and relationships, stored workout numeric values, schema compatibility, and active pointers. An active-workout pointer must identify an unfinished workout in the selected active mesocycle. Missing, duplicate, malformed, corrupt, incompatible, or mismatched content is rejected with an error and does not change current data.
 
 After validation, the app checkpoints and closes the current database, preserves a recovery copy, removes old SQLite WAL/SHM files, and installs the staged database. A durable recovery record keeps the database and settings together: if replacement fails, the app restores both immediately, and if the app stops between those steps, it rolls both back before opening the database on the next launch. A successful restore still requires the app to restart.
 

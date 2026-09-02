@@ -55,6 +55,46 @@ void main() {
     expect(find.text('km'), findsNothing);
   });
 
+  test('set validation rejects non-finite values and permits assistance', () {
+    const movement = Movement(
+      id: 1,
+      name: 'Timed loaded carry',
+      muscleGroup: MuscleGroup.other,
+      isRequiredReps: true,
+      isRequiredWeight: true,
+      isRequiredTime: true,
+      isRequiredDistance: true,
+      category: MovementCategory.resistance,
+      bodyweightLoadFraction: 0,
+    );
+    final state = SetUiState(
+      reps: '8',
+      weight: '-40',
+      distance: '1',
+      time: '60',
+      isChecked: false,
+      isSkipped: false,
+    );
+    addTearDown(state.dispose);
+
+    expect(state.canCheck(movement), isTrue);
+
+    state.weightCtrl.text = 'NaN';
+    expect(state.canCheck(movement), isFalse);
+    state.weightCtrl.text = '-40';
+
+    state.distanceCtrl.text = 'Infinity';
+    expect(state.canCheck(movement), isFalse);
+    state.distanceCtrl.text = '1';
+
+    state.timeCtrl.text = 'NaN';
+    expect(state.canCheck(movement), isFalse);
+    state.timeCtrl.text = '60';
+
+    state.repsCtrl.text = '0';
+    expect(state.canCheck(movement), isFalse);
+  });
+
   testWidgets('editing reps does not change following sets', (tester) async {
     final movement = Movement(
       id: 1,

@@ -1168,15 +1168,36 @@ class AppDatabase extends _$AppDatabase {
       double? weight,
       double? distance,
       double? time,
-  }) =>
-      (update(completedSets)..where((s) => s.id.equals(id))).write(
-        CompletedSetsCompanion(
-          reps: Value(reps),
-          weight: Value(weight),
-          distance: Value(distance),
-          time: Value(time),
-        ),
+  }) async {
+    if (reps != null && reps < 1) {
+      throw ArgumentError.value(reps, 'reps', 'must be greater than 0');
+    }
+    if (weight != null && !weight.isFinite) {
+      throw ArgumentError.value(weight, 'weight', 'must be finite');
+    }
+    if (distance != null && (!distance.isFinite || distance <= 0)) {
+      throw ArgumentError.value(
+        distance,
+        'distance',
+        'must be finite and greater than 0',
       );
+    }
+    if (time != null && (!time.isFinite || time <= 0)) {
+      throw ArgumentError.value(
+        time,
+        'time',
+        'must be finite and greater than 0',
+      );
+    }
+    await (update(completedSets)..where((s) => s.id.equals(id))).write(
+      CompletedSetsCompanion(
+        reps: Value(reps),
+        weight: Value(weight),
+        distance: Value(distance),
+        time: Value(time),
+      ),
+    );
+  }
 
   Future<void> skipSet(int id, SkipReason reason) =>
       (update(completedSets)..where((s) => s.id.equals(id))).write(
@@ -1632,12 +1653,63 @@ class AppDatabase extends _$AppDatabase {
         ]))
           .get();
 
-  Future<Movement> createMovement(MovementsCompanion companion) =>
-      into(movements).insertReturning(companion);
+  void _validateMovementNumbers(MovementsCompanion companion) {
+    final minWeight = companion.minWeight;
+    if (minWeight.present &&
+        minWeight.value != null &&
+        !minWeight.value!.isFinite) {
+      throw ArgumentError.value(
+        minWeight.value,
+        'minWeight',
+        'must be finite',
+      );
+    }
 
-  Future<void> updateMovement(MovementsCompanion companion) =>
-      (update(movements)..where((m) => m.id.equals(companion.id.value)))
-          .write(companion);
+    final weightDelta = companion.weightDelta;
+    if (weightDelta.present &&
+        weightDelta.value != null &&
+        (!weightDelta.value!.isFinite || weightDelta.value! <= 0)) {
+      throw ArgumentError.value(
+        weightDelta.value,
+        'weightDelta',
+        'must be finite and greater than 0',
+      );
+    }
+
+    final bodyweightLoadFraction = companion.bodyweightLoadFraction;
+    if (bodyweightLoadFraction.present &&
+        (!bodyweightLoadFraction.value.isFinite ||
+            bodyweightLoadFraction.value < 0 ||
+            bodyweightLoadFraction.value > 1)) {
+      throw ArgumentError.value(
+        bodyweightLoadFraction.value,
+        'bodyweightLoadFraction',
+        'must be finite and between 0 and 1',
+      );
+    }
+
+    final restSeconds = companion.restSeconds;
+    if (restSeconds.present &&
+        restSeconds.value != null &&
+        restSeconds.value! < 0) {
+      throw ArgumentError.value(
+        restSeconds.value,
+        'restSeconds',
+        'must be 0 or greater',
+      );
+    }
+  }
+
+  Future<Movement> createMovement(MovementsCompanion companion) {
+    _validateMovementNumbers(companion);
+    return into(movements).insertReturning(companion);
+  }
+
+  Future<void> updateMovement(MovementsCompanion companion) {
+    _validateMovementNumbers(companion);
+    return (update(movements)..where((m) => m.id.equals(companion.id.value)))
+        .write(companion);
+  }
 
   /// Marks the workout complete in the DB.
   /// Caller is responsible for clearing AppPreferences.currentCompletedWorkoutId.

@@ -55,8 +55,14 @@ class AppPreferences {
       : _prefs.setString(_kProfileDateOfBirth, v.toIso8601String());
 
   static double? getWeight() => _prefs.getDouble(_kProfileWeight);
-  static Future<void> setWeight(double? v) =>
-      v == null ? _prefs.remove(_kProfileWeight) : _prefs.setDouble(_kProfileWeight, v);
+  static Future<void> setWeight(double? v) {
+    if (v != null && (!v.isFinite || v <= 0)) {
+      throw ArgumentError.value(v, 'weight', 'must be finite and greater than 0');
+    }
+    return v == null
+        ? _prefs.remove(_kProfileWeight)
+        : _prefs.setDouble(_kProfileWeight, v);
+  }
 
   static TrainingGoal? getTrainingGoal() {
     final s = _prefs.getString(_kProfileTrainingGoal);

@@ -21,6 +21,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  final _formKey = GlobalKey<FormState>();
   DateTime? _dateOfBirth;
   final _weightController = TextEditingController();
   final _liftingYearsController = TextEditingController();
@@ -63,7 +64,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (picked != null) setState(() => _dateOfBirth = picked);
   }
 
+  String? _validateWeight(String? raw) {
+    final text = raw?.trim() ?? '';
+    if (text.isEmpty) return null;
+    final value = double.tryParse(text);
+    if (value == null || !value.isFinite || value <= 0) {
+      return 'Enter a number greater than 0';
+    }
+    return null;
+  }
+
+  String? _validateLiftingYears(String? raw) {
+    final text = raw?.trim() ?? '';
+    if (text.isEmpty) return null;
+    final value = double.tryParse(text);
+    if (value == null || !value.isFinite || value < 0) {
+      return 'Enter a number of 0 or more';
+    }
+    return null;
+  }
+
   Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
     final weight = double.tryParse(_weightController.text.trim());
     final liftingYears = double.tryParse(_liftingYearsController.text.trim());
     DateTime? trainingStartDate;
@@ -176,28 +198,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 16),
 
-          // ── Weight ───────────────────────────────────────────────────────
-          TextField(
-            controller: _weightController,
-            decoration: InputDecoration(
-              labelText: 'Weight',
-              border: const OutlineInputBorder(),
-              suffixText: WorkoutUnits.weight,
+          // ── Weight and experience ────────────────────────────────────────
+          Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                TextFormField(
+                  controller: _weightController,
+                  decoration: InputDecoration(
+                    labelText: 'Weight',
+                    border: const OutlineInputBorder(),
+                    suffixText: WorkoutUnits.weight,
+                  ),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  validator: _validateWeight,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _liftingYearsController,
+                  decoration: const InputDecoration(
+                    labelText: 'Years lifting / exercising',
+                    hintText: 'e.g. 3.5',
+                    border: OutlineInputBorder(),
+                    suffixText: 'yrs',
+                  ),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  validator: _validateLiftingYears,
+                ),
+              ],
             ),
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          ),
-          const SizedBox(height: 16),
-
-          // ── Years Lifting ─────────────────────────────────────────────────
-          TextField(
-            controller: _liftingYearsController,
-            decoration: const InputDecoration(
-              labelText: 'Years lifting / exercising',
-              hintText: 'e.g. 3.5',
-              border: OutlineInputBorder(),
-              suffixText: 'yrs',
-            ),
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
           ),
           const SizedBox(height: 24),
 

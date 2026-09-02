@@ -31,15 +31,15 @@ class SetUiState {
     }
     if (m.isRequiredWeight) {
       final v = double.tryParse(weightCtrl.text.trim());
-      if (v == null) return false;
+      if (v == null || !v.isFinite) return false;
     }
     if (m.isRequiredDistance) {
       final v = double.tryParse(distanceCtrl.text.trim());
-      if (v == null || v <= 0) return false;
+      if (v == null || !v.isFinite || v <= 0) return false;
     }
     if (m.isRequiredTime) {
       final v = double.tryParse(timeCtrl.text.trim());
-      if (v == null || v <= 0) return false;
+      if (v == null || !v.isFinite || v <= 0) return false;
     }
     return true;
   }

@@ -1,0 +1,16 @@
+{
+  "id": "numeric-input-validation",
+  "summary": "Validated profile, movement, and completed-set numbers before saving so unusable values cannot corrupt planning or backups while preserving assisted-exercise weights.",
+  "audience": "user",
+  "releaseNote": "Profile, exercise, and workout fields now reject unusable numeric values with clear guidance before saving.",
+  "docs": {
+    "impact": "updated",
+    "paths": [
+      "docs/guides/settings-backups.md",
+      "docs/guides/movements-history.md",
+      "docs/guides/workouts.md"
+    ],
+    "reason": ""
+  },
+  "screenshots": []
+}

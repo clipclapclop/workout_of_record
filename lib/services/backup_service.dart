@@ -140,7 +140,7 @@ class BackupSettings {
       return parsed;
     }
 
-    double? finiteNumber(String key) {
+    double? positiveFiniteNumber(String key) {
       final value = json[key];
       if (value == null) {
         return null;
@@ -151,9 +151,9 @@ class BackupSettings {
         );
       }
       final converted = value.toDouble();
-      if (!converted.isFinite || converted < 0) {
+      if (!converted.isFinite || converted <= 0) {
         throw BackupRestoreException(
-          'Invalid backup settings: $key must be a finite, non-negative number.',
+          'Invalid backup settings: $key must be a finite number greater than 0.',
         );
       }
       return converted;
@@ -260,7 +260,7 @@ class BackupSettings {
       currentMesocycleId: positiveId('currentMesocycleId'),
       currentCompletedWorkoutId: positiveId('currentCompletedWorkoutId'),
       dateOfBirth: date('dateOfBirth'),
-      weight: finiteNumber('weight'),
+      weight: positiveFiniteNumber('weight'),
       trainingGoal: enumValue('trainingGoal', TrainingGoal.values),
       calorieState: enumValue('calorieState', CalorieState.values),
       trainingStartDate: date('trainingStartDate'),
@@ -904,6 +904,7 @@ class BackupRestoreService {
       }
 
       await _validateExpectedSchema(candidate);
+      await _validateNumericContents(candidate);
       await _validatePointers(candidate, settings);
     } on BackupRestoreException {
       rethrow;
@@ -923,6 +924,64 @@ class BackupRestoreService {
       await candidate
           .customSelect('SELECT $columns FROM $tableName LIMIT 0')
           .get();
+    }
+  }
+
+  Future<void> _validateNumericContents(AppDatabase candidate) async {
+    Never invalid() => throw const BackupRestoreException(
+          'Invalid backup database: stored numeric values are unusable.',
+        );
+
+    bool isFiniteNumber(Object? value) =>
+        value is num && value.toDouble().isFinite;
+
+    final completedSetRows = await candidate.customSelect(
+      'SELECT reps, weight, distance, time FROM completed_sets',
+    ).get();
+    for (final row in completedSetRows) {
+      final values = row.data;
+      final reps = values['reps'];
+      if (reps != null && (reps is! int || reps < 1)) invalid();
+
+      final weight = values['weight'];
+      if (weight != null && !isFiniteNumber(weight)) invalid();
+
+      for (final name in ['distance', 'time']) {
+        final value = values[name];
+        if (value != null &&
+            (!isFiniteNumber(value) || (value as num) <= 0)) {
+          invalid();
+        }
+      }
+    }
+
+    final movementRows = await candidate.customSelect(
+      'SELECT min_weight, weight_delta, bodyweight_load_fraction, rest_seconds '
+      'FROM movements',
+    ).get();
+    for (final row in movementRows) {
+      final values = row.data;
+      final minWeight = values['min_weight'];
+      if (minWeight != null && !isFiniteNumber(minWeight)) invalid();
+
+      final weightDelta = values['weight_delta'];
+      if (weightDelta != null &&
+          (!isFiniteNumber(weightDelta) || (weightDelta as num) <= 0)) {
+        invalid();
+      }
+
+      final fraction = values['bodyweight_load_fraction'];
+      if (!isFiniteNumber(fraction) ||
+          (fraction as num) < 0 ||
+          fraction > 1) {
+        invalid();
+      }
+
+      final restSeconds = values['rest_seconds'];
+      if (restSeconds != null &&
+          (restSeconds is! int || restSeconds < 0)) {
+        invalid();
+      }
     }
   }
 

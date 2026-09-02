@@ -248,9 +248,10 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
                         const TextInputType.numberWithOptions(
                             decimal: true, signed: true),
                     validator: (v) {
-                      if (v != null && v.trim().isNotEmpty &&
-                          double.tryParse(v.trim()) == null) {
-                        return 'Invalid number';
+                      if (v == null || v.trim().isEmpty) return null;
+                      final value = double.tryParse(v.trim());
+                      if (value == null || !value.isFinite) {
+                        return 'Enter a finite number';
                       }
                       return null;
                     },
@@ -265,9 +266,10 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
                     validator: (v) {
-                      if (v != null && v.trim().isNotEmpty &&
-                          double.tryParse(v.trim()) == null) {
-                        return 'Invalid number';
+                      if (v == null || v.trim().isEmpty) return null;
+                      final value = double.tryParse(v.trim());
+                      if (value == null || !value.isFinite || value <= 0) {
+                        return 'Enter a number greater than 0';
                       }
                       return null;
                     },
@@ -286,8 +288,8 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
                   const TextInputType.numberWithOptions(decimal: true),
               validator: (v) {
                 final n = double.tryParse(v?.trim() ?? '');
-                if (n == null || n < 0 || n > 1) {
-                  return 'Enter a number from 0 to 1';
+                if (n == null || !n.isFinite || n < 0 || n > 1) {
+                  return 'Enter a finite number from 0 to 1';
                 }
                 return null;
               },
