@@ -31,7 +31,20 @@ class BackupSettings {
     this.weight,
     this.trainingGoal,
     this.calorieState,
+    this.trainingStartDate,
+    this.timerEnabled = true,
+    this.timerDefaultSeconds = 60,
+    this.timerSound = TimerSound.tts,
+    this.timerHaptic = true,
+    this.timerKeepAwake = false,
+    this.timerGetReadyChimes = false,
     this.aiEnabled = true,
+    this.aiModel = AppPreferences.defaultAiModel,
+    this.aiCreditId,
+    this.aiRecommendationPrompt = AppPreferences.defaultRecommendationPrompt,
+    this.aiChatPrompt = AppPreferences.defaultChatPrompt,
+    this.aiHistoryWeeks = 4,
+    this.aiUserNotes = '',
     this.hasSeenProfilePrompt = false,
     this.notes = '',
   });
@@ -42,7 +55,20 @@ class BackupSettings {
   final double? weight;
   final TrainingGoal? trainingGoal;
   final CalorieState? calorieState;
+  final DateTime? trainingStartDate;
+  final bool timerEnabled;
+  final int timerDefaultSeconds;
+  final TimerSound timerSound;
+  final bool timerHaptic;
+  final bool timerKeepAwake;
+  final bool timerGetReadyChimes;
   final bool aiEnabled;
+  final String aiModel;
+  final String? aiCreditId;
+  final String aiRecommendationPrompt;
+  final String aiChatPrompt;
+  final int aiHistoryWeeks;
+  final String aiUserNotes;
   final bool hasSeenProfilePrompt;
   final String notes;
 
@@ -53,7 +79,20 @@ class BackupSettings {
     'weight',
     'trainingGoal',
     'calorieState',
+    'trainingStartDate',
+    'timerEnabled',
+    'timerDefaultSeconds',
+    'timerSound',
+    'timerHaptic',
+    'timerKeepAwake',
+    'timerGetReadyChimes',
     'aiEnabled',
+    'aiModel',
+    'aiCreditId',
+    'aiRecommendationPrompt',
+    'aiChatPrompt',
+    'aiHistoryWeeks',
+    'aiUserNotes',
     'unitsMetric',
     'hasSeenProfilePrompt',
     'notes',
@@ -120,6 +159,29 @@ class BackupSettings {
       return converted;
     }
 
+    int boundedInt(
+      String key,
+      int defaultValue, {
+      required int minimum,
+      int? maximum,
+    }) {
+      if (!json.containsKey(key)) return defaultValue;
+      final value = json[key];
+      final outsideRange =
+          value is! int ||
+          value < minimum ||
+          (maximum != null && value > maximum);
+      if (outsideRange) {
+        final range = maximum == null
+            ? 'at least $minimum'
+            : '$minimum–$maximum';
+        throw BackupRestoreException(
+          'Invalid backup settings: $key must be an integer in the range $range.',
+        );
+      }
+      return value;
+    }
+
     T? enumValue<T extends Enum>(String key, List<T> values) {
       final value = json[key];
       if (value == null) {
@@ -128,6 +190,26 @@ class BackupSettings {
       if (value is! String) {
         throw BackupRestoreException(
           'Invalid backup settings: $key must be a supported name or null.',
+        );
+      }
+      for (final candidate in values) {
+        if (candidate.name == value) return candidate;
+      }
+      throw BackupRestoreException(
+        'Invalid backup settings: unsupported $key value "$value".',
+      );
+    }
+
+    T enumWithDefault<T extends Enum>(
+      String key,
+      List<T> values,
+      T defaultValue,
+    ) {
+      if (!json.containsKey(key)) return defaultValue;
+      final value = json[key];
+      if (value is! String) {
+        throw BackupRestoreException(
+          'Invalid backup settings: $key must be a supported name.',
         );
       }
       for (final candidate in values) {
@@ -160,6 +242,17 @@ class BackupSettings {
       return value;
     }
 
+    String? nullableString(String key) {
+      final value = json[key];
+      if (value == null) return null;
+      if (value is! String) {
+        throw BackupRestoreException(
+          'Invalid backup settings: $key must be a string or null.',
+        );
+      }
+      return value;
+    }
+
     // Validate the removed field so malformed legacy backups still fail safely.
     boolean('unitsMetric', false);
 
@@ -170,7 +263,27 @@ class BackupSettings {
       weight: finiteNumber('weight'),
       trainingGoal: enumValue('trainingGoal', TrainingGoal.values),
       calorieState: enumValue('calorieState', CalorieState.values),
+      trainingStartDate: date('trainingStartDate'),
+      timerEnabled: boolean('timerEnabled', true),
+      timerDefaultSeconds: boundedInt('timerDefaultSeconds', 60, minimum: 1),
+      timerSound: enumWithDefault(
+        'timerSound',
+        TimerSound.values,
+        TimerSound.tts,
+      ),
+      timerHaptic: boolean('timerHaptic', true),
+      timerKeepAwake: boolean('timerKeepAwake', false),
+      timerGetReadyChimes: boolean('timerGetReadyChimes', false),
       aiEnabled: boolean('aiEnabled', true),
+      aiModel: string('aiModel', AppPreferences.defaultAiModel),
+      aiCreditId: nullableString('aiCreditId'),
+      aiRecommendationPrompt: string(
+        'aiRecommendationPrompt',
+        AppPreferences.defaultRecommendationPrompt,
+      ),
+      aiChatPrompt: string('aiChatPrompt', AppPreferences.defaultChatPrompt),
+      aiHistoryWeeks: boundedInt('aiHistoryWeeks', 4, minimum: 1, maximum: 12),
+      aiUserNotes: string('aiUserNotes', ''),
       hasSeenProfilePrompt: boolean('hasSeenProfilePrompt', false),
       notes: string('notes', ''),
     );
@@ -183,7 +296,20 @@ class BackupSettings {
     'weight': weight,
     'trainingGoal': trainingGoal?.name,
     'calorieState': calorieState?.name,
+    'trainingStartDate': trainingStartDate?.toIso8601String(),
+    'timerEnabled': timerEnabled,
+    'timerDefaultSeconds': timerDefaultSeconds,
+    'timerSound': timerSound.name,
+    'timerHaptic': timerHaptic,
+    'timerKeepAwake': timerKeepAwake,
+    'timerGetReadyChimes': timerGetReadyChimes,
     'aiEnabled': aiEnabled,
+    'aiModel': aiModel,
+    'aiCreditId': aiCreditId,
+    'aiRecommendationPrompt': aiRecommendationPrompt,
+    'aiChatPrompt': aiChatPrompt,
+    'aiHistoryWeeks': aiHistoryWeeks,
+    'aiUserNotes': aiUserNotes,
     'hasSeenProfilePrompt': hasSeenProfilePrompt,
     'notes': notes,
   };
@@ -197,22 +323,48 @@ class BackupSettings {
       other.weight == weight &&
       other.trainingGoal == trainingGoal &&
       other.calorieState == calorieState &&
+      other.trainingStartDate == trainingStartDate &&
+      other.timerEnabled == timerEnabled &&
+      other.timerDefaultSeconds == timerDefaultSeconds &&
+      other.timerSound == timerSound &&
+      other.timerHaptic == timerHaptic &&
+      other.timerKeepAwake == timerKeepAwake &&
+      other.timerGetReadyChimes == timerGetReadyChimes &&
       other.aiEnabled == aiEnabled &&
+      other.aiModel == aiModel &&
+      other.aiCreditId == aiCreditId &&
+      other.aiRecommendationPrompt == aiRecommendationPrompt &&
+      other.aiChatPrompt == aiChatPrompt &&
+      other.aiHistoryWeeks == aiHistoryWeeks &&
+      other.aiUserNotes == aiUserNotes &&
       other.hasSeenProfilePrompt == hasSeenProfilePrompt &&
       other.notes == notes;
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     currentMesocycleId,
     currentCompletedWorkoutId,
     dateOfBirth,
     weight,
     trainingGoal,
     calorieState,
+    trainingStartDate,
+    timerEnabled,
+    timerDefaultSeconds,
+    timerSound,
+    timerHaptic,
+    timerKeepAwake,
+    timerGetReadyChimes,
     aiEnabled,
+    aiModel,
+    aiCreditId,
+    aiRecommendationPrompt,
+    aiChatPrompt,
+    aiHistoryWeeks,
+    aiUserNotes,
     hasSeenProfilePrompt,
     notes,
-  );
+  ]);
 }
 
 abstract interface class BackupSettingsStore {
@@ -231,7 +383,20 @@ class AppPreferencesBackupSettingsStore implements BackupSettingsStore {
     weight: AppPreferences.getWeight(),
     trainingGoal: AppPreferences.getTrainingGoal(),
     calorieState: AppPreferences.getCalorieState(),
+    trainingStartDate: AppPreferences.getTrainingStartDate(),
+    timerEnabled: AppPreferences.getTimerEnabled(),
+    timerDefaultSeconds: AppPreferences.getTimerDefaultSeconds(),
+    timerSound: AppPreferences.getTimerSound(),
+    timerHaptic: AppPreferences.getTimerHaptic(),
+    timerKeepAwake: AppPreferences.getTimerKeepAwake(),
+    timerGetReadyChimes: AppPreferences.getTimerGetReadyChimes(),
     aiEnabled: AppPreferences.getAiEnabled(),
+    aiModel: AppPreferences.getAiModel(),
+    aiCreditId: AppPreferences.getAiCreditId(),
+    aiRecommendationPrompt: AppPreferences.getAiRecommendationPrompt(),
+    aiChatPrompt: AppPreferences.getAiChatPrompt(),
+    aiHistoryWeeks: AppPreferences.getAiHistoryWeeks(),
+    aiUserNotes: AppPreferences.getAiUserNotes(),
     hasSeenProfilePrompt: AppPreferences.hasSeenProfilePrompt(),
     notes: AppPreferences.getNotes(),
   );
@@ -246,7 +411,22 @@ class AppPreferencesBackupSettingsStore implements BackupSettingsStore {
     await AppPreferences.setWeight(settings.weight);
     await AppPreferences.setTrainingGoal(settings.trainingGoal);
     await AppPreferences.setCalorieState(settings.calorieState);
+    await AppPreferences.setTrainingStartDate(settings.trainingStartDate);
+    await AppPreferences.setTimerEnabled(settings.timerEnabled);
+    await AppPreferences.setTimerDefaultSeconds(settings.timerDefaultSeconds);
+    await AppPreferences.setTimerSound(settings.timerSound);
+    await AppPreferences.setTimerHaptic(settings.timerHaptic);
+    await AppPreferences.setTimerKeepAwake(settings.timerKeepAwake);
+    await AppPreferences.setTimerGetReadyChimes(settings.timerGetReadyChimes);
     await AppPreferences.setAiEnabled(settings.aiEnabled);
+    await AppPreferences.setAiModel(settings.aiModel);
+    await AppPreferences.setAiCreditId(settings.aiCreditId);
+    await AppPreferences.setAiRecommendationPrompt(
+      settings.aiRecommendationPrompt,
+    );
+    await AppPreferences.setAiChatPrompt(settings.aiChatPrompt);
+    await AppPreferences.setAiHistoryWeeks(settings.aiHistoryWeeks);
+    await AppPreferences.setAiUserNotes(settings.aiUserNotes);
     await AppPreferences.setHasSeenProfilePrompt(settings.hasSeenProfilePrompt);
     await AppPreferences.setNotes(settings.notes);
 
@@ -1026,9 +1206,41 @@ class _PreparedBackup {
   final BackupSettings settings;
 }
 
+class BackupWriteCoordinator {
+  BackupWriteCoordinator({
+    required this.buildBytes,
+    required this.writeFile,
+    required this.markSuccessful,
+    DateTime Function()? now,
+  }) : now = now ?? DateTime.now;
+
+  final Future<Uint8List> Function() buildBytes;
+  final Future<void> Function(String folderUri, Uint8List bytes) writeFile;
+  final Future<void> Function(DateTime timestamp) markSuccessful;
+  final DateTime Function() now;
+
+  Future<void> _tail = Future<void>.value();
+
+  Future<void> backup(String folderUri) {
+    final operation = _tail.then((_) async {
+      final bytes = await buildBytes();
+      await writeFile(folderUri, bytes);
+      await markSuccessful(now());
+    });
+    _tail = operation.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    return operation;
+  }
+}
+
 class BackupService {
   static const zipFileName = 'workout_of_record.zip';
   static bool _restoreInProgress = false;
+  static final BackupWriteCoordinator _writeCoordinator =
+      BackupWriteCoordinator(
+        buildBytes: buildBackupBytes,
+        writeFile: SafService.writeFile,
+        markSuccessful: AppPreferences.setLastBackupTimestamp,
+      );
 
   /// Builds the backup zip and returns raw bytes without writing to disk.
   static Future<Uint8List> buildBackupBytes() async {
@@ -1093,11 +1305,8 @@ class BackupService {
   }
 
   /// Writes backup zip to the user-chosen SAF folder at [folderUri].
-  static Future<void> backup(String folderUri) async {
-    final zipBytes = await buildBackupBytes();
-    await SafService.writeFile(folderUri, zipBytes);
-    await AppPreferences.setLastBackupTimestamp(DateTime.now());
-  }
+  static Future<void> backup(String folderUri) =>
+      _writeCoordinator.backup(folderUri);
 
   static Future<void> restore(String zipPath) async {
     if (_restoreInProgress) {

@@ -332,7 +332,20 @@ void main() {
       weight: 72.5,
       trainingGoal: TrainingGoal.hypertrophy,
       calorieState: CalorieState.surplus,
+      trainingStartDate: DateTime.utc(2020, 4, 5),
+      timerEnabled: false,
+      timerDefaultSeconds: 90,
+      timerSound: TimerSound.chime,
+      timerHaptic: false,
+      timerKeepAwake: true,
+      timerGetReadyChimes: true,
       aiEnabled: true,
+      aiModel: 'synthetic-model',
+      aiCreditId: 'synthetic-credit-id',
+      aiRecommendationPrompt: 'Synthetic recommendation prompt',
+      aiChatPrompt: 'Synthetic chat prompt',
+      aiHistoryWeeks: 8,
+      aiUserNotes: 'Synthetic AI notes',
       hasSeenProfilePrompt: true,
       notes: 'Restored synthetic note',
     );
@@ -443,13 +456,27 @@ void main() {
     test(
       'production settings adapter round-trips every backed-up value',
       () async {
-        SharedPreferences.setMockInitialValues({});
+        SharedPreferences.setMockInitialValues({
+          'backup_enabled': true,
+          'auto_backup_enabled': true,
+          'backup_directory_path': 'synthetic-backup-folder',
+          'ai_logging_enabled': true,
+          'ai_log_directory_path': 'synthetic-log-folder',
+        });
         await AppPreferences.init();
         const store = AppPreferencesBackupSettingsStore();
 
         await store.write(restoredSettings);
 
         expect(store.read(), restoredSettings);
+        expect(AppPreferences.getBackupEnabled(), isTrue);
+        expect(AppPreferences.getAutoBackupEnabled(), isTrue);
+        expect(
+          AppPreferences.getBackupDirectoryPath(),
+          'synthetic-backup-folder',
+        );
+        expect(AppPreferences.getAiLoggingEnabled(), isTrue);
+        expect(AppPreferences.getAiLogDirectoryPath(), 'synthetic-log-folder');
       },
     );
 
@@ -471,7 +498,10 @@ void main() {
 
           expect(settingsStore.current, restoredSettings);
           expect(settingsStore.current.weight, 72.5);
-          expect(settingsStore.current.toJson(), isNot(contains('unitsMetric')));
+          expect(
+            settingsStore.current.toJson(),
+            isNot(contains('unitsMetric')),
+          );
         },
       );
     }
@@ -493,10 +523,21 @@ void main() {
 
     final invalidSettings = <String, Map<String, Object?>>{
       'wrong pointer type': {'currentMesocycleId': '1'},
-      'unknown enum': {'trainingGoal': 'powerlifting'},
-      'wrong boolean type': {'unitsMetric': 1},
-      'invalid date': {'dateOfBirth': 'not-a-date'},
+      'unknown profile enum': {'trainingGoal': 'powerlifting'},
+      'wrong legacy boolean type': {'unitsMetric': 1},
+      'invalid profile date': {'dateOfBirth': 'not-a-date'},
+      'invalid training date': {'trainingStartDate': 'not-a-date'},
       'negative weight': {'weight': -1},
+      'wrong timer boolean type': {'timerEnabled': 1},
+      'non-positive timer duration': {'timerDefaultSeconds': 0},
+      'unknown timer sound': {'timerSound': 'airHorn'},
+      'null timer sound': {'timerSound': null},
+      'wrong AI model type': {'aiModel': 4},
+      'wrong AI credit ID type': {'aiCreditId': true},
+      'wrong AI prompt type': {'aiRecommendationPrompt': 4},
+      'AI history below range': {'aiHistoryWeeks': 0},
+      'AI history above range': {'aiHistoryWeeks': 13},
+      'wrong AI notes type': {'aiUserNotes': false},
       'unknown field': {'futureSetting': true},
     };
 

@@ -1,0 +1,14 @@
+{
+  "id": "safe-fixed-backup",
+  "summary": "Backups now stage and verify a replacement before safely swapping the fixed workout_of_record.zip file, while preserving the exact filename used by external backup tools. Restores also include previously omitted timer, training-start, and non-secret AI settings.",
+  "audience": "user",
+  "releaseNote": "Backups now safely replace the fixed backup file and restore timer, training-start, and non-secret AI settings.",
+  "docs": {
+    "impact": "updated",
+    "paths": [
+      "docs/guides/settings-backups.md"
+    ],
+    "reason": "The fixed-name replacement process, included settings, exclusions, and compatibility behavior are documented."
+  },
+  "screenshots": []
+}

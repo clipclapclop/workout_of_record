@@ -103,12 +103,9 @@ class SafChannel(private val activity: MainActivity) {
             val treeUri = Uri.parse(uriString)
             val tree = DocumentFile.fromTreeUri(activity, treeUri)
                 ?: throw Exception("Cannot access folder")
-            val existing = tree.findFile(SafBackupWorker.ZIP_FILENAME)
-            val target = existing ?: tree.createFile("application/zip", SafBackupWorker.ZIP_FILENAME)
-                ?: throw Exception("Cannot create file in folder")
-            activity.contentResolver.openOutputStream(target.uri, "w")!!.use {
-                it.write(bytes)
-            }
+            FixedNameBackupWriter(
+                SafBackupDocumentStore(activity, tree),
+            ).replace(bytes)
             result.success(null)
         } catch (e: Exception) {
             result.error("WRITE_FAILED", e.message, null)

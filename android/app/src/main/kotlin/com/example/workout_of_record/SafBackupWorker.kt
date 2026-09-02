@@ -20,7 +20,6 @@ class SafBackupWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, para
         private const val KEY_BACKUP_URI = "flutter.backup_directory_path"
         private const val KEY_LAST_BACKUP = "flutter.backup_last_timestamp"
         private const val DB_FILENAME = "workout_of_record.sqlite"
-        const val ZIP_FILENAME = "workout_of_record.zip"
         private const val SETTINGS_FILENAME = "settings.json"
     }
 
@@ -86,11 +85,8 @@ class SafBackupWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, para
         val treeUri = Uri.parse(uriString)
         val tree = DocumentFile.fromTreeUri(applicationContext, treeUri)
             ?: throw Exception("Cannot access backup folder")
-        val existing = tree.findFile(ZIP_FILENAME)
-        val target = existing ?: tree.createFile("application/zip", ZIP_FILENAME)
-            ?: throw Exception("Cannot create backup file")
-        applicationContext.contentResolver.openOutputStream(target.uri, "w")!!.use {
-            it.write(bytes)
-        }
+        FixedNameBackupWriter(
+            SafBackupDocumentStore(applicationContext, tree),
+        ).replace(bytes)
     }
 }
