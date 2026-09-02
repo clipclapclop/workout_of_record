@@ -51,8 +51,11 @@ internal class FixedNameBackupWriter(
         try {
             store.write(PENDING_NAME, bytes)
             requireDigest(PENDING_NAME, expected)
+            writeVerificationMarker(expected)
         } catch (error: Exception) {
             deleteBestEffort(PENDING_NAME)
+            deleteBestEffort(VERIFIED_NAME)
+            deleteBestEffort(VERIFIED_PENDING_NAME)
             throw BackupReplacementException(
                 "Could not stage and verify the new backup. The existing backup was not changed.",
                 error,
@@ -67,7 +70,6 @@ internal class FixedNameBackupWriter(
             }
             renameRequired(PENDING_NAME, FINAL_NAME)
             requireDigest(FINAL_NAME, expected)
-            writeVerificationMarker(expected)
         } catch (error: Exception) {
             val rollbackError = rollbackPrevious()
             if (rollbackError != null) {
