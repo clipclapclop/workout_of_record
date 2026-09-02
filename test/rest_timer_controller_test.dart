@@ -2,25 +2,28 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_of_record/widgets/rest_timer_controller.dart';
 
 void main() {
-  test('duration changes do not restart or replace a running countdown', () {
+  test('tracks whether a set has started the current timer', () {
     final controller = RestTimerController(durationSeconds: 60);
     addTearDown(controller.dispose);
 
     expect(controller.isRunning, isFalse);
-    controller.start();
-    controller.setDurationWhenIdle(90);
+    expect(controller.hasBeenStarted, isFalse);
 
+    controller.setDuration(90);
+    expect(controller.hasBeenStarted, isFalse);
+    expect(controller.remainingMs, 90000);
+
+    controller.start();
     expect(controller.isRunning, isTrue);
-    expect(controller.durationSeconds, 60);
+    expect(controller.hasBeenStarted, isTrue);
 
     controller.markCued();
-    expect(controller.remainingMs, 0);
-    controller.setDurationWhenIdle(60);
     expect(controller.isRunning, isFalse);
-    expect(controller.remainingMs, 60000);
+    expect(controller.hasBeenStarted, isTrue);
+    expect(controller.remainingMs, 0);
 
-    controller.setDurationWhenIdle(90);
-    expect(controller.durationSeconds, 90);
+    controller.reset();
+    expect(controller.hasBeenStarted, isFalse);
     expect(controller.remainingMs, 90000);
   });
 

@@ -198,10 +198,12 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     _timerActiveExId = activeId;
     _timerCueText = _cueText(activeEx);
 
-    // Loading a workout or moving between exercises only updates the idle
-    // duration and next-set context. A running rest belongs to the set that
-    // triggered it and must continue through post-exercise questions.
-    _timerController.setDurationWhenIdle(_effectiveDuration(activeEx.movement));
+    // Before any set has triggered the timer, keep its idle duration aligned
+    // with the active set. Once started, stopped, or completed, that rest
+    // belongs to its triggering set and survives exercise/feedback changes.
+    if (!_timerController.hasBeenStarted) {
+      _timerController.setDuration(_effectiveDuration(activeEx.movement));
+    }
     _pushTimerToService();
   }
 
@@ -228,7 +230,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
   void _onTimerReset(SetData interactedSet, ExerciseData exercise) {
     if (_isFinalUsableSet(interactedSet)) {
-      _timerController.stop();
+      _timerController.reset();
       _timerActiveExId = null;
       _timerCueText = null;
       _pushTimerToService();
@@ -240,7 +242,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     if (duration <= 0 ||
         !AppPreferences.getTimerEnabled() ||
         !_timerWorkoutOn) {
-      _timerController.stop();
+      _timerController.reset();
       _timerActiveExId = null;
       _timerCueText = null;
       _pushTimerToService();

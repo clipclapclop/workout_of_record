@@ -15,12 +15,14 @@ class RestTimerController extends ChangeNotifier {
   int _pausedRemainingMs;
   DateTime? _startedAt;
   bool _cued = false; // whether the zero-cue has already fired this round
+  bool _hasBeenStarted = false;
 
   // ── Getters ────────────────────────────────────────────────────────────────
 
   int get durationSeconds => _durationSeconds;
   bool get isRunning => _startedAt != null;
   bool get cued => _cued;
+  bool get hasBeenStarted => _hasBeenStarted;
 
   /// Milliseconds remaining.  Clamped to [0, durationSeconds * 1000].
   int get remainingMs {
@@ -42,6 +44,7 @@ class RestTimerController extends ChangeNotifier {
     // Backdate _startedAt so that remaining == startFrom immediately.
     _startedAt = DateTime.now()
         .subtract(Duration(milliseconds: _durationSeconds * 1000 - startFrom));
+    _hasBeenStarted = true;
     notifyListeners();
   }
 
@@ -57,6 +60,7 @@ class RestTimerController extends ChangeNotifier {
     _startedAt = null;
     _pausedRemainingMs = _durationSeconds * 1000;
     _cued = false;
+    _hasBeenStarted = false;
     notifyListeners();
   }
 
@@ -66,11 +70,6 @@ class RestTimerController extends ChangeNotifier {
     reset(); // reset() already calls notifyListeners
   }
 
-  /// Update an idle timer without disturbing a countdown already in progress.
-  void setDurationWhenIdle(int seconds) {
-    if (isRunning) return;
-    setDuration(seconds);
-  }
 
   /// Called by the widget after it has fired the cue so we don't fire twice.
   void markCued() {
