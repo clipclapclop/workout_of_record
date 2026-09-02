@@ -11,6 +11,7 @@ For a single user, no multi-user, no accounts
 - Not a workout builder/program generator
 - Not a personal coach
 - Not internet-dependent for core logging functionality
+- Basic interface rendering uses Android's built-in Roboto font and does not fetch a web font
 
 ---
 

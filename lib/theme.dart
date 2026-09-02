@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 const _seed = Color(0xFF1565C0); // steel blue
 
@@ -12,12 +11,12 @@ abstract final class AppTheme {
     final base = ThemeData.dark(useMaterial3: true);
     return base.copyWith(
       colorScheme: cs,
-      textTheme: GoogleFonts.interTextTheme(base.textTheme),
+      textTheme: base.textTheme,
       appBarTheme: AppBarTheme(
         centerTitle: false,
         scrolledUnderElevation: 0,
         backgroundColor: cs.surface,
-        titleTextStyle: GoogleFonts.inter(
+        titleTextStyle: base.textTheme.titleLarge?.copyWith(
           fontSize: 20,
           fontWeight: FontWeight.w600,
           color: cs.onSurface,
@@ -39,8 +38,10 @@ abstract final class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle:
-              GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 15),
+          textStyle: base.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+          ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -49,14 +50,18 @@ abstract final class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle:
-              GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 15),
+          textStyle: base.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w500,
+            fontSize: 15,
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          textStyle:
-              GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 14),
+          textStyle: base.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+          ),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -82,7 +87,10 @@ abstract final class AppTheme {
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: SegmentedButton.styleFrom(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          textStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+          textStyle: base.textTheme.labelLarge?.copyWith(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ),
     );
@@ -91,9 +99,6 @@ abstract final class AppTheme {
   static ThemeData light() {
     final cs = ColorScheme.fromSeed(seedColor: _seed);
     final base = ThemeData.light(useMaterial3: true);
-    return base.copyWith(
-      colorScheme: cs,
-      textTheme: GoogleFonts.interTextTheme(base.textTheme),
-    );
+    return base.copyWith(colorScheme: cs, textTheme: base.textTheme);
   }
 }

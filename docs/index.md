@@ -1,6 +1,6 @@
 # Workout of Record
 
-Workout of Record is a private, Android-first workout logger for one user. It keeps core workout data locally, saves workout progress as you go, and can use optional AI recommendations without making workout logging depend on an internet connection.
+Workout of Record is a private, Android-first workout logger for one user. It keeps core workout data locally, saves workout progress as you go, and can use optional AI recommendations without making workout logging depend on an internet connection. The interface uses Android's built-in Roboto font rather than downloading a web font at runtime.
 
 Use this guide to:
 

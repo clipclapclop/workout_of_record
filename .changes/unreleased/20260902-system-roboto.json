@@ -1,0 +1,15 @@
+{
+  "id": "system-roboto",
+  "summary": "Replaced runtime Google Fonts usage with Android's built-in Roboto typography so basic interface rendering remains local.",
+  "audience": "user",
+  "releaseNote": "The interface now uses Android's built-in Roboto font without downloading a web font at runtime.",
+  "docs": {
+    "impact": "updated",
+    "paths": [
+      "docs/index.md",
+      "refs/overview.md"
+    ],
+    "reason": ""
+  },
+  "screenshots": []
+}
