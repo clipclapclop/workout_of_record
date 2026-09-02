@@ -1362,7 +1362,16 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         .any((s) => _setStates[s.completed.id]?.isChecked ?? false);
 
     final isNotStarted = !isExSkipped && !anySetChecked;
-    final canReplace = isNotStarted && !postExDone;
+    final hasPersistedSetActivity = exercise.sets.any((set) {
+      final completed = set.completed;
+      return completed.reps != null ||
+          completed.weight != null ||
+          completed.distance != null ||
+          completed.time != null ||
+          completed.skipReason != null;
+    });
+    final canReplace =
+        !isExSkipped && !hasPersistedSetActivity && !postExDone;
     final exercises = _data!.exercises;
     final canMoveUp = isNotStarted &&
         index > 0 &&
