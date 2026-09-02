@@ -73,7 +73,7 @@ internal class FixedNameBackupWriter(
             promotedByThisOperation = true
             requireDigest(FINAL_NAME, expected)
         } catch (error: Exception) {
-            val rollbackError = rollbackPrevious()
+            val rollbackError = rollbackPrevious(promotedByThisOperation)
             if (rollbackError != null) {
                 throw BackupReplacementException(
                     "Backup replacement failed and the previous backup could not be restored. " +
@@ -115,7 +115,7 @@ internal class FixedNameBackupWriter(
             if (hasValidVerificationMarker()) {
                 deleteRequired(PREVIOUS_NAME)
             } else {
-                val rollbackError = rollbackPrevious()
+                val rollbackError = rollbackPrevious(allowDeleteFinal = false)
                 if (rollbackError != null) {
                     throw BackupReplacementException(
                         "An interrupted backup could not be recovered. Keep $PREVIOUS_NAME and try again.",
@@ -130,11 +130,18 @@ internal class FixedNameBackupWriter(
         deleteRequired(VERIFIED_PENDING_NAME)
     }
 
-    private fun rollbackPrevious(): Exception? {
+    private fun rollbackPrevious(allowDeleteFinal: Boolean): Exception? {
         if (!store.exists(PREVIOUS_NAME)) return null
         return try {
-            if (store.exists(FINAL_NAME) && !store.delete(FINAL_NAME)) {
-                throw BackupReplacementException("Could not remove the incomplete final backup.")
+            if (store.exists(FINAL_NAME)) {
+                if (!allowDeleteFinal) {
+                    throw BackupReplacementException(
+                        "The fixed-name backup changed during replacement; both files were preserved.",
+                    )
+                }
+                if (!store.delete(FINAL_NAME)) {
+                    throw BackupReplacementException("Could not remove the incomplete final backup.")
+                }
             }
             renameRequired(PREVIOUS_NAME, FINAL_NAME)
             null

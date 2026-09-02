@@ -194,6 +194,22 @@ class FixedNameBackupWriterTest {
     }
 
     @Test
+    fun `foreign final appearing mid-replacement preserves both files`() {
+        val old = byteArrayOf(1, 2, 3)
+        val external = byteArrayOf(4, 5, 6)
+        val store = FakeStore(mapOf(FixedNameBackupWriter.FINAL_NAME to old)).apply {
+            externalFinalOnPendingRename = external
+        }
+
+        assertThrows(BackupReplacementException::class.java) {
+            FixedNameBackupWriter(store).replace(byteArrayOf(9, 8, 7))
+        }
+
+        assertArrayEquals(external, store.files[FixedNameBackupWriter.FINAL_NAME])
+        assertArrayEquals(old, store.files[FixedNameBackupWriter.PREVIOUS_NAME])
+    }
+
+    @Test
     fun `interrupted cleanup keeps the promoted final backup`() {
         val old = byteArrayOf(1, 2, 3)
         val promoted = byteArrayOf(4, 5, 6)
@@ -218,7 +234,7 @@ class FixedNameBackupWriterTest {
     }
 
     @Test
-    fun `failed rollback state restores previous instead of trusting final`() {
+    fun `ambiguous interrupted rollback preserves both files`() {
         val old = byteArrayOf(1, 2, 3)
         val unverified = byteArrayOf(4, 5, 6)
         val store = FakeStore(
@@ -228,10 +244,12 @@ class FixedNameBackupWriterTest {
             ),
         )
 
-        FixedNameBackupWriter(store).recoverInterruptedReplacement()
+        assertThrows(BackupReplacementException::class.java) {
+            FixedNameBackupWriter(store).recoverInterruptedReplacement()
+        }
 
-        assertArrayEquals(old, store.files[FixedNameBackupWriter.FINAL_NAME])
-        assertFalse(store.exists(FixedNameBackupWriter.PREVIOUS_NAME))
+        assertArrayEquals(unverified, store.files[FixedNameBackupWriter.FINAL_NAME])
+        assertArrayEquals(old, store.files[FixedNameBackupWriter.PREVIOUS_NAME])
     }
 
     @Test
