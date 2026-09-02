@@ -1371,7 +1371,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           completed.skipReason != null;
     });
     final canReplace =
-        !isExSkipped && !hasPersistedSetActivity && !postExDone;
+        isNotStarted && !hasPersistedSetActivity && !postExDone;
     final exercises = _data!.exercises;
     final canMoveUp = isNotStarted &&
         index > 0 &&
