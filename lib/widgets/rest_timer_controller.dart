@@ -15,6 +15,8 @@ class RestTimerController extends ChangeNotifier {
   int _pausedRemainingMs;
   DateTime? _startedAt;
   bool _cued = false; // whether the zero-cue has already fired this round
+  // Deliberately session-only: recreating the workout screen creates an idle
+  // timer. Workout data persists, but an in-progress rest countdown does not.
   bool _hasBeenStarted = false;
 
   // ── Getters ────────────────────────────────────────────────────────────────
@@ -74,10 +76,10 @@ class RestTimerController extends ChangeNotifier {
 
   /// Called by the widget after it has fired the cue so we don't fire twice.
   void markCued() {
-    _cued = true;
-    // Stop ticking by clearing _startedAt — keep remaining at 0.
+    // Stop the active countdown at zero before recording cue delivery.
     _pausedRemainingMs = 0;
     _startedAt = null;
+    _cued = true;
     notifyListeners();
   }
 }
