@@ -93,7 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
         data = await (widget.loadActiveWorkout?.call(
               active.completedWorkoutId,
             ) ??
-            db.getWorkoutData(active.completedWorkoutId));
+            db.getActiveWorkoutData(active.completedWorkoutId));
       } on WorkoutDataIntegrityException catch (error) {
         return _DamagedActiveWorkout(active, canReset: error.canReset);
       }

@@ -1135,7 +1135,16 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
-  Future<WorkoutData> getWorkoutData(int completedWorkoutId) async {
+  Future<WorkoutData> getWorkoutData(int completedWorkoutId) =>
+      _getWorkoutData(completedWorkoutId, classifyActiveDamage: false);
+
+  Future<WorkoutData> getActiveWorkoutData(int completedWorkoutId) =>
+      _getWorkoutData(completedWorkoutId, classifyActiveDamage: true);
+
+  Future<WorkoutData> _getWorkoutData(
+    int completedWorkoutId, {
+    required bool classifyActiveDamage,
+  }) async {
     final cw = await (select(completedWorkouts)
           ..where((w) => w.id.equals(completedWorkoutId)))
         .getSingle();
@@ -1151,7 +1160,12 @@ class AppDatabase extends _$AppDatabase {
       try {
         return await read;
       } on StateError {
-        throw const WorkoutDataIntegrityException.resettable();
+        if (classifyActiveDamage &&
+            cw.status == WorkoutStatus.active &&
+            cw.completedAt == null) {
+          throw const WorkoutDataIntegrityException.resettable();
+        }
+        rethrow;
       }
     }
 
@@ -1168,6 +1182,11 @@ class AppDatabase extends _$AppDatabase {
             ..where((m) => m.id.equals(ce.movementId)))
           .getSingleOrNull();
       if (movement == null) {
+        if (!classifyActiveDamage ||
+            cw.status != WorkoutStatus.active ||
+            cw.completedAt != null) {
+          throw StateError('The workout references a missing movement.');
+        }
         if (plannedWorkout == null) {
           throw const WorkoutDataIntegrityException.notResettable();
         }

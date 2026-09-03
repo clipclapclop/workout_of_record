@@ -699,7 +699,7 @@ void main() {
         .go();
 
     await expectLater(
-      database.getWorkoutData(fixture.completedWorkoutId),
+      database.getActiveWorkoutData(fixture.completedWorkoutId),
       throwsA(
         isA<WorkoutDataIntegrityException>().having(
           (error) => error.canReset,
@@ -707,6 +707,10 @@ void main() {
           isTrue,
         ),
       ),
+    );
+    await expectLater(
+      database.getWorkoutData(fixture.completedWorkoutId),
+      throwsA(isA<StateError>()),
     );
   });
 
@@ -722,7 +726,7 @@ void main() {
         .go();
 
     await expectLater(
-      database.getWorkoutData(fixture.completedWorkoutId),
+      database.getActiveWorkoutData(fixture.completedWorkoutId),
       throwsA(
         isA<WorkoutDataIntegrityException>().having(
           (error) => error.canReset,
@@ -758,7 +762,7 @@ void main() {
         .go();
 
     await expectLater(
-      database.getWorkoutData(fixture.completedWorkoutId),
+      database.getActiveWorkoutData(fixture.completedWorkoutId),
       throwsA(
         isA<WorkoutDataIntegrityException>().having(
           (error) => error.canReset,
