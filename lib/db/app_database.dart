@@ -1079,10 +1079,60 @@ class AppDatabase extends _$AppDatabase {
           ..limit(1))
         .getSingleOrNull();
     if (row == null) return null;
+    final completed = row.readTable(completedWorkouts);
+    final workout = row.readTable(workouts);
     return ActiveWorkoutReference(
-      completedWorkoutId: row.readTable(completedWorkouts).id,
+      completedWorkoutId: completed.id,
+      workoutId: workout.id,
+      workoutName: workout.name,
+      startedAt: completed.startedAt,
       mesocycleId: row.readTable(weeks).mesocycleId,
     );
+  }
+
+  /// Atomically removes one exact in-progress attempt so its planned workout
+  /// can be started again. Completed workouts are never eligible.
+  Future<void> resetActiveWorkout(int completedWorkoutId) async {
+    await transaction(() async {
+      final active = await (select(completedWorkouts)
+            ..where((row) =>
+                row.id.equals(completedWorkoutId) &
+                row.status.equals(WorkoutStatus.active.name) &
+                row.completedAt.isNull()))
+          .getSingleOrNull();
+      if (active == null) {
+        throw StateError('The workout is no longer active.');
+      }
+
+      final exerciseIds = await (selectOnly(completedExercises)
+            ..addColumns([completedExercises.id])
+            ..where(completedExercises.completedWorkoutId
+                .equals(completedWorkoutId)))
+          .map((row) => row.read(completedExercises.id)!)
+          .get();
+      if (exerciseIds.isNotEmpty) {
+        await (delete(postExerciseCheckins)
+              ..where((row) => row.completedExerciseId.isIn(exerciseIds)))
+            .go();
+        await (delete(completedSets)
+              ..where((row) => row.completedExerciseId.isIn(exerciseIds)))
+            .go();
+      }
+      await (delete(completedExercises)
+            ..where((row) =>
+                row.completedWorkoutId.equals(completedWorkoutId)))
+          .go();
+      await (delete(postMuscleGroupCheckins)
+            ..where((row) =>
+                row.completedWorkoutId.equals(completedWorkoutId)))
+          .go();
+      await (delete(completedWorkouts)
+            ..where((row) => row.id.equals(completedWorkoutId)))
+          .go();
+      await (delete(preWorkoutCheckins)
+            ..where((row) => row.workoutId.equals(active.workoutId)))
+          .go();
+    });
   }
 
   Future<WorkoutData> getWorkoutData(int completedWorkoutId) async {

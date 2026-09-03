@@ -656,6 +656,130 @@ void main() {
   );
 
   test(
+    'resetting an active attempt preserves history and offers the same workout',
+    () async {
+      final database = _openMemoryDatabase();
+      addTearDown(database.close);
+      final template = (await database.getMesoTemplates()).first;
+      final mesocycleId = await database.createMesocycle(
+        template.id,
+        'Recovery Cycle',
+        2,
+      );
+      final completedWorkout = await database.getOrCreateNextWorkout(
+        mesocycleId,
+      );
+      final historicalId = await _completeWorkout(
+        database,
+        completedWorkout!.id,
+      );
+      final workout = await database.getOrCreateNextWorkout(mesocycleId);
+      await database.generatePlannedWorkout(workout!.id);
+      final activeId = await database.initializeWorkout(workout.id);
+      final active = await database.getWorkoutData(activeId);
+      final exercise = active.exercises.first;
+      await database.saveCompletedSet(
+        exercise.sets.first.completed.id,
+        reps: 8,
+        weight: 45,
+      );
+      await database.savePostExerciseCheckin(
+        PostExerciseCheckinsCompanion.insert(
+          completedExerciseId: exercise.completed.id,
+          jointPain: Soreness.none,
+        ),
+      );
+      await database.savePostMuscleGroupCheckin(
+        PostMuscleGroupCheckinsCompanion.insert(
+          completedWorkoutId: activeId,
+          muscleGroup: exercise.movement.muscleGroup,
+          effortLevel: Effort.good,
+          volumeLevel: Volume.good,
+          pumpLevel: Pump.good,
+        ),
+      );
+      await database.savePreWorkoutCheckin(
+        PreWorkoutCheckinsCompanion.insert(workoutId: workout.id),
+      );
+
+      await database.resetActiveWorkout(activeId);
+
+      expect(await database.getActiveWorkoutReference(), isNull);
+      expect(await database.getPreWorkoutCheckin(workout.id), isNull);
+      expect(
+        await (database.select(database.completedWorkouts)
+              ..where((row) => row.id.equals(historicalId)))
+            .getSingleOrNull(),
+        isNotNull,
+      );
+      expect(
+        await (database.select(database.completedWorkouts)
+              ..where((row) => row.id.equals(activeId)))
+            .getSingleOrNull(),
+        isNull,
+      );
+      expect(await database.getOrCreateNextWorkout(mesocycleId), workout);
+      expect(
+        await (database.select(database.plannedWorkouts)
+              ..where((row) => row.workoutId.equals(workout.id)))
+            .getSingleOrNull(),
+        isNotNull,
+      );
+    },
+  );
+
+  test('failed active-workout reset rolls back every deletion', () async {
+    final database = _openMemoryDatabase();
+    addTearDown(database.close);
+    final fixture = await _startWorkout(database);
+    final before = await database.getWorkoutData(fixture.completedWorkoutId);
+    final setId = before.exercises.first.sets.first.completed.id;
+    await database.saveCompletedSet(setId, reps: 9, weight: 50);
+    await database.savePreWorkoutCheckin(
+      PreWorkoutCheckinsCompanion.insert(workoutId: fixture.workoutId),
+    );
+    await database.customStatement('''
+      CREATE TRIGGER block_pre_workout_delete
+      BEFORE DELETE ON pre_workout_checkins
+      BEGIN
+        SELECT RAISE(ABORT, 'blocked for test');
+      END;
+    ''');
+
+    await expectLater(
+      database.resetActiveWorkout(fixture.completedWorkoutId),
+      throwsA(anything),
+    );
+
+    final after = await database.getWorkoutData(fixture.completedWorkoutId);
+    expect(after.exercises.first.sets.first.completed.reps, 9);
+    expect(after.exercises.first.sets.first.completed.weight, 50);
+    expect(await database.getPreWorkoutCheckin(fixture.workoutId), isNotNull);
+    expect(
+      (await database.getActiveWorkoutReference())!.completedWorkoutId,
+      fixture.completedWorkoutId,
+    );
+  });
+
+  test('reset refuses to remove a completed workout', () async {
+    final database = _openMemoryDatabase();
+    addTearDown(database.close);
+    final fixture = await _startWorkout(database);
+    await database.finishWorkout(fixture.completedWorkoutId);
+
+    await expectLater(
+      database.resetActiveWorkout(fixture.completedWorkoutId),
+      throwsStateError,
+    );
+    expect(
+      await (database.select(database.completedWorkouts)
+            ..where((row) => row.id.equals(fixture.completedWorkoutId)))
+          .getSingleOrNull(),
+      isNotNull,
+    );
+  });
+
+  test(
     'finishing advances the cycle and reconciliation clears stale pointers',
     () async {
       final database = _openMemoryDatabase();

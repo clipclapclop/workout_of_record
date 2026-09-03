@@ -4,6 +4,8 @@ import '../app_preferences.dart';
 import '../db/app_database.dart';
 import '../db/db.dart';
 import '../db/tables/enums.dart';
+import '../db/workout_data.dart';
+import '../services/workout_foreground_service.dart';
 import '../services/workout_recovery_service.dart';
 import '../widgets/app_nav_menu.dart';
 import '../widgets/load_failure_view.dart';
@@ -30,10 +32,30 @@ class _WorkoutReady extends _HomeResult {
   _WorkoutReady(this.workout, this.expectedDate, this.progress);
 }
 
+/// An exact active attempt exists, but its complete workout data did not load.
+class _DamagedActiveWorkout extends _HomeResult {
+  final ActiveWorkoutReference active;
+  _DamagedActiveWorkout(this.active);
+}
+
 // ── Screen ───────────────────────────────────────────────────────────────────
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({
+    super.key,
+    this.reconcileActiveWorkout,
+    this.loadActiveWorkout,
+    this.resetActiveWorkout,
+    this.clearResetWorkoutState,
+    this.activeWorkoutBuilder,
+  });
+
+  final Future<ActiveWorkoutReference?> Function()? reconcileActiveWorkout;
+  final Future<WorkoutData> Function(int)? loadActiveWorkout;
+  final Future<void> Function(int)? resetActiveWorkout;
+  final Future<void> Function()? clearResetWorkoutState;
+  final Widget Function(ActiveWorkoutReference, WorkoutData)?
+      activeWorkoutBuilder;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -41,6 +63,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late Future<_HomeResult> _resultFuture;
+  bool _resettingWorkout = false;
+  String? _resetWorkoutError;
 
   @override
   void initState() {
@@ -50,28 +74,41 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _retryLoad() {
     setState(() {
+      _resetWorkoutError = null;
       _resultFuture = _init();
     });
   }
 
   Future<_HomeResult> _init() async {
-    await WorkoutRecoveryService.reconcileNavigationPointers(db);
+    final active = await (widget.reconcileActiveWorkout?.call() ??
+        WorkoutRecoveryService.reconcileNavigationPointers(db));
 
-    // Resume in-progress workout if one exists.
-    final activeId = AppPreferences.getCurrentCompletedWorkoutId();
-    if (activeId != null) {
-      final data = await db.getWorkoutData(activeId);
+    // Resume an in-progress workout if one exists. A failure after the exact
+    // attempt is known receives narrowly scoped recovery rather than exposing
+    // a destructive action for every possible Home loading error.
+    if (active != null) {
+      late WorkoutData data;
+      try {
+        data = await (widget.loadActiveWorkout?.call(
+              active.completedWorkoutId,
+            ) ??
+            db.getWorkoutData(active.completedWorkoutId));
+      } catch (_) {
+        return _DamagedActiveWorkout(active);
+      }
       if (mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               settings: const RouteSettings(name: WorkoutScreen.routeName),
-              builder: (_) => WorkoutScreen(
-                completedWorkoutId: activeId,
-                workoutName: data.workout.name,
-                mesocycleId: AppPreferences.getCurrentMesocycleId()!,
-              ),
+              builder: (_) => widget.activeWorkoutBuilder?.call(active, data) ??
+                  WorkoutScreen(
+                    completedWorkoutId: active.completedWorkoutId,
+                    workoutName: data.workout.name,
+                    mesocycleId: active.mesocycleId,
+                    initialData: data,
+                  ),
             ),
           );
         });
@@ -290,6 +327,72 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _resetDamagedWorkout(ActiveWorkoutReference active) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reset this workout?'),
+        content: Text(
+          'This permanently removes the in-progress sets, feedback, and '
+          'pre-workout check-in for ${active.workoutName}. The scheduled '
+          'workout and completed history will be kept.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Reset Workout'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _resettingWorkout = true;
+      _resetWorkoutError = null;
+    });
+    try {
+      await (widget.resetActiveWorkout?.call(active.completedWorkoutId) ??
+          db.resetActiveWorkout(active.completedWorkoutId));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _resettingWorkout = false;
+        _resetWorkoutError = 'Couldn’t reset this workout. Try again.';
+      });
+      return;
+    }
+
+    try {
+      if (widget.clearResetWorkoutState != null) {
+        await widget.clearResetWorkoutState!();
+      } else {
+        await AppPreferences.setCurrentCompletedWorkoutId(null);
+        await AppPreferences.clearActiveRestTimer();
+        await WorkoutForegroundService.stop();
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _resettingWorkout = false;
+        _resetWorkoutError =
+            'The workout was reset, but cleanup was incomplete. Tap Retry.';
+      });
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _resettingWorkout = false;
+      _resetWorkoutError = null;
+      _resultFuture = _init();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -347,6 +450,71 @@ class _HomeScreenState extends State<HomeScreen> {
                       onPressed: _startNewMesocycle,
                       child: const Text('Start New Mesocycle'),
                     ),
+                  ],
+                ),
+              ),
+            _DamagedActiveWorkout(:final active) => Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 56,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Couldn’t reopen this workout',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      active.workoutName,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Started ${_formatExpectedDate(active.startedAt)}',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Retry first. If this saved attempt is damaged, reset it '
+                      'to start the same scheduled workout again.',
+                      textAlign: TextAlign.center,
+                    ),
+                    if (_resetWorkoutError != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _resetWorkoutError!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    FilledButton.icon(
+                      onPressed: _resettingWorkout ? null : _retryLoad,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton(
+                      onPressed: _resettingWorkout
+                          ? null
+                          : () => _resetDamagedWorkout(active),
+                      child: const Text('Reset Workout'),
+                    ),
+                    if (_resettingWorkout) ...[
+                      const SizedBox(height: 16),
+                      const LinearProgressIndicator(),
+                    ],
                   ],
                 ),
               ),

@@ -3,10 +3,16 @@ import 'app_database.dart';
 class ActiveWorkoutReference {
   const ActiveWorkoutReference({
     required this.completedWorkoutId,
+    required this.workoutId,
+    required this.workoutName,
+    required this.startedAt,
     required this.mesocycleId,
   });
 
   final int completedWorkoutId;
+  final int workoutId;
+  final String workoutName;
+  final DateTime startedAt;
   final int mesocycleId;
 }
 
@@ -47,6 +53,7 @@ class WorkoutData {
     final weightOk = !m.isRequiredWeight || cs.weight != null;
     final distanceOk = !m.isRequiredDistance || cs.distance != null;
     final timeOk = !m.isRequiredTime || cs.time != null;
-    return (repsOk && weightOk && distanceOk && timeOk) || cs.skipReason != null;
+    return (repsOk && weightOk && distanceOk && timeOk) ||
+        cs.skipReason != null;
   }
 }

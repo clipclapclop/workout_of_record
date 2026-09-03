@@ -35,11 +35,13 @@ class WorkoutScreen extends StatefulWidget {
     required this.completedWorkoutId,
     required this.workoutName,
     required this.mesocycleId,
+    this.initialData,
   });
 
   final int completedWorkoutId;
   final String workoutName;
   final int mesocycleId;
+  final WorkoutData? initialData;
 
   @override
   State<WorkoutScreen> createState() => _WorkoutScreenState();
@@ -47,6 +49,7 @@ class WorkoutScreen extends StatefulWidget {
 
 class _WorkoutScreenState extends State<WorkoutScreen> {
   WorkoutData? _data;
+  WorkoutData? _initialData;
   final Map<int, SetUiState> _setStates = {};
   // keyed by completedExercise.id
   final Map<int, bool> _postExDone = {};
@@ -74,6 +77,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   @override
   void initState() {
     super.initState();
+    _initialData = widget.initialData;
     _timerController = RestTimerController(durationSeconds: 0);
     _timerController.addListener(_onTimerControllerChanged);
     unawaited(_initialize());
@@ -366,7 +370,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   }
 
   Future<void> _load() async {
-    final data = await db.getWorkoutData(widget.completedWorkoutId);
+    final initialData = _initialData;
+    _initialData = null;
+    final data = initialData != null
+        ? await Future<WorkoutData>.value(initialData)
+        : await db.getWorkoutData(widget.completedWorkoutId);
 
     final newSetStates = <int, SetUiState>{};
     for (final ex in data.exercises) {

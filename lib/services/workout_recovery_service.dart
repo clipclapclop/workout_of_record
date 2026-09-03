@@ -1,5 +1,6 @@
 import '../app_preferences.dart';
 import '../db/app_database.dart';
+import '../db/workout_data.dart';
 
 /// Reconciles navigation acceleration pointers with persisted workout state.
 ///
@@ -9,7 +10,9 @@ import '../db/app_database.dart';
 class WorkoutRecoveryService {
   const WorkoutRecoveryService._();
 
-  static Future<void> reconcileNavigationPointers(AppDatabase database) async {
+  static Future<ActiveWorkoutReference?> reconcileNavigationPointers(
+    AppDatabase database,
+  ) async {
     final active = await database.getActiveWorkoutReference();
     if (active != null) {
       if (AppPreferences.getCurrentCompletedWorkoutId() !=
@@ -21,7 +24,7 @@ class WorkoutRecoveryService {
       if (AppPreferences.getCurrentMesocycleId() != active.mesocycleId) {
         await AppPreferences.setCurrentMesocycleId(active.mesocycleId);
       }
-      return;
+      return active;
     }
 
     if (AppPreferences.getCurrentCompletedWorkoutId() != null) {
@@ -29,12 +32,13 @@ class WorkoutRecoveryService {
     }
 
     final mesocycleId = AppPreferences.getCurrentMesocycleId();
-    if (mesocycleId == null) return;
+    if (mesocycleId == null) return null;
     final mesocycle = await (database.select(
       database.mesocycles,
     )..where((row) => row.id.equals(mesocycleId))).getSingleOrNull();
     if (mesocycle == null || mesocycle.completedAt != null) {
       await AppPreferences.setCurrentMesocycleId(null);
     }
+    return null;
   }
 }

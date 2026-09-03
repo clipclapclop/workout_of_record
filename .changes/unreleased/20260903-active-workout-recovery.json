@@ -1,0 +1,12 @@
+{
+  "id": "active-workout-recovery",
+  "summary": "Added narrowly scoped recovery for an identified active workout that cannot be reopened, including an atomic reset of only its incomplete attempt.",
+  "audience": "user",
+  "releaseNote": "A damaged in-progress workout can now be retried or safely reset without skipping the scheduled workout or affecting completed history.",
+  "docs": {
+    "impact": "updated",
+    "paths": ["docs/guides/workouts.md"],
+    "reason": ""
+  },
+  "screenshots": []
+}
