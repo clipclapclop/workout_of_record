@@ -141,6 +141,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Persist if requested, then let the caller complete its requested route:
+  /// PopScope returns to the previous screen; AppNavMenu opens its selection.
   Future<bool> _confirmNavigateAway() async {
     if (!_hasUnsavedChanges) return true;
     final action = await showUnsavedChangesDialog(context);

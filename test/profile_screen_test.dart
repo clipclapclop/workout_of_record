@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_of_record/app_preferences.dart';
 import 'package:workout_of_record/screens/profile_screen.dart';
+import 'package:workout_of_record/screens/settings_screen.dart';
+import 'package:workout_of_record/widgets/app_nav_menu.dart';
 
 import 'support/test_app.dart';
 
@@ -41,6 +43,28 @@ void main() {
     expect(find.text('Enter a number greater than 0'), findsOneWidget);
     expect(find.text('Enter a number of 0 or more'), findsOneWidget);
     expect(AppPreferences.getWeight(), 187.5);
+  });
+
+  testWidgets('dialog Save continues to the app-menu destination', (
+    tester,
+  ) async {
+    await initializeTestPreferences({'profile_weight_lbs': 187.5});
+
+    await tester.pumpWidget(buildTestApp(home: const ProfileScreen()));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, '187.5'), '190');
+
+    await tester.tap(find.byType(PopupMenuButton<AppScreen>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    final dialog = find.byType(AlertDialog);
+    await tester.tap(find.descendant(of: dialog, matching: find.text('Save')));
+    await tester.pumpAndSettle();
+
+    expect(AppPreferences.getWeight(), 190);
+    expect(find.byType(SettingsScreen), findsOneWidget);
+    expect(find.byType(ProfileScreen), findsNothing);
   });
 
   testWidgets('invalid profile stays open when dialog Save is chosen', (
