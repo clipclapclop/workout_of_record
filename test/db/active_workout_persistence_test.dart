@@ -672,7 +672,34 @@ void main() {
     expect(after.exercises, isEmpty);
   });
 
-  test('physically missing planned exercise rows are resettable damage',
+  test('duplicate visible exercise rows are resettable attempt damage',
+      () async {
+    final database = _openMemoryDatabase();
+    addTearDown(database.close);
+    final fixture = await _startWorkout(database);
+    final before = await database.getWorkoutData(fixture.completedWorkoutId);
+    final exercise = before.exercises.first;
+    await database.into(database.completedExercises).insert(
+          CompletedExercisesCompanion.insert(
+            completedWorkoutId: fixture.completedWorkoutId,
+            movementId: exercise.movement.id,
+            orderIndex: 999,
+          ),
+        );
+
+    await expectLater(
+      database.getActiveWorkoutData(fixture.completedWorkoutId),
+      throwsA(
+        isA<WorkoutDataIntegrityException>().having(
+          (error) => error.canReset,
+          'canReset',
+          isTrue,
+        ),
+      ),
+    );
+  });
+
+  test('physically missing exercise parents are not resettable',
       () async {
     final database = _openMemoryDatabase();
     addTearDown(database.close);
@@ -695,7 +722,7 @@ void main() {
         isA<WorkoutDataIntegrityException>().having(
           (error) => error.canReset,
           'canReset',
-          isTrue,
+          isFalse,
         ),
       ),
     );

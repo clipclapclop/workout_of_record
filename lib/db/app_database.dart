@@ -1155,6 +1155,12 @@ class AppDatabase extends _$AppDatabase {
     final plannedWorkout = await (select(plannedWorkouts)
           ..where((pw) => pw.workoutId.equals(cw.workoutId)))
         .getSingleOrNull();
+    if (classifyActiveDamage &&
+        cw.status == WorkoutStatus.active &&
+        cw.completedAt == null &&
+        plannedWorkout == null) {
+      throw const WorkoutDataIntegrityException.notResettable();
+    }
 
     Future<T> requireIntactAttemptData<T>(Future<T> read) async {
       try {
@@ -1188,19 +1194,26 @@ class AppDatabase extends _$AppDatabase {
             ..where((exercise) =>
                 exercise.completedWorkoutId.equals(completedWorkoutId)))
           .get();
+      final visibleMovementIds = <int>{};
+      final visibleOrderIndexes = <int>{};
+      for (final completed in completedExs) {
+        final duplicateMovement =
+            !visibleMovementIds.add(completed.movementId);
+        final duplicateOrder =
+            !visibleOrderIndexes.add(completed.orderIndex);
+        if (duplicateMovement || duplicateOrder) {
+          throw const WorkoutDataIntegrityException.resettable();
+        }
+      }
       for (final planned in plannedExs) {
         final hasAttemptRow = allAttemptExs.any(
           (completed) => completed.movementId == planned.movementId,
         );
-        if (hasAttemptRow) continue;
-        final movementExists = await (select(movements)
-              ..where((movement) => movement.id.equals(planned.movementId))
-              ..limit(1))
-            .getSingleOrNull();
-        if (movementExists == null) {
+        if (!hasAttemptRow) {
+          // A physically missing parent may have untraceable orphaned children,
+          // so deleting this attempt cannot promise complete cleanup.
           throw const WorkoutDataIntegrityException.notResettable();
         }
-        throw const WorkoutDataIntegrityException.resettable();
       }
     }
 
