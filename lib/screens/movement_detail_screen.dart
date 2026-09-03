@@ -26,6 +26,7 @@ class MovementDetailScreen extends StatefulWidget {
 
 class _MovementDetailScreenState extends State<MovementDetailScreen> {
   final _formKey = GlobalKey<FormState>();
+  bool _saving = false;
 
   late final TextEditingController _nameCtrl;
   late final TextEditingController _subMuscleCtrl;
@@ -151,7 +152,7 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
   }
 
   Future<(bool, Movement?)> _persist() async {
-    if (!_formKey.currentState!.validate()) return (false, null);
+    if (_saving || !_formKey.currentState!.validate()) return (false, null);
     final companion = MovementsCompanion(
       name: Value(_nameCtrl.text.trim()),
       muscleGroup: Value(_muscleGroup),
@@ -171,6 +172,7 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
       isRequiredDistance: Value(_isRequiredDistance),
       restSeconds: Value(_parseRestSeconds()),
     );
+    setState(() => _saving = true);
     try {
       Movement? created;
       if (widget.movement != null) {
@@ -178,7 +180,7 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
       } else {
         created = await db.createMovement(companion);
       }
-      if (mounted) setState(() => _savedDraft = _currentDraft);
+      if (mounted) _savedDraft = _currentDraft;
       return (true, created);
     } catch (e) {
       if (!mounted) return (false, null);
@@ -190,6 +192,8 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
           : 'Could not save exercise: $e';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       return (false, null);
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -199,6 +203,7 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
   }
 
   Future<bool> _confirmMenuNavigation() async {
+    if (_saving) return false;
     if (!_hasUnsavedChanges) return true;
     final action = await showUnsavedChangesDialog(context);
     return switch (action) {
@@ -209,6 +214,7 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
   }
 
   Future<void> _handleSystemBack() async {
+    if (_saving) return;
     if (!_hasUnsavedChanges) {
       if (mounted) Navigator.pop(context);
       return;
@@ -236,7 +242,7 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
         automaticallyImplyLeading: true,
         actions: [
           TextButton(
-            onPressed: _save,
+            onPressed: _saving ? null : _save,
             child: const Text('Save'),
           ),
           AppNavMenu(
