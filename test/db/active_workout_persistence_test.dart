@@ -680,7 +680,13 @@ void main() {
 
     await expectLater(
       database.getWorkoutData(fixture.completedWorkoutId),
-      throwsA(isA<WorkoutDataIntegrityException>()),
+      throwsA(
+        isA<WorkoutDataIntegrityException>().having(
+          (error) => error.canReset,
+          'canReset',
+          isTrue,
+        ),
+      ),
     );
   });
 
@@ -697,7 +703,13 @@ void main() {
 
     await expectLater(
       database.getWorkoutData(fixture.completedWorkoutId),
-      throwsA(isA<StateError>()),
+      throwsA(
+        isA<WorkoutDataIntegrityException>().having(
+          (error) => error.canReset,
+          'canReset',
+          isFalse,
+        ),
+      ),
     );
   });
 

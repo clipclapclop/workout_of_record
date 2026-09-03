@@ -22,7 +22,7 @@ void main() {
           loadActiveWorkout: (_) async {
             loadCalls++;
             if (loadCalls == 1) {
-              throw const WorkoutDataIntegrityException();
+              throw const WorkoutDataIntegrityException.resettable();
             }
             return _workoutData(active);
           },
@@ -63,6 +63,29 @@ void main() {
     expect(find.text('Couldn’t load your current workout.'), findsOneWidget);
     expect(find.text('Reset Workout'), findsNothing);
     expect(find.textContaining('temporary read'), findsNothing);
+  });
+
+  testWidgets('shared plan damage is explained without offering reset', (
+    tester,
+  ) async {
+    await initializeTestPreferences();
+    final active = _activeReference();
+
+    await tester.pumpWidget(
+      buildTestApp(
+        home: HomeScreen(
+          reconcileActiveWorkout: () async => active,
+          loadActiveWorkout: (_) async =>
+              throw const WorkoutDataIntegrityException.notResettable(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Couldn’t reopen this workout'), findsOneWidget);
+    expect(find.text('Tuesday'), findsOneWidget);
+    expect(find.textContaining('cannot be reset safely'), findsOneWidget);
+    expect(find.text('Reset Workout'), findsNothing);
   });
 
   testWidgets('startup clears stale runtime state when no workout is active', (
@@ -118,7 +141,7 @@ void main() {
         home: HomeScreen(
           reconcileActiveWorkout: () async => active,
           loadActiveWorkout: (_) async =>
-              throw const WorkoutDataIntegrityException(),
+              throw const WorkoutDataIntegrityException.resettable(),
           resetActiveWorkout: (_) async {
             resetCalls++;
             throw Exception('write failed');
@@ -164,7 +187,7 @@ void main() {
         home: HomeScreen(
           reconcileActiveWorkout: () async => active,
           loadActiveWorkout: (_) async =>
-              throw const WorkoutDataIntegrityException(),
+              throw const WorkoutDataIntegrityException.resettable(),
           resetActiveWorkout: (_) async => events.add('database'),
           clearWorkoutRuntimeState: () async => events.add('transient state'),
         ),

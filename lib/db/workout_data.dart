@@ -3,7 +3,10 @@ import 'app_database.dart';
 /// The in-progress attempt contains broken owned records that can be removed
 /// safely without changing its planned workout or completed history.
 class WorkoutDataIntegrityException implements Exception {
-  const WorkoutDataIntegrityException();
+  const WorkoutDataIntegrityException.resettable() : canReset = true;
+  const WorkoutDataIntegrityException.notResettable() : canReset = false;
+
+  final bool canReset;
 }
 
 class ActiveWorkoutReference {

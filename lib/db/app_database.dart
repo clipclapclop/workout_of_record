@@ -1151,7 +1151,7 @@ class AppDatabase extends _$AppDatabase {
       try {
         return await read;
       } on StateError {
-        throw const WorkoutDataIntegrityException();
+        throw const WorkoutDataIntegrityException.resettable();
       }
     }
 
@@ -1177,9 +1177,9 @@ class AppDatabase extends _$AppDatabase {
                   ..limit(1))
                 .getSingleOrNull();
         if (plannedReference != null) {
-          throw StateError('The workout plan references a missing movement.');
+          throw const WorkoutDataIntegrityException.notResettable();
         }
-        throw const WorkoutDataIntegrityException();
+        throw const WorkoutDataIntegrityException.resettable();
       }
 
       final completedSetsForEx = await (select(completedSets)

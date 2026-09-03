@@ -35,7 +35,8 @@ class _WorkoutReady extends _HomeResult {
 /// An exact active attempt exists, but its complete workout data did not load.
 class _DamagedActiveWorkout extends _HomeResult {
   final ActiveWorkoutReference active;
-  _DamagedActiveWorkout(this.active);
+  final bool canReset;
+  _DamagedActiveWorkout(this.active, {required this.canReset});
 }
 
 // ── Screen ───────────────────────────────────────────────────────────────────
@@ -93,8 +94,8 @@ class _HomeScreenState extends State<HomeScreen> {
               active.completedWorkoutId,
             ) ??
             db.getWorkoutData(active.completedWorkoutId));
-      } on WorkoutDataIntegrityException {
-        return _DamagedActiveWorkout(active);
+      } on WorkoutDataIntegrityException catch (error) {
+        return _DamagedActiveWorkout(active, canReset: error.canReset);
       }
       if (mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -461,7 +462,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-            _DamagedActiveWorkout(:final active) => Padding(
+            _DamagedActiveWorkout(:final active, :final canReset) => Padding(
                 padding: const EdgeInsets.all(32),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -491,9 +492,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'Retry first. If this saved attempt is damaged, reset it '
-                      'to start the same scheduled workout again.',
+                    Text(
+                      canReset
+                          ? 'Retry first. If this saved attempt is damaged, '
+                              'reset it to start the same scheduled workout again.'
+                          : 'Retry first. The saved workout plan is damaged, so '
+                              'this attempt cannot be reset safely. Restore a '
+                              'known-good backup from Settings if retrying fails.',
                       textAlign: TextAlign.center,
                     ),
                     if (_resetWorkoutError != null) ...[
@@ -512,13 +517,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: const Icon(Icons.refresh),
                       label: const Text('Retry'),
                     ),
-                    const SizedBox(height: 8),
-                    OutlinedButton(
-                      onPressed: _resettingWorkout
-                          ? null
-                          : () => _resetDamagedWorkout(active),
-                      child: const Text('Reset Workout'),
-                    ),
+                    if (canReset) ...[
+                      const SizedBox(height: 8),
+                      OutlinedButton(
+                        onPressed: _resettingWorkout
+                            ? null
+                            : () => _resetDamagedWorkout(active),
+                        child: const Text('Reset Workout'),
+                      ),
+                    ],
                     if (_resettingWorkout) ...[
                       const SizedBox(height: 16),
                       const LinearProgressIndicator(),
