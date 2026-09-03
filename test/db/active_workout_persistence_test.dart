@@ -666,6 +666,15 @@ void main() {
       await database.deleteExercise(exercise.completed.id);
     }
 
+    final droppedRows = await (database.select(database.completedExercises)
+          ..where((row) =>
+              row.completedWorkoutId.equals(fixture.completedWorkoutId)))
+        .get();
+    expect(droppedRows, hasLength(before.exercises.length));
+    expect(
+      droppedRows.every((row) => row.persistence == Persistence.dropped),
+      isTrue,
+    );
     final after = await database.getActiveWorkoutData(
       fixture.completedWorkoutId,
     );

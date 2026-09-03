@@ -1190,7 +1190,9 @@ class AppDatabase extends _$AppDatabase {
             ..where((exercise) =>
                 exercise.plannedWorkoutId.equals(plannedWorkout.id)))
           .get();
-      final allAttemptExs = await (select(completedExercises)
+      // Deliberately no persistence filter: intentionally removed exercises
+      // remain as dropped rows and satisfy the planned-to-attempt link below.
+      final attemptExsIncludingDropped = await (select(completedExercises)
             ..where((exercise) =>
                 exercise.completedWorkoutId.equals(completedWorkoutId)))
           .get();
@@ -1206,7 +1208,7 @@ class AppDatabase extends _$AppDatabase {
         }
       }
       for (final planned in plannedExs) {
-        final hasAttemptRow = allAttemptExs.any(
+        final hasAttemptRow = attemptExsIncludingDropped.any(
           (completed) => completed.movementId == planned.movementId,
         );
         if (!hasAttemptRow) {
