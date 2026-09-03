@@ -5,6 +5,7 @@ import '../db/app_database.dart';
 import '../db/db.dart';
 import '../db/tables/enums.dart';
 import '../widgets/app_nav_menu.dart';
+import '../widgets/unsaved_changes_dialog.dart';
 
 class MovementDetailScreen extends StatefulWidget {
   const MovementDetailScreen({
@@ -42,6 +43,59 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
   late bool _isRequiredWeight;
   late bool _isRequiredTime;
   late bool _isRequiredDistance;
+  late (
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    MuscleGroup,
+    MovementCategory,
+    bool,
+    bool,
+    bool,
+    bool,
+  ) _savedDraft;
+
+  (
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    MuscleGroup,
+    MovementCategory,
+    bool,
+    bool,
+    bool,
+    bool,
+  ) get _currentDraft => (
+        _nameCtrl.text.trim(),
+        _subMuscleCtrl.text.trim(),
+        _note1Ctrl.text.trim(),
+        _note2Ctrl.text.trim(),
+        _linkCtrl.text.trim(),
+        _minWeightCtrl.text.trim(),
+        _weightDeltaCtrl.text.trim(),
+        _bodyweightLoadFractionCtrl.text.trim(),
+        _restSecondsCtrl.text.trim(),
+        _muscleGroup,
+        _category,
+        _isRequiredReps,
+        _isRequiredWeight,
+        _isRequiredTime,
+        _isRequiredDistance,
+      );
+
+  bool get _hasUnsavedChanges => _currentDraft != _savedDraft;
 
   @override
   void initState() {
@@ -66,6 +120,7 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
     _isRequiredWeight = m?.isRequiredWeight ?? true;
     _isRequiredTime = m?.isRequiredTime ?? false;
     _isRequiredDistance = m?.isRequiredDistance ?? false;
+    _savedDraft = _currentDraft;
   }
 
   @override
@@ -95,8 +150,8 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
     return int.tryParse(raw);
   }
 
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<(bool, Movement?)> _persist() async {
+    if (!_formKey.currentState!.validate()) return (false, null);
     final companion = MovementsCompanion(
       name: Value(_nameCtrl.text.trim()),
       muscleGroup: Value(_muscleGroup),
@@ -117,15 +172,16 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
       restSeconds: Value(_parseRestSeconds()),
     );
     try {
+      Movement? created;
       if (widget.movement != null) {
         await db.updateMovement(companion.copyWith(id: Value(widget.movement!.id)));
-        if (mounted) Navigator.pop(context);
       } else {
-        final created = await db.createMovement(companion);
-        if (mounted) Navigator.pop(context, created);
+        created = await db.createMovement(companion);
       }
+      if (mounted) setState(() => _savedDraft = _currentDraft);
+      return (true, created);
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return (false, null);
       final isUniqueConflict = e.toString().contains('UNIQUE');
       final muscleLabel =
           _muscleGroup.name[0].toUpperCase() + _muscleGroup.name.substring(1);
@@ -133,12 +189,48 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
           ? 'An exercise named "${_nameCtrl.text.trim()}" already exists for $muscleLabel.'
           : 'Could not save exercise: $e';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      return (false, null);
     }
+  }
+
+  Future<void> _save() async {
+    final result = await _persist();
+    if (result.$1 && mounted) Navigator.pop(context, result.$2);
+  }
+
+  Future<bool> _confirmMenuNavigation() async {
+    if (!_hasUnsavedChanges) return true;
+    final action = await showUnsavedChangesDialog(context);
+    return switch (action) {
+      UnsavedChangesAction.keepEditing => false,
+      UnsavedChangesAction.discard => true,
+      UnsavedChangesAction.save => (await _persist()).$1,
+    };
+  }
+
+  Future<void> _handleSystemBack() async {
+    if (!_hasUnsavedChanges) {
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+    final action = await showUnsavedChangesDialog(context);
+    if (!mounted || action == UnsavedChangesAction.keepEditing) return;
+    if (action == UnsavedChangesAction.discard) {
+      Navigator.pop(context);
+      return;
+    }
+    final result = await _persist();
+    if (result.$1 && mounted) Navigator.pop(context, result.$2);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (!didPop) await _handleSystemBack();
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: Text(widget.movement?.name ?? 'New Exercise'),
         automaticallyImplyLeading: true,
@@ -151,6 +243,7 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
             current: AppScreen.exercises,
             activeWorkoutId: widget.activeWorkoutId,
             activeWorkoutName: widget.activeWorkoutName,
+            onNavigateAway: _confirmMenuNavigation,
           ),
         ],
       ),
@@ -318,6 +411,7 @@ class _MovementDetailScreenState extends State<MovementDetailScreen> {
             const SizedBox(height: 32),
           ],
         ),
+      ),
       ),
     );
   }

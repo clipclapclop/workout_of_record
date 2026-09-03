@@ -10,6 +10,62 @@ void main() {
   Finder fieldWithLabel(String label) =>
       find.widgetWithText(TextFormField, label);
 
+  testWidgets('movement switch changes are guarded and can be reverted', (
+    tester,
+  ) async {
+    await initializeTestPreferences();
+    const movement = Movement(
+      id: 1,
+      name: 'Pull-up',
+      muscleGroup: MuscleGroup.back,
+      isRequiredReps: true,
+      isRequiredWeight: true,
+      isRequiredTime: false,
+      isRequiredDistance: false,
+      category: MovementCategory.resistance,
+      bodyweightLoadFraction: 1,
+    );
+
+    await tester.pumpWidget(
+      buildTestApp(home: const MovementDetailScreen(movement: movement)),
+    );
+    await tester.pumpAndSettle();
+
+    final reps = find.widgetWithText(SwitchListTile, 'Reps');
+    await tester.tap(reps);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Unsaved changes'), findsOneWidget);
+
+    await tester.tap(find.text('Keep editing'));
+    await tester.pumpAndSettle();
+    await tester.tap(reps);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unsaved changes'), findsNothing);
+  });
+
+  testWidgets('invalid movement stays open when dialog Save is chosen', (
+    tester,
+  ) async {
+    await initializeTestPreferences();
+    await tester.pumpWidget(
+      buildTestApp(home: const MovementDetailScreen()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(fieldWithLabel('Sub-muscle Group (optional)'), 'Arm');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    final dialog = find.byType(AlertDialog);
+    await tester.tap(find.descendant(of: dialog, matching: find.text('Save')));
+    await tester.pump();
+
+    expect(find.byType(MovementDetailScreen), findsOneWidget);
+    expect(find.text('Required'), findsOneWidget);
+  });
+
   testWidgets(
     'movement numbers must be finite while assisted minimums remain valid',
     (tester) async {

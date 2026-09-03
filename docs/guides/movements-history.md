@@ -2,7 +2,7 @@
 
 ## Movements
 
-The movements screen lists known movements and supports filtering and grouping. Opening a movement shows its configuration and recorded performance history. Movement requirements determine whether its sets ask for reps, weight, time, or a combination.
+The movements screen lists known movements and supports filtering and grouping. Opening a movement shows its configuration and recorded performance history. Movement requirements determine whether its sets ask for reps, weight, time, or a combination. Leaving after changing a movement offers Save, Discard, or Keep editing; validation or saving failures keep the draft open.
 
 Take care when changing an existing movement's required fields: the change affects how future sets are displayed and validated.
 

@@ -12,7 +12,7 @@ To start from prior training, choose **Review Past Mesocycle Week** during mesoc
 
 After selecting a week, the app shows its completed persistent exercises before making any template changes. **Use Week** compares that plan with the saved template associated with the mesocycle. An exact match reuses the saved template. If they differ, choose either **Update Existing** to replace the saved template's plan while keeping its name, or **Save as New** to create a distinctly named template. **Edit Week** unlocks the plan first; an exact final match reuses the associated template, while any different name, day, exercise, order, or automatic-progression setting is saved as a new template.
 
-Within a template, exercises can be reordered, added, or removed. Automatic progression can be configured per exercise. A non-rest workout day may intentionally contain no exercises; when it arrives, add exercises on the workout screen or complete it empty. This remains a scheduled workout and is distinct from an explicit rest day.
+Within a template, exercises can be reordered, added, or removed. Automatic progression can be configured per exercise. Leaving after changing a template offers Save, Discard, or Keep editing; Save validates and writes the complete template before leaving. A non-rest workout day may intentionally contain no exercises; when it arrives, add exercises on the workout screen or complete it empty. This remains a scheduled workout and is distinct from an explicit rest day.
 
 ## Change the duration
 

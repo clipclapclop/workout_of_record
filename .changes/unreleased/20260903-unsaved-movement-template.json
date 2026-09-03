@@ -1,0 +1,15 @@
+{
+  "id": "unsaved-movement-template",
+  "summary": "Protected changed movement and mesocycle-template drafts from accidental loss while preserving their database save results.",
+  "audience": "user",
+  "releaseNote": "Movement and template editors now ask whether to save, discard, or keep editing before leaving with unsaved changes.",
+  "docs": {
+    "impact": "updated",
+    "paths": [
+      "docs/guides/mesocycles.md",
+      "docs/guides/movements-history.md"
+    ],
+    "reason": ""
+  },
+  "screenshots": []
+}

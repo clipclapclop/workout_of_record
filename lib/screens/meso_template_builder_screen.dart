@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../db/app_database.dart';
@@ -5,6 +7,7 @@ import '../db/db.dart';
 import '../db/template_data.dart';
 import '../widgets/app_nav_menu.dart';
 import '../widgets/movement_picker_sheet.dart';
+import '../widgets/unsaved_changes_dialog.dart';
 import 'chat_screen.dart';
 
 /// Per-exercise draft state within a day — tracks movement + auto-progress flag.
@@ -36,6 +39,7 @@ class MesoTemplateBuilderScreen extends StatefulWidget {
     this.pastWeekSourceTemplateName,
     this.activeWorkoutId,
     this.activeWorkoutName,
+    this.loadMovements,
   });
 
   final MesoTemplateData? existing;
@@ -44,6 +48,9 @@ class MesoTemplateBuilderScreen extends StatefulWidget {
   final String? pastWeekSourceTemplateName;
   final int? activeWorkoutId;
   final String? activeWorkoutName;
+
+  /// Overrides movement loading for tests.
+  final Future<List<Movement>> Function()? loadMovements;
 
   @override
   State<MesoTemplateBuilderScreen> createState() =>
@@ -59,6 +66,20 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
   // Cached movement list for the picker.
   List<Movement>? _allMovements;
   bool _saving = false;
+  late String _savedDraftSignature;
+
+  String get _draftSignature => jsonEncode([
+        _nameCtrl.text.trim(),
+        for (final day in _days)
+          [
+            day.name.trim(),
+            day.isRestDay,
+            for (final exercise in day.exercises)
+              [exercise.movement.id, exercise.autoProgress],
+          ],
+      ]);
+
+  bool get _hasUnsavedChanges => _draftSignature != _savedDraftSignature;
 
   @override
   void initState() {
@@ -82,6 +103,7 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
         : [];
 
     _tabCtrl = TabController(length: _days.length + 1, vsync: this);
+    _savedDraftSignature = _draftSignature;
     _loadMovements();
   }
 
@@ -93,7 +115,7 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
   }
 
   Future<void> _loadMovements() async {
-    final movs = await db.getMovements();
+    final movs = await (widget.loadMovements?.call() ?? db.getMovements());
     if (mounted) setState(() => _allMovements = movs);
   }
 
@@ -174,25 +196,25 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
 
   // ── Save ───────────────────────────────────────────────────────────────────
 
-  Future<void> _save() async {
+  Future<int?> _persist() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a template name.')),
       );
-      return;
+      return null;
     }
     if (_days.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Add at least one day.')),
       );
-      return;
+      return null;
     }
     if (_days.any((d) => d.name.trim().isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('All days must have a name.')),
       );
-      return;
+      return null;
     }
 
     setState(() => _saving = true);
@@ -231,9 +253,8 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
                   ),
                 ),
               );
-              setState(() => _saving = false);
             }
-            return;
+            return null;
           }
           templateId = await db.createMesoTemplate(name, specs);
         }
@@ -244,10 +265,50 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
         templateId = widget.existing!.template.id;
       }
 
-      if (mounted) Navigator.pop(context, templateId);
+      if (mounted) setState(() => _savedDraftSignature = _draftSignature);
+      return templateId;
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Couldn’t save template.')),
+        );
+      }
+      return null;
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _save() async {
+    final templateId = await _persist();
+    if (templateId != null && mounted) Navigator.pop(context, templateId);
+  }
+
+  Future<bool> _confirmMenuNavigation() async {
+    if (_saving) return false;
+    if (!_hasUnsavedChanges) return true;
+    final action = await showUnsavedChangesDialog(context);
+    return switch (action) {
+      UnsavedChangesAction.keepEditing => false,
+      UnsavedChangesAction.discard => true,
+      UnsavedChangesAction.save => await _persist() != null,
+    };
+  }
+
+  Future<void> _handleSystemBack() async {
+    if (_saving) return;
+    if (!_hasUnsavedChanges) {
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+    final action = await showUnsavedChangesDialog(context);
+    if (!mounted || action == UnsavedChangesAction.keepEditing) return;
+    if (action == UnsavedChangesAction.discard) {
+      Navigator.pop(context);
+      return;
+    }
+    final templateId = await _persist();
+    if (templateId != null && mounted) Navigator.pop(context, templateId);
   }
 
   // ── Day name dialog ────────────────────────────────────────────────────────
@@ -269,7 +330,12 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (!didPop) await _handleSystemBack();
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: TextField(
           controller: _nameCtrl,
@@ -309,6 +375,7 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
             current: AppScreen.mesoTemplates,
             activeWorkoutId: widget.activeWorkoutId,
             activeWorkoutName: widget.activeWorkoutName,
+            onNavigateAway: _confirmMenuNavigation,
           ),
         ],
         bottom: _days.isEmpty
@@ -373,6 +440,7 @@ class _MesoTemplateBuilderScreenState extends State<MesoTemplateBuilderScreen>
                 ),
               ],
             ),
+      ),
     );
   }
 
