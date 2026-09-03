@@ -141,9 +141,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// Persist if requested, then let the caller complete its requested route:
-  /// PopScope returns to the previous screen; AppNavMenu opens its selection.
-  Future<bool> _confirmNavigateAway() async {
+  /// Persist if requested, then let AppNavMenu open the selected destination.
+  Future<bool> _confirmMenuNavigation() async {
     if (!_hasUnsavedChanges) return true;
     final action = await showUnsavedChangesDialog(context);
     return switch (action) {
@@ -151,6 +150,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
       UnsavedChangesAction.discard => true,
       UnsavedChangesAction.save => _persist(),
     };
+  }
+
+  Future<void> _handleSystemBack() async {
+    if (!_hasUnsavedChanges) {
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+    final action = await showUnsavedChangesDialog(context);
+    if (!mounted || action == UnsavedChangesAction.keepEditing) return;
+    if (action == UnsavedChangesAction.discard) {
+      Navigator.pop(context);
+      return;
+    }
+    if (!await _persist() || !mounted) return;
+    if (widget.activeWorkoutId != null) {
+      AppNavMenu.returnToActiveWorkout(
+        context,
+        activeWorkoutId: widget.activeWorkoutId!,
+        activeWorkoutName: widget.activeWorkoutName,
+      );
+    } else {
+      Navigator.pop(context);
+    }
   }
 
   void _showCalorieStateInfo(BuildContext context) {
@@ -201,9 +223,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) return;
-        final leave = await _confirmNavigateAway();
-        if (leave && context.mounted) Navigator.pop(context);
+        if (!didPop) await _handleSystemBack();
       },
       child: Scaffold(
       appBar: AppBar(
@@ -214,7 +234,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             current: AppScreen.profile,
             activeWorkoutId: widget.activeWorkoutId,
             activeWorkoutName: widget.activeWorkoutName,
-            onNavigateAway: _confirmNavigateAway,
+            onNavigateAway: _confirmMenuNavigation,
           ),
         ],
       ),
