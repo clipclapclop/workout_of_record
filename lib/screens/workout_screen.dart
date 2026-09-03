@@ -311,7 +311,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     _timerStateWrite = (() async {
       try {
         await previousWrite;
-        if (endsAt == null || durationSeconds <= 0) {
+        if (durationSeconds <= 0) {
           await AppPreferences.clearActiveRestTimer();
         } else {
           await AppPreferences.setActiveRestTimer(
