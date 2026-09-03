@@ -1,0 +1,12 @@
+{
+  "id": "independent-restore",
+  "summary": "Made restore available independently from backup creation and prevented enabling backups without a destination folder.",
+  "audience": "user",
+  "releaseNote": "Restore is now always available without enabling backups, while backup creation requires a destination folder.",
+  "docs": {
+    "impact": "updated",
+    "paths": ["docs/guides/settings-backups.md"],
+    "reason": ""
+  },
+  "screenshots": []
+}

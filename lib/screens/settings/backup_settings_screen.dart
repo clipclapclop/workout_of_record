@@ -55,16 +55,31 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
     if (!ok && mounted) setState(() => _folderStale = true);
   }
 
-  Future<void> _save() async {
+  Future<bool> _save() async {
+    if (_backupEnabled && _backupDirPath == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Choose a backup folder before enabling backups.'),
+          ),
+        );
+      }
+      return false;
+    }
+
     await AppPreferences.setBackupEnabled(_backupEnabled);
     if (_backupDirPath != null) {
       await AppPreferences.setBackupDirectoryPath(_backupDirPath!);
     }
-    await AppPreferences.setAutoBackupEnabled(_autoBackupEnabled);
+    await AppPreferences.setAutoBackupEnabled(
+      _backupEnabled && _autoBackupEnabled,
+    );
 
+    _autoBackupEnabled = _backupEnabled && _autoBackupEnabled;
     _initBackupEnabled = _backupEnabled;
     _initAutoBackupEnabled = _autoBackupEnabled;
     _initBackupDirPath = _backupDirPath;
+    return true;
   }
 
   Future<void> _pickBackupLocation() async {
@@ -174,8 +189,7 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
     if (!_hasUnsavedChanges) return true;
     final result = await showUnsavedSettingsDialog(context);
     if (result == UnsavedSettingsAction.save) {
-      await _save();
-      return true;
+      return _save();
     }
     return result == UnsavedSettingsAction.discard;
   }
@@ -196,8 +210,8 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
             child: FilledButton(
               onPressed: () async {
-                await _save();
-                if (context.mounted) Navigator.pop(context);
+                final saved = await _save();
+                if (saved && context.mounted) Navigator.pop(context);
               },
               child: const Text('Save'),
             ),
@@ -262,8 +276,24 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
                     value: _backupEnabled,
                     onChanged: _isBusy
                         ? null
-                        : (v) => setState(() => _backupEnabled = v),
+                        : (v) => setState(() {
+                            _backupEnabled = v;
+                            if (!v) _autoBackupEnabled = false;
+                          }),
                   ),
+                  if (_backupEnabled && _backupDirPath == null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Choose a folder before saving backup settings.',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                      ),
+                    ),
                   if (_backupEnabled) ...[
                     const Divider(height: 1),
                     ListTile(
@@ -288,43 +318,45 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
                       subtitle: const Text(
                           'Run a backup automatically each time you finish a workout.'),
                       value: _autoBackupEnabled,
-                      onChanged: _isBusy
+                      onChanged: (_isBusy || _backupDirPath == null)
                           ? null
                           : (v) => setState(() => _autoBackupEnabled = v),
                     ),
                     const Divider(height: 1),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: (_isBusy || _backupDirPath == null)
-                                  ? null
-                                  : _backupNow,
-                              child: _isBusy
-                                  ? const SizedBox(
-                                      height: 16,
-                                      width: 16,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2),
-                                    )
-                                  : const Text('Back Up Now'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed:
-                                  _isBusy ? null : _restoreFromBackup,
-                              child: const Text('Restore'),
-                            ),
-                          ),
-                        ],
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: (_isBusy || _backupDirPath == null)
+                              ? null
+                              : _backupNow,
+                          child: _isBusy
+                              ? const SizedBox(
+                                  height: 16,
+                                  width: 16,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2),
+                                )
+                              : const Text('Back Up Now'),
+                        ),
                       ),
                     ),
                   ],
                 ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card.outlined(
+              child: ListTile(
+                leading: const Icon(Icons.restore),
+                title: const Text('Restore from Backup'),
+                subtitle: const Text(
+                  'Select an existing backup ZIP. Enabling backups is not required.',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                enabled: !_isBusy,
+                onTap: _isBusy ? null : _restoreFromBackup,
               ),
             ),
           ],
