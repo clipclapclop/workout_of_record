@@ -43,6 +43,27 @@ void main() {
     expect(loadCalls, 2);
   });
 
+  testWidgets('startup clears stale runtime state when no workout is active',
+      (tester) async {
+    await initializeTestPreferences();
+    var cleanupStarted = false;
+
+    await tester.pumpWidget(
+      buildTestApp(
+        home: HomeScreen(
+          reconcileActiveWorkout: () async => null,
+          clearWorkoutRuntimeState: () {
+            cleanupStarted = true;
+            return Future<void>.value();
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(cleanupStarted, isTrue);
+  });
+
   testWidgets('generic Home failures never offer destructive recovery', (
     tester,
   ) async {
@@ -78,7 +99,7 @@ void main() {
             resetCalls++;
             throw Exception('write failed');
           },
-          clearResetWorkoutState: () async => clearCalls++,
+          clearWorkoutRuntimeState: () async => clearCalls++,
         ),
       ),
     );
@@ -120,7 +141,7 @@ void main() {
           reconcileActiveWorkout: () async => active,
           loadActiveWorkout: (_) async => throw Exception('damaged'),
           resetActiveWorkout: (_) async => events.add('database'),
-          clearResetWorkoutState: () async => events.add('transient state'),
+          clearWorkoutRuntimeState: () async => events.add('transient state'),
         ),
       ),
     );

@@ -46,14 +46,14 @@ class HomeScreen extends StatefulWidget {
     this.reconcileActiveWorkout,
     this.loadActiveWorkout,
     this.resetActiveWorkout,
-    this.clearResetWorkoutState,
+    this.clearWorkoutRuntimeState,
     this.activeWorkoutBuilder,
   });
 
   final Future<ActiveWorkoutReference?> Function()? reconcileActiveWorkout;
   final Future<WorkoutData> Function(int)? loadActiveWorkout;
   final Future<void> Function(int)? resetActiveWorkout;
-  final Future<void> Function()? clearResetWorkoutState;
+  final Future<void> Function()? clearWorkoutRuntimeState;
   final Widget Function(ActiveWorkoutReference, WorkoutData)?
       activeWorkoutBuilder;
 
@@ -115,6 +115,10 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       return _Redirecting();
     }
+
+    // Also repairs a crash after a workout was durably reset but before its
+    // cached timer and Android foreground-service state could be cleared.
+    await _clearWorkoutRuntimeState();
 
     // No active mesocycle — cold boot or meso complete.
     final mesocycleId = AppPreferences.getCurrentMesocycleId();
@@ -327,6 +331,16 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _clearWorkoutRuntimeState() async {
+    if (widget.clearWorkoutRuntimeState != null) {
+      await widget.clearWorkoutRuntimeState!();
+      return;
+    }
+    await AppPreferences.setCurrentCompletedWorkoutId(null);
+    await AppPreferences.clearActiveRestTimer();
+    await WorkoutForegroundService.stop();
+  }
+
   Future<void> _resetDamagedWorkout(ActiveWorkoutReference active) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -368,13 +382,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     try {
-      if (widget.clearResetWorkoutState != null) {
-        await widget.clearResetWorkoutState!();
-      } else {
-        await AppPreferences.setCurrentCompletedWorkoutId(null);
-        await AppPreferences.clearActiveRestTimer();
-        await WorkoutForegroundService.stop();
-      }
+      await _clearWorkoutRuntimeState();
     } catch (_) {
       if (!mounted) return;
       setState(() {
