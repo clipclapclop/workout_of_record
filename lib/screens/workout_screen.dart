@@ -195,8 +195,17 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       return;
     }
 
-    final activeEx =
-        _data!.exercises.firstWhere((e) => e.completed.id == activeId);
+    ExerciseData? activeEx;
+    for (final exercise in _data!.exercises) {
+      if (exercise.completed.id == activeId) {
+        activeEx = exercise;
+        break;
+      }
+    }
+    if (activeEx == null) {
+      unawaited(AppPreferences.clearActiveRestTimer());
+      return;
+    }
     _timerActiveExId = activeId;
     _timerCueText = _cueText(activeEx);
     _timerController.restoreRunningTimer(
