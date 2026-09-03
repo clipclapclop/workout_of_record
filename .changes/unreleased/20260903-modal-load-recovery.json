@@ -1,0 +1,12 @@
+{
+  "id": "modal-load-recovery",
+  "summary": "Added retryable, closable load-failure states to mesocycle calendar, workout-detail, and past-mesocycle modal sheets.",
+  "audience": "user",
+  "releaseNote": "Mesocycle calendar and past-week dialogs now recover from loading failures instead of showing permanent spinners or technical errors.",
+  "docs": {
+    "impact": "none",
+    "paths": [],
+    "reason": "The new Retry and Close controls explain the recovery behavior directly where a load fails."
+  },
+  "screenshots": []
+}

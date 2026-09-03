@@ -3,38 +3,50 @@ import 'package:flutter/material.dart';
 import '../db/db.dart';
 import '../db/tables/enums.dart';
 import '../db/template_data.dart';
+import 'load_failure_view.dart';
 
 /// Lets the user choose a fully completed week from a completed mesocycle.
-Future<PastWeekTemplateData?> showPastMesoPickerSheet(BuildContext context) {
+Future<PastWeekTemplateData?> showPastMesoPickerSheet(
+  BuildContext context, {
+  Future<List<MesocycleWeekSummary>> Function()? loadSummaries,
+  Future<PastWeekTemplateData> Function(int)? loadWeek,
+}) {
   return showModalBottomSheet<PastWeekTemplateData>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (_) => const _PastMesoPickerSheet(),
+    builder: (_) => _PastMesoPickerSheet(
+      loadSummaries: loadSummaries ?? db.getMesocyclesWithCompletedWeeks,
+      loadWeek: loadWeek ?? db.getMesoTemplateDataFromWeek,
+    ),
   );
 }
 
 class _PastMesoPickerSheet extends StatefulWidget {
-  const _PastMesoPickerSheet();
+  const _PastMesoPickerSheet({
+    required this.loadSummaries,
+    required this.loadWeek,
+  });
+
+  final Future<List<MesocycleWeekSummary>> Function() loadSummaries;
+  final Future<PastWeekTemplateData> Function(int) loadWeek;
 
   @override
   State<_PastMesoPickerSheet> createState() => _PastMesoPickerSheetState();
 }
 
 class _PastMesoPickerSheetState extends State<_PastMesoPickerSheet> {
-  late Future<List<MesocycleWeekSummary>> _future;
+  Future<List<MesocycleWeekSummary>>? _future;
   bool _loading = false; // true while extracting a week
 
-  @override
-  void initState() {
-    super.initState();
-    _future = db.getMesocyclesWithCompletedWeeks();
+  void _retry() {
+    setState(() => _future = null);
   }
 
   Future<void> _onWeekTap(int weekId) async {
     setState(() => _loading = true);
     try {
-      final data = await db.getMesoTemplateDataFromWeek(weekId);
+      final data = await widget.loadWeek(weekId);
       if (!mounted) return;
       Navigator.pop(context, data);
     } catch (_) {
@@ -48,6 +60,7 @@ class _PastMesoPickerSheetState extends State<_PastMesoPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final future = _future ??= Future.sync(widget.loadSummaries);
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
       minChildSize: 0.4,
@@ -91,13 +104,17 @@ class _PastMesoPickerSheetState extends State<_PastMesoPickerSheet> {
             if (_loading) const LinearProgressIndicator(),
             Expanded(
               child: FutureBuilder<List<MesocycleWeekSummary>>(
-                future: _future,
+                future: future,
                 builder: (ctx, snap) {
                   if (snap.connectionState != ConnectionState.done) {
                     return const Center(child: CircularProgressIndicator());
                   }
                   if (snap.hasError) {
-                    return Center(child: Text('Error: ${snap.error}'));
+                    return LoadFailureView(
+                      message: 'Couldn’t load past mesocycles.',
+                      onRetry: _retry,
+                      onClose: () => Navigator.pop(context),
+                    );
                   }
                   final summaries = snap.data!;
                   if (summaries.isEmpty) {

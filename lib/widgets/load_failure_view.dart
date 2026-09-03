@@ -6,10 +6,12 @@ class LoadFailureView extends StatelessWidget {
     super.key,
     required this.message,
     required this.onRetry,
+    this.onClose,
   });
 
   final String message;
   final VoidCallback onRetry;
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +38,10 @@ class LoadFailureView extends StatelessWidget {
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
             ),
+            if (onClose != null) ...[
+              const SizedBox(height: 8),
+              TextButton(onPressed: onClose, child: const Text('Close')),
+            ],
           ],
         ),
       ),

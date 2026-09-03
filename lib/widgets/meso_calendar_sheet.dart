@@ -7,9 +7,16 @@ import '../db/tables/enums.dart';
 import '../db/workout_data.dart';
 import '../workout_units.dart';
 import 'calendar_cell_widget.dart';
+import 'load_failure_view.dart';
 
 void showMesoCalendarSheet(
-    BuildContext context, int mesocycleId, int currentCompletedWorkoutId) {
+  BuildContext context,
+  int mesocycleId,
+  int currentCompletedWorkoutId, {
+  Future<MesocycleCalendar> Function(int)? loadCalendar,
+  Future<WorkoutData> Function(int)? loadWorkout,
+  Future<List<String>> Function(CalendarCell)? loadUpcomingExercises,
+}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -17,37 +24,97 @@ void showMesoCalendarSheet(
     builder: (_) => _MesoCalendarSheet(
       mesocycleId: mesocycleId,
       currentCompletedWorkoutId: currentCompletedWorkoutId,
+      loadCalendar: loadCalendar ?? db.getMesocycleCalendar,
+      loadWorkout: loadWorkout ?? db.getWorkoutData,
+      loadUpcomingExercises: loadUpcomingExercises,
     ),
   );
+}
+
+class _RetryableSheetLoad<T> extends StatefulWidget {
+  const _RetryableSheetLoad({
+    required this.initialChildSize,
+    required this.minChildSize,
+    required this.message,
+    required this.load,
+    required this.contentBuilder,
+  });
+
+  final double initialChildSize;
+  final double minChildSize;
+  final String message;
+  final Future<T> Function() load;
+  final Widget Function(BuildContext, T, ScrollController) contentBuilder;
+
+  @override
+  State<_RetryableSheetLoad<T>> createState() =>
+      _RetryableSheetLoadState<T>();
+}
+
+class _RetryableSheetLoadState<T> extends State<_RetryableSheetLoad<T>> {
+  Future<T>? _future;
+
+  void _retry() {
+    setState(() => _future = null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: widget.initialChildSize,
+      minChildSize: widget.minChildSize,
+      maxChildSize: 0.92,
+      expand: false,
+      builder: (ctx, scrollController) {
+        final future = _future ??= Future.sync(widget.load);
+        return FutureBuilder<T>(
+          future: future,
+          builder: (ctx, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return LoadFailureView(
+                message: widget.message,
+                onRetry: _retry,
+                onClose: () => Navigator.pop(context),
+              );
+            }
+            return widget.contentBuilder(
+              ctx,
+              snapshot.data as T,
+              scrollController,
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
 class _MesoCalendarSheet extends StatelessWidget {
   const _MesoCalendarSheet({
     required this.mesocycleId,
     required this.currentCompletedWorkoutId,
+    required this.loadCalendar,
+    required this.loadWorkout,
+    this.loadUpcomingExercises,
   });
 
   final int mesocycleId;
   final int currentCompletedWorkoutId;
+  final Future<MesocycleCalendar> Function(int) loadCalendar;
+  final Future<WorkoutData> Function(int) loadWorkout;
+  final Future<List<String>> Function(CalendarCell)? loadUpcomingExercises;
 
   @override
   Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
+    return _RetryableSheetLoad<MesocycleCalendar>(
       initialChildSize: 0.6,
       minChildSize: 0.4,
-      maxChildSize: 0.92,
-      expand: false,
-      builder: (ctx, scrollController) {
-        return FutureBuilder<MesocycleCalendar>(
-          future: db.getMesocycleCalendar(mesocycleId),
-          builder: (ctx, snap) {
-            if (!snap.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            return _buildContent(ctx, snap.data!, scrollController);
-          },
-        );
-      },
+      message: 'Couldn’t load the mesocycle calendar.',
+      load: () => loadCalendar(mesocycleId),
+      contentBuilder: _buildContent,
     );
   }
 
@@ -123,20 +190,13 @@ class _MesoCalendarSheet extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => DraggableScrollableSheet(
+      builder: (_) => _RetryableSheetLoad<WorkoutData>(
         initialChildSize: 0.7,
         minChildSize: 0.4,
-        maxChildSize: 0.92,
-        expand: false,
-        builder: (ctx, scroll) => FutureBuilder<WorkoutData>(
-          future: db.getWorkoutData(cw.id),
-          builder: (ctx, snap) {
-            if (!snap.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            return _buildCompletedDetail(ctx, cell, snap.data!, scroll);
-          },
-        ),
+        message: 'Couldn’t load this completed workout.',
+        load: () => loadWorkout(cw.id),
+        contentBuilder: (ctx, data, scroll) =>
+            _buildCompletedDetail(ctx, cell, data, scroll),
       ),
     );
   }
@@ -195,20 +255,14 @@ class _MesoCalendarSheet extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => DraggableScrollableSheet(
+      builder: (_) => _RetryableSheetLoad<List<String>>(
         initialChildSize: 0.5,
         minChildSize: 0.3,
-        maxChildSize: 0.92,
-        expand: false,
-        builder: (ctx, scroll) => FutureBuilder<List<String>>(
-          future: _loadUpcomingExercises(cell),
-          builder: (ctx, snap) {
-            if (!snap.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            return _buildUpcomingDetail(ctx, cell, snap.data!, scroll);
-          },
-        ),
+        message: 'Couldn’t load this upcoming workout.',
+        load: () => loadUpcomingExercises?.call(cell) ??
+            _loadUpcomingExercises(cell),
+        contentBuilder: (ctx, exercises, scroll) =>
+            _buildUpcomingDetail(ctx, cell, exercises, scroll),
       ),
     );
   }
