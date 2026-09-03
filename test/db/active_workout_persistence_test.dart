@@ -733,6 +733,42 @@ void main() {
     );
   });
 
+  test('missing planned workout makes attempt damage non-resettable', () async {
+    final database = _openMemoryDatabase();
+    addTearDown(database.close);
+    final fixture = await _startWorkout(database);
+    final data = await database.getWorkoutData(fixture.completedWorkoutId);
+    final original = data.exercises.first;
+    final replacement = await _unusedMovement(
+      database,
+      data.exercises.map((exercise) => exercise.movement.id),
+    );
+    await database.replaceExercise(
+      original.completed.id,
+      replacement.id,
+      original.completed.orderIndex,
+      fixture.completedWorkoutId,
+    );
+    await database.customStatement('PRAGMA foreign_keys = OFF');
+    await (database.delete(database.plannedWorkouts)
+          ..where((row) => row.workoutId.equals(fixture.workoutId)))
+        .go();
+    await (database.delete(database.movements)
+          ..where((row) => row.id.equals(replacement.id)))
+        .go();
+
+    await expectLater(
+      database.getWorkoutData(fixture.completedWorkoutId),
+      throwsA(
+        isA<WorkoutDataIntegrityException>().having(
+          (error) => error.canReset,
+          'canReset',
+          isFalse,
+        ),
+      ),
+    );
+  });
+
   test(
     'resetting an active attempt preserves history and offers the same workout',
     () async {

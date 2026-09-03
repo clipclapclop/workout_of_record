@@ -1168,14 +1168,15 @@ class AppDatabase extends _$AppDatabase {
             ..where((m) => m.id.equals(ce.movementId)))
           .getSingleOrNull();
       if (movement == null) {
-        final plannedReference = plannedWorkout == null
-            ? null
-            : await (select(plannedExercises)
-                  ..where((exercise) =>
-                      exercise.plannedWorkoutId.equals(plannedWorkout.id) &
-                      exercise.movementId.equals(ce.movementId))
-                  ..limit(1))
-                .getSingleOrNull();
+        if (plannedWorkout == null) {
+          throw const WorkoutDataIntegrityException.notResettable();
+        }
+        final plannedReference = await (select(plannedExercises)
+              ..where((exercise) =>
+                  exercise.plannedWorkoutId.equals(plannedWorkout.id) &
+                  exercise.movementId.equals(ce.movementId))
+              ..limit(1))
+            .getSingleOrNull();
         if (plannedReference != null) {
           throw const WorkoutDataIntegrityException.notResettable();
         }
