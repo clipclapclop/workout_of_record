@@ -303,9 +303,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   void _onTimerControllerChanged() {
     final running = _timerController.isRunning;
     final durationSeconds = _timerController.durationSeconds;
+    final remainingMs = _timerController.remainingMs;
     final endsAt = running
-        ? DateTime.now()
-            .add(Duration(milliseconds: _timerController.remainingMs))
+        ? DateTime.now().add(Duration(milliseconds: remainingMs))
         : null;
     final previousWrite = _timerStateWrite;
     _timerStateWrite = (() async {
@@ -317,6 +317,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           await AppPreferences.setActiveRestTimer(
             workoutId: widget.completedWorkoutId,
             durationSeconds: durationSeconds,
+            remainingMs: remainingMs,
             endsAt: endsAt,
           );
         }

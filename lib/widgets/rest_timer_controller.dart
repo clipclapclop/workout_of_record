@@ -67,6 +67,18 @@ class RestTimerController extends ChangeNotifier {
     reset(); // reset() already calls notifyListeners
   }
 
+  /// Restore a persisted paused timer without starting it.
+  void restorePausedTimer({
+    required int durationSeconds,
+    required int remainingMs,
+  }) {
+    _durationSeconds = durationSeconds;
+    _pausedRemainingMs = remainingMs.clamp(0, durationSeconds * 1000).toInt();
+    _startedAt = null;
+    _cued = _pausedRemainingMs <= 0;
+    notifyListeners();
+  }
+
   /// Restore a persisted countdown without giving it a new deadline.
   void restoreRunningTimer({
     required int durationSeconds,

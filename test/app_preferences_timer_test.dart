@@ -52,12 +52,14 @@ void main() {
     await AppPreferences.setActiveRestTimer(
       workoutId: 42,
       durationSeconds: 90,
+      remainingMs: 45000,
       endsAt: endsAt,
     );
 
     final restored = AppPreferences.getActiveRestTimer();
     expect(restored?.workoutId, 42);
     expect(restored?.durationSeconds, 90);
+    expect(restored?.remainingMs, 45000);
     expect(restored?.endsAt, endsAt);
 
     await AppPreferences.clearActiveRestTimer();

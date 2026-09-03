@@ -7,12 +7,14 @@ class ActiveRestTimerState {
   const ActiveRestTimerState({
     required this.workoutId,
     required this.durationSeconds,
+    required this.remainingMs,
     required this.endsAt,
   });
 
   final int workoutId;
   final int durationSeconds;
-  final DateTime endsAt;
+  final int remainingMs;
+  final DateTime? endsAt;
 }
 
 /// Typed wrapper around SharedPreferences and FlutterSecureStorage.
@@ -210,35 +212,47 @@ Keep answers focused and practical. When suggesting changes, be specific about e
     final encoded = _prefs.getString(_kActiveRestTimer);
     if (encoded == null) return null;
     final parts = encoded.split(':');
-    if (parts.length != 3) return null;
+    if (parts.length != 4) return null;
     final workoutId = int.tryParse(parts[0]);
     final durationSeconds = int.tryParse(parts[1]);
-    final endsAtMs = int.tryParse(parts[2]);
+    final remainingMs = int.tryParse(parts[2]);
+    final endsAtMs = int.tryParse(parts[3]);
     if (workoutId == null ||
         workoutId <= 0 ||
         durationSeconds == null ||
         durationSeconds <= 0 ||
+        remainingMs == null ||
+        remainingMs < 0 ||
+        remainingMs > durationSeconds * 1000 ||
         endsAtMs == null) {
       return null;
     }
     return ActiveRestTimerState(
       workoutId: workoutId,
       durationSeconds: durationSeconds,
-      endsAt: DateTime.fromMillisecondsSinceEpoch(endsAtMs),
+      remainingMs: remainingMs,
+      endsAt: endsAtMs < 0
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(endsAtMs),
     );
   }
 
   static Future<void> setActiveRestTimer({
     required int workoutId,
     required int durationSeconds,
-    required DateTime endsAt,
+    required int remainingMs,
+    required DateTime? endsAt,
   }) {
-    if (workoutId <= 0 || durationSeconds <= 0) {
-      throw ArgumentError('workoutId and durationSeconds must be positive');
+    if (workoutId <= 0 ||
+        durationSeconds <= 0 ||
+        remainingMs < 0 ||
+        remainingMs > durationSeconds * 1000) {
+      throw ArgumentError('invalid active rest timer state');
     }
     return _prefs.setString(
       _kActiveRestTimer,
-      '$workoutId:$durationSeconds:${endsAt.millisecondsSinceEpoch}',
+      '$workoutId:$durationSeconds:$remainingMs:'
+          '${endsAt?.millisecondsSinceEpoch ?? -1}',
     );
   }
 

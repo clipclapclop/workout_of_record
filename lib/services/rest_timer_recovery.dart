@@ -9,14 +9,19 @@ bool restorePersistedRestTimer({
   DateTime? now,
 }) {
   final checkedAt = now ?? DateTime.now();
-  if (saved == null ||
-      saved.workoutId != workoutId ||
-      !saved.endsAt.isAfter(checkedAt)) {
-    return false;
+  if (saved == null || saved.workoutId != workoutId) return false;
+  final endsAt = saved.endsAt;
+  if (endsAt == null) {
+    controller.restorePausedTimer(
+      durationSeconds: saved.durationSeconds,
+      remainingMs: saved.remainingMs,
+    );
+    return true;
   }
+  if (!endsAt.isAfter(checkedAt)) return false;
   controller.restoreRunningTimer(
     durationSeconds: saved.durationSeconds,
-    endsAt: saved.endsAt,
+    endsAt: endsAt,
   );
   return true;
 }
