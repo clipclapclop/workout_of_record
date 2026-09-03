@@ -187,27 +187,32 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
     final saved = AppPreferences.getActiveRestTimer();
     final activeId = _activeExerciseId;
-    if (saved == null ||
-        saved.workoutId != widget.completedWorkoutId ||
-        activeId == null ||
-        !saved.endsAt.isAfter(DateTime.now())) {
+    ExerciseData? activeEx;
+    if (activeId != null) {
+      for (final exercise in _data!.exercises) {
+        if (exercise.completed.id == activeId) {
+          activeEx = exercise;
+          break;
+        }
+      }
+    }
+    if (activeId == null || activeEx == null) {
       unawaited(AppPreferences.clearActiveRestTimer());
       return;
     }
 
-    ExerciseData? activeEx;
-    for (final exercise in _data!.exercises) {
-      if (exercise.completed.id == activeId) {
-        activeEx = exercise;
-        break;
-      }
-    }
-    if (activeEx == null) {
+    _timerActiveExId = activeId;
+    _timerCueText = _cueText(activeEx);
+    if (saved == null ||
+        saved.workoutId != widget.completedWorkoutId ||
+        !saved.endsAt.isAfter(DateTime.now())) {
+      // A missing, stale, or unrelated snapshot initializes the display only.
+      // setDuration() leaves the controller stopped until a set interaction.
+      _timerController.setDuration(_effectiveDuration(activeEx.movement));
       unawaited(AppPreferences.clearActiveRestTimer());
       return;
     }
-    _timerActiveExId = activeId;
-    _timerCueText = _cueText(activeEx);
+
     _timerController.restoreRunningTimer(
       durationSeconds: saved.durationSeconds,
       endsAt: saved.endsAt,

@@ -9,6 +9,10 @@ void main() {
     expect(controller.isRunning, isFalse);
     expect(controller.remainingMs, 60000);
 
+    controller.setDuration(90);
+    expect(controller.isRunning, isFalse);
+    expect(controller.remainingMs, 90000);
+
     controller.start();
     expect(controller.isRunning, isTrue);
 
@@ -18,7 +22,7 @@ void main() {
 
     controller.reset();
     expect(controller.isRunning, isFalse);
-    expect(controller.remainingMs, 60000);
+    expect(controller.remainingMs, 90000);
   });
 
   test('restores a running timer without moving its deadline', () {
