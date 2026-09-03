@@ -2,7 +2,7 @@
 
 ## Start or resume
 
-The home screen shows the next workout in the active mesocycle. Starting it opens the pre-workout check-in before creating the active workout. If the app closes during a workout, reopening it finds the active database record and resumes its persisted sets even when the cached navigation state was not saved. If that exact in-progress attempt cannot be loaded, retry first. **Reset Workout** permanently removes only that attempt’s sets, feedback, and pre-workout check-in, then offers the same scheduled workout again; completed history and the rest of the mesocycle are preserved.
+The home screen shows the next workout in the active mesocycle. Starting it opens the pre-workout check-in before creating the active workout. If the app closes during a workout, reopening it finds the active database record and resumes its persisted sets even when the cached navigation state was not saved. If that exact in-progress attempt cannot be loaded, retry first. When the app can confirm the damage is limited to the attempt itself, **Reset Workout** permanently removes only that attempt’s sets, feedback, and pre-workout check-in, then offers the same scheduled workout again; completed history and the rest of the mesocycle are preserved.
 
 You can skip the scheduled workout by selecting a skip reason. Workouts advance in cycle order; the home screen does not substitute a different workout for the scheduled one.
 

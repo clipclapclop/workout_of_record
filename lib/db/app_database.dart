@@ -1164,10 +1164,23 @@ class AppDatabase extends _$AppDatabase {
 
     final exerciseDataList = <ExerciseData>[];
     for (final ce in completedExs) {
-      final movement = await requireIntactAttemptData(
-        (select(movements)..where((m) => m.id.equals(ce.movementId)))
-            .getSingle(),
-      );
+      final movement = await (select(movements)
+            ..where((m) => m.id.equals(ce.movementId)))
+          .getSingleOrNull();
+      if (movement == null) {
+        final plannedReference = plannedWorkout == null
+            ? null
+            : await (select(plannedExercises)
+                  ..where((exercise) =>
+                      exercise.plannedWorkoutId.equals(plannedWorkout.id) &
+                      exercise.movementId.equals(ce.movementId))
+                  ..limit(1))
+                .getSingleOrNull();
+        if (plannedReference != null) {
+          throw StateError('The workout plan references a missing movement.');
+        }
+        throw const WorkoutDataIntegrityException();
+      }
 
       final completedSetsForEx = await (select(completedSets)
             ..where((s) => s.completedExerciseId.equals(ce.id))

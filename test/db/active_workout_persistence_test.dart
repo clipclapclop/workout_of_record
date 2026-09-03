@@ -662,15 +662,42 @@ void main() {
     addTearDown(database.close);
     final fixture = await _startWorkout(database);
     final data = await database.getWorkoutData(fixture.completedWorkoutId);
-    final movementId = data.exercises.first.movement.id;
+    final original = data.exercises.first;
+    final replacement = await _unusedMovement(
+      database,
+      data.exercises.map((exercise) => exercise.movement.id),
+    );
+    await database.replaceExercise(
+      original.completed.id,
+      replacement.id,
+      original.completed.orderIndex,
+      fixture.completedWorkoutId,
+    );
     await database.customStatement('PRAGMA foreign_keys = OFF');
     await (database.delete(database.movements)
-          ..where((row) => row.id.equals(movementId)))
+          ..where((row) => row.id.equals(replacement.id)))
         .go();
 
     await expectLater(
       database.getWorkoutData(fixture.completedWorkoutId),
       throwsA(isA<WorkoutDataIntegrityException>()),
+    );
+  });
+
+  test('missing planned data is not classified as resettable damage', () async {
+    final database = _openMemoryDatabase();
+    addTearDown(database.close);
+    final fixture = await _startWorkout(database);
+    final data = await database.getWorkoutData(fixture.completedWorkoutId);
+    final plannedMovementId = data.exercises.first.movement.id;
+    await database.customStatement('PRAGMA foreign_keys = OFF');
+    await (database.delete(database.movements)
+          ..where((row) => row.id.equals(plannedMovementId)))
+        .go();
+
+    await expectLater(
+      database.getWorkoutData(fixture.completedWorkoutId),
+      throwsA(isA<StateError>()),
     );
   });
 
