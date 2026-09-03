@@ -12,6 +12,7 @@ import '../db/planning.dart';
 import '../db/tables/enums.dart';
 import '../db/workout_data.dart';
 import '../services/backup_service.dart';
+import '../services/rest_timer_recovery.dart';
 import '../services/workout_cue_text.dart';
 import '../services/workout_foreground_service.dart';
 import '../workout_units.dart';
@@ -203,20 +204,17 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
     _timerActiveExId = activeId;
     _timerCueText = _cueText(activeEx);
-    if (saved == null ||
-        saved.workoutId != widget.completedWorkoutId ||
-        !saved.endsAt.isAfter(DateTime.now())) {
+    final restored = restorePersistedRestTimer(
+      controller: _timerController,
+      saved: saved,
+      workoutId: widget.completedWorkoutId,
+    );
+    if (!restored) {
       // A missing, stale, or unrelated snapshot initializes the display only.
       // setDuration() leaves the controller stopped until a set interaction.
       _timerController.setDuration(_effectiveDuration(activeEx.movement));
       unawaited(AppPreferences.clearActiveRestTimer());
-      return;
     }
-
-    _timerController.restoreRunningTimer(
-      durationSeconds: saved.durationSeconds,
-      endsAt: saved.endsAt,
-    );
   }
 
   void _syncTimer() {
