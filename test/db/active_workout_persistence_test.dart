@@ -656,6 +656,26 @@ void main() {
     },
   );
 
+  test('intentionally absent sets and unanswered feedback remain valid',
+      () async {
+    final database = _openMemoryDatabase();
+    addTearDown(database.close);
+    final fixture = await _startWorkout(database);
+    final before = await database.getWorkoutData(fixture.completedWorkoutId);
+    final exercise = before.exercises.first;
+    for (final set in exercise.sets) {
+      await database.deleteSet(set.completed.id);
+    }
+
+    final after = await database.getWorkoutData(fixture.completedWorkoutId);
+    final sameExercise = after.exercises.firstWhere(
+      (item) => item.completed.id == exercise.completed.id,
+    );
+    expect(sameExercise.sets, isEmpty);
+    expect(sameExercise.postExerciseCheckin, isNull);
+    expect(after.postMuscleGroupCheckins, isEmpty);
+  });
+
   test('missing attempt-owned data is classified as structural damage',
       () async {
     final database = _openMemoryDatabase();

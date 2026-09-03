@@ -1182,6 +1182,8 @@ class AppDatabase extends _$AppDatabase {
         throw const WorkoutDataIntegrityException.resettable();
       }
 
+      // Zero completed-set rows is valid: the user may intentionally delete
+      // every prescribed set while keeping the exercise in the workout.
       final completedSetsForEx = await (select(completedSets)
             ..where((s) => s.completedExerciseId.equals(ce.id))
             ..orderBy([(s) => OrderingTerm.asc(s.id)]))
@@ -1210,6 +1212,8 @@ class AppDatabase extends _$AppDatabase {
           ),
       ];
 
+      // Feedback is optional until the workout reaches that question. A null
+      // row is valid; only duplicate one-to-one rows indicate attempt damage.
       final postExCheckin = await requireIntactAttemptData(
         (select(postExerciseCheckins)
               ..where((c) => c.completedExerciseId.equals(ce.id)))
@@ -1224,6 +1228,7 @@ class AppDatabase extends _$AppDatabase {
       ));
     }
 
+    // Muscle-group feedback is also optional until it is answered.
     final mgCheckins = await (select(postMuscleGroupCheckins)
           ..where((c) => c.completedWorkoutId.equals(completedWorkoutId)))
         .get();
