@@ -1176,6 +1176,36 @@ class AppDatabase extends _$AppDatabase {
           ..orderBy([(e) => OrderingTerm.asc(e.orderIndex)]))
         .get();
 
+    if (classifyActiveDamage &&
+        cw.status == WorkoutStatus.active &&
+        cw.completedAt == null &&
+        plannedWorkout != null) {
+      final plannedExs = await (select(plannedExercises)
+            ..where((exercise) =>
+                exercise.plannedWorkoutId.equals(plannedWorkout.id)))
+          .get();
+      final allAttemptExs = await (select(completedExercises)
+            ..where((exercise) =>
+                exercise.completedWorkoutId.equals(completedWorkoutId)))
+          .get();
+      for (final planned in plannedExs) {
+        final hasAttemptRow = allAttemptExs.any(
+          (completed) => completed.movementId == planned.movementId,
+        );
+        if (hasAttemptRow) continue;
+        final movementExists = await (select(movements)
+              ..where((movement) => movement.id.equals(planned.movementId))
+              ..limit(1))
+            .getSingleOrNull();
+        if (movementExists == null) {
+          throw const WorkoutDataIntegrityException.notResettable();
+        }
+        throw const WorkoutDataIntegrityException.resettable();
+      }
+    }
+
+    // No visible exercises remains valid when the plan was deliberately empty
+    // or every exercise has an existing row marked as dropped.
     final exerciseDataList = <ExerciseData>[];
     for (final ce in completedExs) {
       final movement = await (select(movements)

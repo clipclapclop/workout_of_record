@@ -656,6 +656,51 @@ void main() {
     },
   );
 
+  test('intentionally dropped exercises remain valid during recovery',
+      () async {
+    final database = _openMemoryDatabase();
+    addTearDown(database.close);
+    final fixture = await _startWorkout(database);
+    final before = await database.getWorkoutData(fixture.completedWorkoutId);
+    for (final exercise in before.exercises) {
+      await database.deleteExercise(exercise.completed.id);
+    }
+
+    final after = await database.getActiveWorkoutData(
+      fixture.completedWorkoutId,
+    );
+    expect(after.exercises, isEmpty);
+  });
+
+  test('physically missing planned exercise rows are resettable damage',
+      () async {
+    final database = _openMemoryDatabase();
+    addTearDown(database.close);
+    final fixture = await _startWorkout(database);
+    final before = await database.getWorkoutData(fixture.completedWorkoutId);
+    final exerciseIds = [
+      for (final exercise in before.exercises) exercise.completed.id,
+    ];
+    await (database.delete(database.completedSets)
+          ..where((row) => row.completedExerciseId.isIn(exerciseIds)))
+        .go();
+    await (database.delete(database.completedExercises)
+          ..where((row) =>
+              row.completedWorkoutId.equals(fixture.completedWorkoutId)))
+        .go();
+
+    await expectLater(
+      database.getActiveWorkoutData(fixture.completedWorkoutId),
+      throwsA(
+        isA<WorkoutDataIntegrityException>().having(
+          (error) => error.canReset,
+          'canReset',
+          isTrue,
+        ),
+      ),
+    );
+  });
+
   test('intentionally absent sets and unanswered feedback remain valid',
       () async {
     final database = _openMemoryDatabase();
