@@ -9,6 +9,7 @@ import 'package:workout_of_record/db/app_database.dart';
 import 'package:workout_of_record/db/planning.dart';
 import 'package:workout_of_record/db/tables/enums.dart';
 import 'package:workout_of_record/db/template_data.dart';
+import 'package:workout_of_record/db/workout_data.dart';
 import 'package:workout_of_record/services/workout_recovery_service.dart';
 
 AppDatabase _openMemoryDatabase() =>
@@ -654,6 +655,24 @@ void main() {
       expect(next!.name, 'Tuesday');
     },
   );
+
+  test('missing attempt-owned data is classified as structural damage',
+      () async {
+    final database = _openMemoryDatabase();
+    addTearDown(database.close);
+    final fixture = await _startWorkout(database);
+    final data = await database.getWorkoutData(fixture.completedWorkoutId);
+    final movementId = data.exercises.first.movement.id;
+    await database.customStatement('PRAGMA foreign_keys = OFF');
+    await (database.delete(database.movements)
+          ..where((row) => row.id.equals(movementId)))
+        .go();
+
+    await expectLater(
+      database.getWorkoutData(fixture.completedWorkoutId),
+      throwsA(isA<WorkoutDataIntegrityException>()),
+    );
+  });
 
   test(
     'resetting an active attempt preserves history and offers the same workout',

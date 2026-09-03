@@ -21,7 +21,9 @@ void main() {
           reconcileActiveWorkout: () async => active,
           loadActiveWorkout: (_) async {
             loadCalls++;
-            if (loadCalls == 1) throw Exception('movement row missing');
+            if (loadCalls == 1) {
+              throw const WorkoutDataIntegrityException();
+            }
             return _workoutData(active);
           },
           activeWorkoutBuilder: (_, _) =>
@@ -34,7 +36,6 @@ void main() {
     expect(find.text('Couldn’t reopen this workout'), findsOneWidget);
     expect(find.text('Tuesday'), findsOneWidget);
     expect(find.text('Reset Workout'), findsOneWidget);
-    expect(find.textContaining('movement row missing'), findsNothing);
 
     await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();
@@ -43,8 +44,30 @@ void main() {
     expect(loadCalls, 2);
   });
 
-  testWidgets('startup clears stale runtime state when no workout is active',
-      (tester) async {
+  testWidgets('transient active-workout failures remain retry-only', (
+    tester,
+  ) async {
+    await initializeTestPreferences();
+    final active = _activeReference();
+
+    await tester.pumpWidget(
+      buildTestApp(
+        home: HomeScreen(
+          reconcileActiveWorkout: () async => active,
+          loadActiveWorkout: (_) async => throw Exception('temporary read'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Couldn’t load your current workout.'), findsOneWidget);
+    expect(find.text('Reset Workout'), findsNothing);
+    expect(find.textContaining('temporary read'), findsNothing);
+  });
+
+  testWidgets('startup clears stale runtime state when no workout is active', (
+    tester,
+  ) async {
     await initializeTestPreferences();
     var cleanupStarted = false;
 
@@ -94,7 +117,8 @@ void main() {
       buildTestApp(
         home: HomeScreen(
           reconcileActiveWorkout: () async => active,
-          loadActiveWorkout: (_) async => throw Exception('damaged'),
+          loadActiveWorkout: (_) async =>
+              throw const WorkoutDataIntegrityException(),
           resetActiveWorkout: (_) async {
             resetCalls++;
             throw Exception('write failed');
@@ -139,7 +163,8 @@ void main() {
       buildTestApp(
         home: HomeScreen(
           reconcileActiveWorkout: () async => active,
-          loadActiveWorkout: (_) async => throw Exception('damaged'),
+          loadActiveWorkout: (_) async =>
+              throw const WorkoutDataIntegrityException(),
           resetActiveWorkout: (_) async => events.add('database'),
           clearWorkoutRuntimeState: () async => events.add('transient state'),
         ),

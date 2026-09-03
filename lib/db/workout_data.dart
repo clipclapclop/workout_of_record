@@ -1,5 +1,11 @@
 import 'app_database.dart';
 
+/// The in-progress attempt contains broken owned records that can be removed
+/// safely without changing its planned workout or completed history.
+class WorkoutDataIntegrityException implements Exception {
+  const WorkoutDataIntegrityException();
+}
+
 class ActiveWorkoutReference {
   const ActiveWorkoutReference({
     required this.completedWorkoutId,

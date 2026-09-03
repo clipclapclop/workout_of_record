@@ -1147,6 +1147,14 @@ class AppDatabase extends _$AppDatabase {
           ..where((pw) => pw.workoutId.equals(cw.workoutId)))
         .getSingleOrNull();
 
+    Future<T> requireIntactAttemptData<T>(Future<T> read) async {
+      try {
+        return await read;
+      } on StateError {
+        throw const WorkoutDataIntegrityException();
+      }
+    }
+
     final completedExs = await (select(completedExercises)
           ..where((e) =>
               e.completedWorkoutId.equals(completedWorkoutId) &
@@ -1156,9 +1164,10 @@ class AppDatabase extends _$AppDatabase {
 
     final exerciseDataList = <ExerciseData>[];
     for (final ce in completedExs) {
-      final movement = await (select(movements)
-            ..where((m) => m.id.equals(ce.movementId)))
-          .getSingle();
+      final movement = await requireIntactAttemptData(
+        (select(movements)..where((m) => m.id.equals(ce.movementId)))
+            .getSingle(),
+      );
 
       final completedSetsForEx = await (select(completedSets)
             ..where((s) => s.completedExerciseId.equals(ce.id))
@@ -1188,9 +1197,11 @@ class AppDatabase extends _$AppDatabase {
           ),
       ];
 
-      final postExCheckin = await (select(postExerciseCheckins)
-            ..where((c) => c.completedExerciseId.equals(ce.id)))
-          .getSingleOrNull();
+      final postExCheckin = await requireIntactAttemptData(
+        (select(postExerciseCheckins)
+              ..where((c) => c.completedExerciseId.equals(ce.id)))
+            .getSingleOrNull(),
+      );
 
       exerciseDataList.add(ExerciseData(
         completed: ce,

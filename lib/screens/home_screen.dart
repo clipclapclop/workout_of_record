@@ -93,7 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
               active.completedWorkoutId,
             ) ??
             db.getWorkoutData(active.completedWorkoutId));
-      } catch (_) {
+      } on WorkoutDataIntegrityException {
         return _DamagedActiveWorkout(active);
       }
       if (mounted) {
