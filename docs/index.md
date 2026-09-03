@@ -10,4 +10,4 @@ Use this guide to:
 - [review movements and workout history](guides/movements-history.md); and
 - [configure settings and backups](guides/settings-backups.md).
 
-The documentation describes released builds. Internal requirements and design notes remain in the repository's `refs/` directory.
+If a primary data screen cannot load its local data, it shows a concise recovery message and a **Retry** action instead of leaving a permanent loading indicator. The documentation describes released builds. Internal requirements and design notes remain in the repository's `refs/` directory.

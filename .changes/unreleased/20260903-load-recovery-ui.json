@@ -1,0 +1,12 @@
+{
+  "id": "load-recovery-ui",
+  "summary": "Replaced permanent loading indicators and raw exceptions on primary data screens with concise retryable failure states.",
+  "audience": "user",
+  "releaseNote": "Primary screens now offer Retry when local data cannot be loaded instead of remaining stuck or showing technical errors.",
+  "docs": {
+    "impact": "updated",
+    "paths": ["docs/index.md"],
+    "reason": ""
+  },
+  "screenshots": []
+}

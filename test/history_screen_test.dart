@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -5,7 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_of_record/db/app_database.dart';
 import 'package:workout_of_record/db/calendar_data.dart';
 import 'package:workout_of_record/db/tables/enums.dart';
+import 'package:workout_of_record/db/workout_data.dart';
 import 'package:workout_of_record/screens/history_screen.dart';
+import 'package:workout_of_record/screens/workout_history_detail_screen.dart';
 import 'package:workout_of_record/widgets/calendar_cell_widget.dart';
 
 AppDatabase _openDb() => AppDatabase.withExecutor(NativeDatabase.memory());
@@ -26,6 +30,54 @@ Future<(int, int)> _startNextWorkout(
 }
 
 void main() {
+  testWidgets('history load failure can be retried without raw error text',
+      (tester) async {
+    var attempts = 0;
+    Future<List<MesocycleCalendar>> loadCalendars() async {
+      attempts++;
+      if (attempts == 1) throw StateError('private database details');
+      return [];
+    }
+
+    await tester.pumpWidget(
+      MaterialApp(home: HistoryScreen(loadCalendars: loadCalendars)),
+    );
+    await tester.pump();
+
+    expect(find.text('Couldn’t load workout history.'), findsOneWidget);
+    expect(find.textContaining('private database details'), findsNothing);
+
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+
+    expect(attempts, 2);
+    expect(find.text('No workouts yet.'), findsOneWidget);
+  });
+
+  testWidgets('workout detail keeps one Future during ordinary rebuilds',
+      (tester) async {
+    var attempts = 0;
+    final pending = Completer<WorkoutData>();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WorkoutHistoryDetailScreen(
+          completedWorkoutId: 1,
+          title: 'Workout',
+          loadWorkout: () {
+            attempts++;
+            return pending.future;
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(attempts, 1);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+  });
+
   test(
     'history mesocycle IDs include active cycles and exclude unstarted cycles',
     () async {

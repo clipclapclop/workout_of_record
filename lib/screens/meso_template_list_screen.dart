@@ -4,6 +4,7 @@ import '../db/app_database.dart';
 import '../db/db.dart';
 import '../db/template_data.dart';
 import '../widgets/app_nav_menu.dart';
+import '../widgets/load_failure_view.dart';
 import '../widgets/meso_template_card.dart';
 import 'meso_template_builder_screen.dart';
 
@@ -134,7 +135,10 @@ class _MesoTemplateListScreenState extends State<MesoTemplateListScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return LoadFailureView(
+              message: 'Couldn’t load mesocycle templates.',
+              onRetry: _reload,
+            );
           }
           final templates = sortMesoTemplates(snapshot.data!, _sort);
           if (templates.isEmpty) {

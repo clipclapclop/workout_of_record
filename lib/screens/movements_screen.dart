@@ -4,6 +4,7 @@ import '../db/app_database.dart';
 import '../db/db.dart';
 import '../db/tables/enums.dart';
 import '../widgets/app_nav_menu.dart';
+import '../widgets/load_failure_view.dart';
 import 'movement_detail_screen.dart';
 
 enum _SortMode { muscleGroup, alphabetical }
@@ -135,7 +136,10 @@ class _MovementsScreenState extends State<MovementsScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
+                  return LoadFailureView(
+                    message: 'Couldn’t load exercises.',
+                    onRetry: _reload,
+                  );
                 }
                 final movements = _filter(snapshot.data!);
 

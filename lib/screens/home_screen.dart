@@ -6,6 +6,7 @@ import '../db/db.dart';
 import '../db/tables/enums.dart';
 import '../services/workout_recovery_service.dart';
 import '../widgets/app_nav_menu.dart';
+import '../widgets/load_failure_view.dart';
 import 'mesocycle_setup_screen.dart';
 import 'pre_workout_checkin_screen.dart';
 import 'profile_screen.dart';
@@ -45,6 +46,12 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _resultFuture = _init();
+  }
+
+  void _retryLoad() {
+    setState(() {
+      _resultFuture = _init();
+    });
   }
 
   Future<_HomeResult> _init() async {
@@ -299,7 +306,10 @@ class _HomeScreenState extends State<HomeScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return LoadFailureView(
+              message: 'Couldn’t load your current workout.',
+              onRetry: _retryLoad,
+            );
           }
 
           return switch (snapshot.data!) {

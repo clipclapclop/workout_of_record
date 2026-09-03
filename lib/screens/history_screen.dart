@@ -4,6 +4,7 @@ import '../db/calendar_data.dart';
 import '../db/db.dart';
 import '../widgets/app_nav_menu.dart';
 import '../widgets/calendar_cell_widget.dart';
+import '../widgets/load_failure_view.dart';
 import 'workout_history_detail_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -31,6 +32,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
   void initState() {
     super.initState();
     _future = _loadHistoryCalendars();
+  }
+
+  void _retryLoad() {
+    setState(() {
+      _future = _loadHistoryCalendars();
+    });
   }
 
   Future<List<MesocycleCalendar>> _loadHistoryCalendars() async {
@@ -61,8 +68,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
       body: FutureBuilder<List<MesocycleCalendar>>(
         future: _future,
         builder: (context, snapshot) {
-          if (!snapshot.hasData) {
+          if (snapshot.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return LoadFailureView(
+              message: 'Couldn’t load workout history.',
+              onRetry: _retryLoad,
+            );
           }
           final calendars = snapshot.data!;
           if (calendars.isEmpty) {

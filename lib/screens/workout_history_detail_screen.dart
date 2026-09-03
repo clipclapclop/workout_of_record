@@ -5,21 +5,55 @@ import '../db/db.dart';
 import '../db/tables/enums.dart';
 import '../db/workout_data.dart';
 import '../widgets/app_nav_menu.dart';
+import '../widgets/load_failure_view.dart';
 import '../workout_units.dart';
 
-class WorkoutHistoryDetailScreen extends StatelessWidget {
+class WorkoutHistoryDetailScreen extends StatefulWidget {
   const WorkoutHistoryDetailScreen({
     super.key,
     required this.completedWorkoutId,
     required this.title,
     this.activeWorkoutId,
     this.activeWorkoutName,
+    this.loadWorkout,
   });
 
   final int completedWorkoutId;
   final String title;
   final int? activeWorkoutId;
   final String? activeWorkoutName;
+
+  /// Overrides workout loading for tests.
+  final Future<WorkoutData> Function()? loadWorkout;
+
+  @override
+  State<WorkoutHistoryDetailScreen> createState() =>
+      _WorkoutHistoryDetailScreenState();
+}
+
+class _WorkoutHistoryDetailScreenState
+    extends State<WorkoutHistoryDetailScreen> {
+  late Future<WorkoutData> _workoutFuture;
+
+  int get completedWorkoutId => widget.completedWorkoutId;
+  String get title => widget.title;
+  int? get activeWorkoutId => widget.activeWorkoutId;
+  String? get activeWorkoutName => widget.activeWorkoutName;
+
+  @override
+  void initState() {
+    super.initState();
+    _workoutFuture = _loadWorkout();
+  }
+
+  Future<WorkoutData> _loadWorkout() =>
+      widget.loadWorkout?.call() ?? db.getWorkoutData(completedWorkoutId);
+
+  void _retryLoad() {
+    setState(() {
+      _workoutFuture = _loadWorkout();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,10 +69,16 @@ class WorkoutHistoryDetailScreen extends StatelessWidget {
         ],
       ),
       body: FutureBuilder<WorkoutData>(
-        future: db.getWorkoutData(completedWorkoutId),
+        future: _workoutFuture,
         builder: (context, snapshot) {
-          if (!snapshot.hasData) {
+          if (snapshot.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return LoadFailureView(
+              message: 'Couldn’t load this workout.',
+              onRetry: _retryLoad,
+            );
           }
           final data = snapshot.data!;
           final cw = data.completedWorkout;

@@ -5,6 +5,7 @@ import '../db/app_database.dart';
 import '../db/db.dart';
 import '../db/template_data.dart';
 import '../widgets/app_nav_menu.dart';
+import '../widgets/load_failure_view.dart';
 import '../widgets/meso_template_card.dart';
 import 'home_screen.dart';
 import '../widgets/past_meso_picker_sheet.dart';
@@ -34,6 +35,15 @@ class _MesocycleSetupScreenState extends State<MesocycleSetupScreen> {
     _hasPastWeeksFuture = db
         .getMesocyclesWithCompletedWeeks()
         .then((summaries) => summaries.isNotEmpty);
+  }
+
+  void _retryLoad() {
+    setState(() {
+      _templatesFuture = db.getMesoTemplatesWithHistory();
+      _hasPastWeeksFuture = db
+          .getMesocyclesWithCompletedWeeks()
+          .then((summaries) => summaries.isNotEmpty);
+    });
   }
 
   @override
@@ -163,7 +173,10 @@ class _MesocycleSetupScreenState extends State<MesocycleSetupScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return LoadFailureView(
+              message: 'Couldn’t load mesocycle templates.',
+              onRetry: _retryLoad,
+            );
           }
 
           final templates = sortMesoTemplates(snapshot.data!, _sort);
