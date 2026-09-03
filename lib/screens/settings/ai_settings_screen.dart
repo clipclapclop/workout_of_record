@@ -3,7 +3,7 @@ import '../../app_preferences.dart';
 import '../../services/ai_service.dart';
 import '../../services/saf_service.dart';
 import 'ai_log_screen.dart';
-import 'unsaved_settings_dialog.dart';
+import '../../widgets/unsaved_changes_dialog.dart';
 
 class AiSettingsScreen extends StatefulWidget {
   const AiSettingsScreen({super.key});
@@ -161,12 +161,12 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
 
   Future<bool> _onPop() async {
     if (!_hasUnsavedChanges) return true;
-    final result = await showUnsavedSettingsDialog(context);
-    if (result == UnsavedSettingsAction.save) {
+    final result = await showUnsavedChangesDialog(context);
+    if (result == UnsavedChangesAction.save) {
       await _save();
       return true;
     }
-    return result == UnsavedSettingsAction.discard;
+    return result == UnsavedChangesAction.discard;
   }
 
   void _showPromptEditor({

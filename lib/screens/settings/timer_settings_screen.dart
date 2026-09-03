@@ -3,7 +3,7 @@ import '../../app_preferences.dart';
 import '../../db/tables/enums.dart';
 import '../../services/workout_cue_service.dart';
 import '../../services/workout_foreground_service.dart';
-import 'unsaved_settings_dialog.dart';
+import '../../widgets/unsaved_changes_dialog.dart';
 
 class TimerSettingsScreen extends StatefulWidget {
   const TimerSettingsScreen({super.key});
@@ -122,12 +122,12 @@ class _TimerSettingsScreenState extends State<TimerSettingsScreen> {
 
   Future<bool> _onPop() async {
     if (!_hasUnsavedChanges) return true;
-    final result = await showUnsavedSettingsDialog(context);
-    if (result == UnsavedSettingsAction.save) {
+    final result = await showUnsavedChangesDialog(context);
+    if (result == UnsavedChangesAction.save) {
       await _save();
       return true;
     }
-    return result == UnsavedSettingsAction.discard;
+    return result == UnsavedChangesAction.discard;
   }
 
   @override

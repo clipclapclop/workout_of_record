@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app_preferences.dart';
 import '../../services/backup_service.dart';
 import '../../services/saf_service.dart';
-import 'unsaved_settings_dialog.dart';
+import '../../widgets/unsaved_changes_dialog.dart';
 
 class BackupSettingsScreen extends StatefulWidget {
   const BackupSettingsScreen({super.key});
@@ -187,11 +187,11 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
 
   Future<bool> _onPop() async {
     if (!_hasUnsavedChanges) return true;
-    final result = await showUnsavedSettingsDialog(context);
-    if (result == UnsavedSettingsAction.save) {
+    final result = await showUnsavedChangesDialog(context);
+    if (result == UnsavedChangesAction.save) {
       return _save();
     }
-    return result == UnsavedSettingsAction.discard;
+    return result == UnsavedChangesAction.discard;
   }
 
   @override

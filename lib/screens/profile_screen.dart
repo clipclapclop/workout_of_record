@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_preferences.dart';
 import '../db/tables/enums.dart';
 import '../widgets/app_nav_menu.dart';
+import '../widgets/unsaved_changes_dialog.dart';
 import '../workout_units.dart';
 import 'home_screen.dart';
 
@@ -27,6 +28,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _liftingYearsController = TextEditingController();
   TrainingGoal? _trainingGoal;
   CalorieState? _calorieState;
+  late (DateTime?, String, String, TrainingGoal?, CalorieState?) _savedDraft;
+
+  (DateTime?, String, String, TrainingGoal?, CalorieState?) get _currentDraft => (
+        _dateOfBirth,
+        _weightController.text.trim(),
+        _liftingYearsController.text.trim(),
+        _trainingGoal,
+        _calorieState,
+      );
+
+  bool get _hasUnsavedChanges => _currentDraft != _savedDraft;
 
   @override
   void initState() {
@@ -43,6 +55,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _liftingYearsController.text =
           rounded == rounded.truncateToDouble() ? rounded.toInt().toString() : rounded.toString();
     }
+    _savedDraft = _currentDraft;
   }
 
   @override
@@ -84,8 +97,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return null;
   }
 
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<bool> _persist() async {
+    if (!_formKey.currentState!.validate()) return false;
     final weight = double.tryParse(_weightController.text.trim());
     final liftingYears = double.tryParse(_liftingYearsController.text.trim());
     DateTime? trainingStartDate;
@@ -93,12 +106,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final days = (liftingYears * 365.25).round();
       trainingStartDate = DateTime.now().subtract(Duration(days: days));
     }
-    await AppPreferences.setDateOfBirth(_dateOfBirth);
-    await AppPreferences.setWeight(weight);
-    await AppPreferences.setTrainingGoal(_trainingGoal);
-    await AppPreferences.setCalorieState(_calorieState);
-    await AppPreferences.setTrainingStartDate(trainingStartDate);
-    if (!mounted) return;
+    try {
+      await AppPreferences.setDateOfBirth(_dateOfBirth);
+      await AppPreferences.setWeight(weight);
+      await AppPreferences.setTrainingGoal(_trainingGoal);
+      await AppPreferences.setCalorieState(_calorieState);
+      await AppPreferences.setTrainingStartDate(trainingStartDate);
+      if (mounted) setState(() => _savedDraft = _currentDraft);
+      return true;
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Couldn’t save profile.')),
+        );
+      }
+      return false;
+    }
+  }
+
+  Future<void> _save() async {
+    if (!await _persist() || !mounted) return;
     if (widget.activeWorkoutId != null) {
       AppNavMenu.returnToActiveWorkout(
         context,
@@ -112,6 +139,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
       MaterialPageRoute(builder: (_) => const HomeScreen()),
       (_) => false,
     );
+  }
+
+  Future<bool> _confirmNavigateAway() async {
+    if (!_hasUnsavedChanges) return true;
+    final action = await showUnsavedChangesDialog(context);
+    return switch (action) {
+      UnsavedChangesAction.keepEditing => false,
+      UnsavedChangesAction.discard => true,
+      UnsavedChangesAction.save => _persist(),
+    };
   }
 
   void _showCalorieStateInfo(BuildContext context) {
@@ -159,7 +196,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final leave = await _confirmNavigateAway();
+        if (leave && context.mounted) Navigator.pop(context);
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
         automaticallyImplyLeading: false,
@@ -168,6 +212,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             current: AppScreen.profile,
             activeWorkoutId: widget.activeWorkoutId,
             activeWorkoutName: widget.activeWorkoutName,
+            onNavigateAway: _confirmNavigateAway,
           ),
         ],
       ),
@@ -287,6 +332,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: const Text('Save'),
           ),
         ],
+      ),
       ),
     );
   }

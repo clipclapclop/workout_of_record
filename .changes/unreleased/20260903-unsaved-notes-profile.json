@@ -1,0 +1,12 @@
+{
+  "id": "unsaved-notes-profile",
+  "summary": "Protected changed Notes and Profile values from accidental loss during system-back and app-menu navigation.",
+  "audience": "user",
+  "releaseNote": "Notes and Profile now ask whether to save, discard, or keep editing before leaving with unsaved changes.",
+  "docs": {
+    "impact": "updated",
+    "paths": ["docs/guides/settings-backups.md"],
+    "reason": ""
+  },
+  "screenshots": []
+}

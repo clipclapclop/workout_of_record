@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:workout_of_record/screens/settings/unsaved_settings_dialog.dart';
+import 'package:workout_of_record/widgets/unsaved_changes_dialog.dart';
 
 import 'support/test_app.dart';
 
@@ -100,12 +100,12 @@ class _TestSettingsScreenState extends State<_TestSettingsScreen> {
 
   Future<bool> _onPop() async {
     if (_value == _savedValue) return true;
-    final action = await showUnsavedSettingsDialog(context);
-    if (action == UnsavedSettingsAction.save) {
+    final action = await showUnsavedChangesDialog(context);
+    if (action == UnsavedChangesAction.save) {
       _save();
       return true;
     }
-    return action == UnsavedSettingsAction.discard;
+    return action == UnsavedChangesAction.discard;
   }
 
   void _save() {

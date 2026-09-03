@@ -43,6 +43,26 @@ void main() {
     expect(AppPreferences.getWeight(), 187.5);
   });
 
+  testWidgets('invalid profile stays open when dialog Save is chosen', (
+    tester,
+  ) async {
+    await initializeTestPreferences({'profile_weight_lbs': 187.5});
+
+    await tester.pumpWidget(buildTestApp(home: const ProfileScreen()));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, '187.5'), 'NaN');
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    final dialog = find.byType(AlertDialog);
+    await tester.tap(find.descendant(of: dialog, matching: find.text('Save')));
+    await tester.pump();
+
+    expect(find.byType(ProfileScreen), findsOneWidget);
+    expect(find.text('Enter a number greater than 0'), findsOneWidget);
+    expect(AppPreferences.getWeight(), 187.5);
+  });
+
   test('legacy zero profile weight is treated as blank', () async {
     await initializeTestPreferences({'profile_weight_lbs': 0.0});
 

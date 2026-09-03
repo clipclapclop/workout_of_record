@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
-enum UnsavedSettingsAction { keepEditing, discard, save }
+enum UnsavedChangesAction { keepEditing, discard, save }
 
-Future<UnsavedSettingsAction> showUnsavedSettingsDialog(
+Future<UnsavedChangesAction> showUnsavedChangesDialog(
   BuildContext context,
 ) async {
-  final action = await showDialog<UnsavedSettingsAction>(
+  final action = await showDialog<UnsavedChangesAction>(
     context: context,
     builder: (dialogContext) => AlertDialog(
       title: const Text('Unsaved changes'),
-      content: const Text('You have unsaved settings.'),
+      content: const Text('You have unsaved changes.'),
       actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       actions: [
         SizedBox(
@@ -24,7 +24,7 @@ Future<UnsavedSettingsAction> showUnsavedSettingsDialog(
                 ),
                 onPressed: () => Navigator.pop(
                   dialogContext,
-                  UnsavedSettingsAction.keepEditing,
+                  UnsavedChangesAction.keepEditing,
                 ),
                 child: const Text('Keep editing'),
               ),
@@ -34,7 +34,7 @@ Future<UnsavedSettingsAction> showUnsavedSettingsDialog(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                 ),
                 onPressed: () =>
-                    Navigator.pop(dialogContext, UnsavedSettingsAction.discard),
+                    Navigator.pop(dialogContext, UnsavedChangesAction.discard),
                 child: const Text('Discard'),
               ),
               const SizedBox(height: 8),
@@ -43,7 +43,7 @@ Future<UnsavedSettingsAction> showUnsavedSettingsDialog(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                 ),
                 onPressed: () =>
-                    Navigator.pop(dialogContext, UnsavedSettingsAction.save),
+                    Navigator.pop(dialogContext, UnsavedChangesAction.save),
                 child: const Text('Save'),
               ),
             ],
@@ -52,5 +52,5 @@ Future<UnsavedSettingsAction> showUnsavedSettingsDialog(
       ],
     ),
   );
-  return action ?? UnsavedSettingsAction.keepEditing;
+  return action ?? UnsavedChangesAction.keepEditing;
 }
