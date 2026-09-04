@@ -49,6 +49,10 @@ class HomeScreen extends StatefulWidget {
     this.resetActiveWorkout,
     this.clearWorkoutRuntimeState,
     this.activeWorkoutBuilder,
+    this.getNextWorkout,
+    this.getExpectedWorkoutDate,
+    this.getMesoProgress,
+    this.skipWorkout,
   });
 
   final Future<ActiveWorkoutReference?> Function()? reconcileActiveWorkout;
@@ -57,6 +61,10 @@ class HomeScreen extends StatefulWidget {
   final Future<void> Function()? clearWorkoutRuntimeState;
   final Widget Function(ActiveWorkoutReference, WorkoutData)?
       activeWorkoutBuilder;
+  final Future<Workout?> Function(int)? getNextWorkout;
+  final Future<DateTime?> Function(int)? getExpectedWorkoutDate;
+  final Future<MesoProgressInfo> Function(int, int)? getMesoProgress;
+  final Future<void> Function(int, WorkoutSkipReason)? skipWorkout;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -77,6 +85,14 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _resetWorkoutError = null;
       _resultFuture = _init();
+    });
+  }
+
+  void _refreshHome() {
+    if (!mounted) return;
+    final nextResult = _init();
+    setState(() {
+      _resultFuture = nextResult;
     });
   }
 
@@ -132,11 +148,17 @@ class _HomeScreenState extends State<HomeScreen> {
       return _Redirecting();
     }
 
-    final workout = await db.getOrCreateNextWorkout(mesocycleId);
+    final workout = await (widget.getNextWorkout?.call(mesocycleId) ??
+        db.getOrCreateNextWorkout(mesocycleId));
     if (workout == null) return _MesoComplete();
 
-    final date = await db.getExpectedWorkoutDate(mesocycleId);
-    final progress = await db.getMesoProgress(mesocycleId, workout.id);
+    final date = await (widget.getExpectedWorkoutDate?.call(mesocycleId) ??
+        db.getExpectedWorkoutDate(mesocycleId));
+    final progress = await (widget.getMesoProgress?.call(
+          mesocycleId,
+          workout.id,
+        ) ??
+        db.getMesoProgress(mesocycleId, workout.id));
     return _WorkoutReady(workout, date, progress);
   }
 
@@ -193,7 +215,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-    setState(() => _resultFuture = _init());
+    _refreshHome();
   }
 
   Future<void> _skipWorkout(Workout workout) async {
@@ -234,7 +256,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (selected == null || !mounted) return;
     try {
-      await db.skipWorkout(workout.id, selected!);
+      await (widget.skipWorkout?.call(workout.id, selected!) ??
+          db.skipWorkout(workout.id, selected!));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -244,7 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       return;
     }
-    if (mounted) setState(() => _resultFuture = _init());
+    _refreshHome();
   }
 
   String _formatProgress(MesoProgressInfo p) {
@@ -288,11 +311,11 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } on StateError {
       // Lost a race against state change — just refresh.
-      if (mounted) setState(() => _resultFuture = _init());
+      _refreshHome();
       return;
     }
     if (!mounted) return;
-    setState(() => _resultFuture = _init());
+    _refreshHome();
 
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(SnackBar(

@@ -1,0 +1,12 @@
+{
+  "id": "home-refresh",
+  "summary": "Refresh Home with synchronous state callbacks after workout and mesocycle actions so successful operations do not trigger a Flutter framework error.",
+  "audience": "user",
+  "releaseNote": "Home now refreshes cleanly after skipping a workout or changing workout-cycle state.",
+  "docs": {
+    "impact": "none",
+    "paths": [],
+    "reason": "This corrects an internal refresh error without changing the documented workflow."
+  },
+  "screenshots": []
+}
