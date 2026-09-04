@@ -1,0 +1,285 @@
+{
+  "version": "1.0.7",
+  "versionCode": 8,
+  "releaseNotes": "docs/releases/1.0.7.md",
+  "docsImpact": "updated",
+  "updatedGuidePaths": [
+    "README.md",
+    "docs/guides/installation.md",
+    "docs/guides/mesocycles.md",
+    "docs/guides/movements-history.md",
+    "docs/guides/settings-backups.md",
+    "docs/guides/workouts.md",
+    "docs/index.md",
+    "docs/releases/index.md",
+    "docs/screenshot-backlog.md"
+  ],
+  "noDocsReason": "",
+  "changeFragments": [
+    "release/fragments/1.0.7/20260901-ai-settings-layout.json",
+    "release/fragments/1.0.7/20260901-imperial-units.json",
+    "release/fragments/1.0.7/20260901-safe-fixed-backup.json",
+    "release/fragments/1.0.7/20260902-disable-android-backup.json",
+    "release/fragments/1.0.7/20260902-empty-workouts.json",
+    "release/fragments/1.0.7/20260902-numeric-input-validation.json",
+    "release/fragments/1.0.7/20260902-safe-exercise-replacement.json",
+    "release/fragments/1.0.7/20260902-set-based-rest-timer.json",
+    "release/fragments/1.0.7/20260902-system-roboto.json",
+    "release/fragments/1.0.7/20260903-active-workout-recovery.json",
+    "release/fragments/1.0.7/20260903-final-polish-cleanup.json",
+    "release/fragments/1.0.7/20260903-home-refresh.json",
+    "release/fragments/1.0.7/20260903-independent-restore.json",
+    "release/fragments/1.0.7/20260903-load-recovery-ui.json",
+    "release/fragments/1.0.7/20260903-modal-load-recovery.json",
+    "release/fragments/1.0.7/20260903-unsaved-movement-template.json",
+    "release/fragments/1.0.7/20260903-unsaved-notes-profile.json"
+  ],
+  "commitAuditExceptions": [
+    {
+      "commit": "fbeabd498073f4d88741a7150041f1caf57c868b",
+      "originatingCommit": "eab0c0d247ceef95ddb391472edd1880a60e53a6",
+      "fragment": "release/fragments/1.0.7/20260901-safe-fixed-backup.json",
+      "reason": "Follow-up “Preserve verified backup on cleanup failures” change in the same safe fixed-name backup implementation."
+    },
+    {
+      "commit": "0d0b922eb3f5a0abf0ef5d82755c387a9961fd60",
+      "originatingCommit": "eab0c0d247ceef95ddb391472edd1880a60e53a6",
+      "fragment": "release/fragments/1.0.7/20260901-safe-fixed-backup.json",
+      "reason": "Follow-up “Distinguish verified backup recovery states” change in the same safe fixed-name backup implementation."
+    },
+    {
+      "commit": "6eff86aa0f0618dc80b92f5c3090ae727b3a50bf",
+      "originatingCommit": "eab0c0d247ceef95ddb391472edd1880a60e53a6",
+      "fragment": "release/fragments/1.0.7/20260901-safe-fixed-backup.json",
+      "reason": "Follow-up “Mark staged backups before promotion” change in the same safe fixed-name backup implementation."
+    },
+    {
+      "commit": "e1c547d2d99f8fabefc8510f14df7dfa025ebc72",
+      "originatingCommit": "eab0c0d247ceef95ddb391472edd1880a60e53a6",
+      "fragment": "release/fragments/1.0.7/20260901-safe-fixed-backup.json",
+      "reason": "Follow-up “Avoid deleting unowned backup files” change in the same safe fixed-name backup implementation."
+    },
+    {
+      "commit": "e93d00499b3dca31d285d0bb2ba12b92afebb423",
+      "originatingCommit": "eab0c0d247ceef95ddb391472edd1880a60e53a6",
+      "fragment": "release/fragments/1.0.7/20260901-safe-fixed-backup.json",
+      "reason": "Follow-up “Track ownership of promoted backup files” change in the same safe fixed-name backup implementation."
+    },
+    {
+      "commit": "a00c9d89fb720d50287280a59f035f73b1db0c36",
+      "originatingCommit": "eab0c0d247ceef95ddb391472edd1880a60e53a6",
+      "fragment": "release/fragments/1.0.7/20260901-safe-fixed-backup.json",
+      "reason": "Follow-up “Preserve conflicting backup files during rollback” change in the same safe fixed-name backup implementation."
+    },
+    {
+      "commit": "41eeb0311bec45a0a7dc593aea544d66dcdd313d",
+      "originatingCommit": "eab0c0d247ceef95ddb391472edd1880a60e53a6",
+      "fragment": "release/fragments/1.0.7/20260901-safe-fixed-backup.json",
+      "reason": "Follow-up “Quarantine unverified promoted backups” change in the same safe fixed-name backup implementation."
+    },
+    {
+      "commit": "3e1540b7d83928bb7db2f74845a254a9ffeb23fa",
+      "originatingCommit": "eab0c0d247ceef95ddb391472edd1880a60e53a6",
+      "fragment": "release/fragments/1.0.7/20260901-safe-fixed-backup.json",
+      "reason": "Follow-up “Name ignored callback parameters explicitly” change in the same safe fixed-name backup implementation."
+    },
+    {
+      "commit": "637ec2a531706a2b0a0c93e98652be8925c58ac4",
+      "originatingCommit": "eab0c0d247ceef95ddb391472edd1880a60e53a6",
+      "fragment": "release/fragments/1.0.7/20260901-safe-fixed-backup.json",
+      "reason": "Follow-up “Use unique names for quarantined backups” change in the same safe fixed-name backup implementation."
+    },
+    {
+      "commit": "99b1e4f35db04d8b687cd037e65a53d8b23f9830",
+      "originatingCommit": "8d4417c4e397c36f94adc1531fbcd866ff9bde4c",
+      "fragment": "release/fragments/1.0.7/20260902-safe-exercise-replacement.json",
+      "reason": "Follow-up “Limit replacement guard to recorded activity” change in the same safe exercise-replacement implementation."
+    },
+    {
+      "commit": "f961883a16bd48a0ac7253fe1ff6d2c313542214",
+      "originatingCommit": "8d4417c4e397c36f94adc1531fbcd866ff9bde4c",
+      "fragment": "release/fragments/1.0.7/20260902-safe-exercise-replacement.json",
+      "reason": "Follow-up “Match replacement UI to persisted activity” change in the same safe exercise-replacement implementation."
+    },
+    {
+      "commit": "1cff40a93483fe5f5fa12ebd5946d5be873bf6e9",
+      "originatingCommit": "8d4417c4e397c36f94adc1531fbcd866ff9bde4c",
+      "fragment": "release/fragments/1.0.7/20260902-safe-exercise-replacement.json",
+      "reason": "Follow-up “Count checked sets as started activity” change in the same safe exercise-replacement implementation."
+    },
+    {
+      "commit": "ced154f24f1d1a7fbd280d98253688363ea92651",
+      "originatingCommit": "fc64c721779ff0485f1c82b6d0cf56f4e6c89443",
+      "fragment": "release/fragments/1.0.7/20260902-numeric-input-validation.json",
+      "reason": "Follow-up “Preserve legacy zero values during restore” change in the same numeric-validation implementation."
+    },
+    {
+      "commit": "44d69e6a082c9d636ab9f9739eb6de35a64e5f2a",
+      "originatingCommit": "fc64c721779ff0485f1c82b6d0cf56f4e6c89443",
+      "fragment": "release/fragments/1.0.7/20260902-numeric-input-validation.json",
+      "reason": "Follow-up “Normalize unusable legacy profile weight” change in the same numeric-validation implementation."
+    },
+    {
+      "commit": "810b8e2672b23eb998c8696a16c852a298a6745d",
+      "originatingCommit": "8aef37031f2c3857cfd5c873201bfb15749794a9",
+      "fragment": "release/fragments/1.0.7/20260902-set-based-rest-timer.json",
+      "reason": "Follow-up “Clear stale idle timer state” change in the same set-based rest-timer implementation."
+    },
+    {
+      "commit": "448f322e470821372b8e0f6c2f3c355e8b648258",
+      "originatingCommit": "8aef37031f2c3857cfd5c873201bfb15749794a9",
+      "fragment": "release/fragments/1.0.7/20260902-set-based-rest-timer.json",
+      "reason": "Follow-up “Distinguish untouched and completed timer state” change in the same set-based rest-timer implementation."
+    },
+    {
+      "commit": "a205b1493e5c5617709c407b2da1a15a7cafc776",
+      "originatingCommit": "8aef37031f2c3857cfd5c873201bfb15749794a9",
+      "fragment": "release/fragments/1.0.7/20260902-set-based-rest-timer.json",
+      "reason": "Follow-up “Clarify timer countdown and cue ownership” change in the same set-based rest-timer implementation."
+    },
+    {
+      "commit": "008ce4fd9c7de1897863fc500f67e76fc0780cc4",
+      "originatingCommit": "8aef37031f2c3857cfd5c873201bfb15749794a9",
+      "fragment": "release/fragments/1.0.7/20260902-set-based-rest-timer.json",
+      "reason": "Follow-up “Document timer resume behavior” change in the same set-based rest-timer implementation."
+    },
+    {
+      "commit": "92c03993b288f1b7280c397c18c89ce1f5b7e1e6",
+      "originatingCommit": "8aef37031f2c3857cfd5c873201bfb15749794a9",
+      "fragment": "release/fragments/1.0.7/20260902-set-based-rest-timer.json",
+      "reason": "Follow-up “Simplify timer context tracking” change in the same set-based rest-timer implementation."
+    },
+    {
+      "commit": "86c9f1611cf59ce53e89f1b861a4f31e2ce0710b",
+      "originatingCommit": "64a554809bfcf56c5f41a0d7cc1921cda72389aa",
+      "fragment": "release/fragments/1.0.7/20260902-set-based-rest-timer.json",
+      "reason": "Follow-up “Make restored timer milliseconds explicit” change in the same active rest-timer recovery implementation."
+    },
+    {
+      "commit": "9493ec5bf0e97803465a6804dd0eb8ae7c2f4dc6",
+      "originatingCommit": "64a554809bfcf56c5f41a0d7cc1921cda72389aa",
+      "fragment": "release/fragments/1.0.7/20260902-set-based-rest-timer.json",
+      "reason": "Follow-up “Discard stale timer exercise references” change in the same active rest-timer recovery implementation."
+    },
+    {
+      "commit": "79f4033596370fdb002223fd9144cb927a2f88b8",
+      "originatingCommit": "64a554809bfcf56c5f41a0d7cc1921cda72389aa",
+      "fragment": "release/fragments/1.0.7/20260902-set-based-rest-timer.json",
+      "reason": "Follow-up “Seed expired timer restores as idle” change in the same active rest-timer recovery implementation."
+    },
+    {
+      "commit": "d7fc38350396c3d3880e30b2a0f995c9f6a2fefe",
+      "originatingCommit": "64a554809bfcf56c5f41a0d7cc1921cda72389aa",
+      "fragment": "release/fragments/1.0.7/20260902-set-based-rest-timer.json",
+      "reason": "Follow-up “Test rest timer recovery decisions” change in the same active rest-timer recovery implementation."
+    },
+    {
+      "commit": "1fe8cbc75693370fecf8c93b0272cf49d35d62fd",
+      "originatingCommit": "64a554809bfcf56c5f41a0d7cc1921cda72389aa",
+      "fragment": "release/fragments/1.0.7/20260902-set-based-rest-timer.json",
+      "reason": "Follow-up “Recover paused rest timers” change in the same active rest-timer recovery implementation."
+    },
+    {
+      "commit": "705cd7a518c1ca7b636516eb68e02d9c4783ee69",
+      "originatingCommit": "64a554809bfcf56c5f41a0d7cc1921cda72389aa",
+      "fragment": "release/fragments/1.0.7/20260902-set-based-rest-timer.json",
+      "reason": "Follow-up “Persist paused timer snapshots” change in the same active rest-timer recovery implementation."
+    },
+    {
+      "commit": "4eb38018d328d6c8e926a0794ea1ffac5db7b593",
+      "originatingCommit": "4f194e52a2c0a12ec087a2e4637267d3f3b40ea4",
+      "fragment": "release/fragments/1.0.7/20260903-unsaved-notes-profile.json",
+      "reason": "Follow-up “Clarify profile prompt navigation” change in the same unsaved Notes and Profile implementation."
+    },
+    {
+      "commit": "9460aa82435b848b35c7f697068b424f5ca05e35",
+      "originatingCommit": "4f194e52a2c0a12ec087a2e4637267d3f3b40ea4",
+      "fragment": "release/fragments/1.0.7/20260903-unsaved-notes-profile.json",
+      "reason": "Follow-up “Preserve active workout return on profile back” change in the same unsaved Notes and Profile implementation."
+    },
+    {
+      "commit": "c80d87b0da0c35fef5462b54c166e20d4bcd8ac9",
+      "originatingCommit": "d414e73c98405bee4b3af2c2f4b4ef7808d4b6b9",
+      "fragment": "release/fragments/1.0.7/20260903-unsaved-movement-template.json",
+      "reason": "Follow-up “Block movement navigation during saves” change in the same unsaved Movement and Template implementation."
+    },
+    {
+      "commit": "37229ddcb1f8b05ce8eb6f50089d335f94a7914b",
+      "originatingCommit": "407f3db5f48a7039c41503c6f7de19eb15fc7160",
+      "fragment": "release/fragments/1.0.7/20260903-active-workout-recovery.json",
+      "reason": "Follow-up “Recover stale runtime state after workout reset” change in the same damaged active-workout recovery implementation."
+    },
+    {
+      "commit": "9b2f7c824627c5254314f90b2c1d75086501f071",
+      "originatingCommit": "407f3db5f48a7039c41503c6f7de19eb15fc7160",
+      "fragment": "release/fragments/1.0.7/20260903-active-workout-recovery.json",
+      "reason": "Follow-up “Limit workout reset to structural damage” change in the same damaged active-workout recovery implementation."
+    },
+    {
+      "commit": "62a2a29705785a2ec0007693574869491d8b425d",
+      "originatingCommit": "407f3db5f48a7039c41503c6f7de19eb15fc7160",
+      "fragment": "release/fragments/1.0.7/20260903-active-workout-recovery.json",
+      "reason": "Follow-up “Reset only repairable workout attempt damage” change in the same damaged active-workout recovery implementation."
+    },
+    {
+      "commit": "4600f90784940287d6a01c0748572b0325d07a8f",
+      "originatingCommit": "407f3db5f48a7039c41503c6f7de19eb15fc7160",
+      "fragment": "release/fragments/1.0.7/20260903-active-workout-recovery.json",
+      "reason": "Follow-up “Explain non-resettable workout plan damage” change in the same damaged active-workout recovery implementation."
+    },
+    {
+      "commit": "7164dbb52991f4c17cc5b497b5c3bf2a949edc88",
+      "originatingCommit": "407f3db5f48a7039c41503c6f7de19eb15fc7160",
+      "fragment": "release/fragments/1.0.7/20260903-active-workout-recovery.json",
+      "reason": "Follow-up “Document valid incomplete workout state” change in the same damaged active-workout recovery implementation."
+    },
+    {
+      "commit": "c3af22ffa2ae86f8d9aed65c17c8fe807e5d247a",
+      "originatingCommit": "407f3db5f48a7039c41503c6f7de19eb15fc7160",
+      "fragment": "release/fragments/1.0.7/20260903-active-workout-recovery.json",
+      "reason": "Follow-up “Block reset when workout plan is missing” change in the same damaged active-workout recovery implementation."
+    },
+    {
+      "commit": "703fe475f575e6265fe26e6572f81407110a02bf",
+      "originatingCommit": "407f3db5f48a7039c41503c6f7de19eb15fc7160",
+      "fragment": "release/fragments/1.0.7/20260903-active-workout-recovery.json",
+      "reason": "Follow-up “Scope damage classification to active recovery” change in the same damaged active-workout recovery implementation."
+    },
+    {
+      "commit": "6c7c8cd1ea57c9b41553f425f9daa541907c71b8",
+      "originatingCommit": "407f3db5f48a7039c41503c6f7de19eb15fc7160",
+      "fragment": "release/fragments/1.0.7/20260903-active-workout-recovery.json",
+      "reason": "Follow-up “Detect physically missing workout exercises” change in the same damaged active-workout recovery implementation."
+    },
+    {
+      "commit": "7d96b24515d6ed44b22559fd59af38ac84180b91",
+      "originatingCommit": "407f3db5f48a7039c41503c6f7de19eb15fc7160",
+      "fragment": "release/fragments/1.0.7/20260903-active-workout-recovery.json",
+      "reason": "Follow-up “Safely classify missing and duplicate exercises” change in the same damaged active-workout recovery implementation."
+    },
+    {
+      "commit": "0473e7b1910541ef89f9f3214f9445c7fd9419dd",
+      "originatingCommit": "407f3db5f48a7039c41503c6f7de19eb15fc7160",
+      "fragment": "release/fragments/1.0.7/20260903-active-workout-recovery.json",
+      "reason": "Follow-up “Clarify dropped exercise recovery handling” change in the same damaged active-workout recovery implementation."
+    },
+    {
+      "commit": "3746274b27e2bf8032ab8e32280c4f25be83a05d",
+      "originatingCommit": "407f3db5f48a7039c41503c6f7de19eb15fc7160",
+      "fragment": "release/fragments/1.0.7/20260903-active-workout-recovery.json",
+      "reason": "Follow-up “Regenerate missing workout plans after reset” change in the same damaged active-workout recovery implementation."
+    },
+    {
+      "commit": "28d66a41337611276f7bc318d36d0042d64a283a",
+      "originatingCommit": "407f3db5f48a7039c41503c6f7de19eb15fc7160",
+      "fragment": "release/fragments/1.0.7/20260903-active-workout-recovery.json",
+      "reason": "Follow-up “Guard missing-plan reset from orphaned children” change in the same damaged active-workout recovery implementation."
+    }
+  ],
+  "outstandingScreenshots": [
+    "workout-home",
+    "mesocycle-calendar",
+    "workout-history",
+    "backup-settings"
+  ]
+}
