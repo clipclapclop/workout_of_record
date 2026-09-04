@@ -866,6 +866,32 @@ void main() {
     expect(restarted.exercises, isNotEmpty);
   });
 
+  test('missing plan with orphaned exercise children is not resettable',
+      () async {
+    final database = _openMemoryDatabase();
+    addTearDown(database.close);
+    final fixture = await _startWorkout(database);
+    await database.customStatement('PRAGMA foreign_keys = OFF');
+    await (database.delete(database.plannedWorkouts)
+          ..where((row) => row.workoutId.equals(fixture.workoutId)))
+        .go();
+    await (database.delete(database.completedExercises)
+          ..where((row) =>
+              row.completedWorkoutId.equals(fixture.completedWorkoutId)))
+        .go();
+
+    await expectLater(
+      database.getActiveWorkoutData(fixture.completedWorkoutId),
+      throwsA(
+        isA<WorkoutDataIntegrityException>().having(
+          (error) => error.canReset,
+          'canReset',
+          isFalse,
+        ),
+      ),
+    );
+  });
+
   test(
     'resetting an active attempt preserves history and offers the same workout',
     () async {

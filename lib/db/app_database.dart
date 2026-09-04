@@ -1092,6 +1092,23 @@ class AppDatabase extends _$AppDatabase {
 
   /// Atomically removes one exact in-progress attempt so its planned workout
   /// can be started again. Completed workouts are never eligible.
+  Future<bool> _hasOrphanedExerciseChildren() async {
+    final row = await customSelect(
+      'SELECT 1 FROM completed_sets AS child '
+      'LEFT JOIN completed_exercises AS parent '
+      'ON parent.id = child.completed_exercise_id '
+      'WHERE parent.id IS NULL '
+      'UNION ALL '
+      'SELECT 1 FROM post_exercise_checkins AS child '
+      'LEFT JOIN completed_exercises AS parent '
+      'ON parent.id = child.completed_exercise_id '
+      'WHERE parent.id IS NULL '
+      'LIMIT 1',
+      readsFrom: {completedSets, postExerciseCheckins, completedExercises},
+    ).getSingleOrNull();
+    return row != null;
+  }
+
   Future<void> resetActiveWorkout(int completedWorkoutId) async {
     await transaction(() async {
       final active = await (select(completedWorkouts)
@@ -1161,6 +1178,11 @@ class AppDatabase extends _$AppDatabase {
         plannedWorkout == null) {
       // Starting this same scheduled workout calls generatePlannedWorkout
       // before initializeWorkout, so a wholly missing plan can be rebuilt.
+      // Do not offer reset if missing exercise parents have already left child
+      // rows that cannot be attributed safely to this exact attempt.
+      if (await _hasOrphanedExerciseChildren()) {
+        throw const WorkoutDataIntegrityException.notResettable();
+      }
       throw const WorkoutDataIntegrityException.resettable();
     }
 
