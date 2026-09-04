@@ -1538,19 +1538,17 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
-  /// Throws [TemplateInUseException] if any active mesocycle uses this template.
-  /// [currentMesocycleId] should come from AppPreferences.getCurrentMesocycleId().
-  Future<void> deleteMesoTemplate(int id, {int? currentMesocycleId}) async {
-    if (currentMesocycleId != null) {
-      final meso = await (select(mesocycles)
-            ..where((m) => m.id.equals(currentMesocycleId)))
-          .getSingleOrNull();
-      if (meso != null && meso.mesoTemplateId == id) {
-        throw TemplateInUseException();
-      }
-    }
-
+  /// Throws [TemplateInUseException] if any mesocycle uses this template.
+  Future<void> deleteMesoTemplate(int id) async {
     await transaction(() async {
+      final referencingMeso = await (select(mesocycles)
+            ..where((m) => m.mesoTemplateId.equals(id))
+            ..limit(1))
+          .getSingleOrNull();
+      if (referencingMeso != null) {
+        throw const TemplateInUseException();
+      }
+
       final wts = await (select(weekTemplates)
             ..where((wt) => wt.mesoTemplateId.equals(id)))
           .get();
@@ -1880,42 +1878,47 @@ class AppDatabase extends _$AppDatabase {
   }
 
   /// Marks the workout complete in the DB.
-  /// Caller is responsible for clearing AppPreferences.currentCompletedWorkoutId.
+  /// Caller is responsible for clearing AppPreferences.currentCompletedWorkoutId
+  /// only after this transaction succeeds.
   Future<void> finishWorkout(int completedWorkoutId) async {
-    await (update(completedWorkouts)
-          ..where((w) => w.id.equals(completedWorkoutId)))
-        .write(CompletedWorkoutsCompanion(
+    await transaction(() async {
+      await (update(completedWorkouts)
+            ..where((w) => w.id.equals(completedWorkoutId)))
+          .write(CompletedWorkoutsCompanion(
         completedAt: Value(DateTime.now()),
         status: const Value(WorkoutStatus.completed),
       ));
-    final completed = await (select(completedWorkouts)
-          ..where((row) => row.id.equals(completedWorkoutId)))
-        .getSingle();
-    final workout = await (select(workouts)
-          ..where((row) => row.id.equals(completed.workoutId)))
-        .getSingle();
-    final week = await (select(weeks)
-          ..where((row) => row.id.equals(workout.weekId)))
-        .getSingle();
-    await _markMesocycleCompleteIfFinished(week.mesocycleId);
+      final completed = await (select(completedWorkouts)
+            ..where((row) => row.id.equals(completedWorkoutId)))
+          .getSingle();
+      final workout = await (select(workouts)
+            ..where((row) => row.id.equals(completed.workoutId)))
+          .getSingle();
+      final week = await (select(weeks)
+            ..where((row) => row.id.equals(workout.weekId)))
+          .getSingle();
+      await _markMesocycleCompleteIfFinished(week.mesocycleId);
+    });
   }
 
   Future<void> skipWorkout(int workoutId, WorkoutSkipReason reason) async {
-    final now = DateTime.now();
-    await into(completedWorkouts).insert(CompletedWorkoutsCompanion.insert(
-      workoutId: workoutId,
-      startedAt: now,
-      completedAt: Value(now),
-      status: WorkoutStatus.skipped,
-      skipReason: Value(reason),
-    ));
-    final workout = await (select(workouts)
-          ..where((row) => row.id.equals(workoutId)))
-        .getSingle();
-    final week = await (select(weeks)
-          ..where((row) => row.id.equals(workout.weekId)))
-        .getSingle();
-    await _markMesocycleCompleteIfFinished(week.mesocycleId);
+    await transaction(() async {
+      final now = DateTime.now();
+      await into(completedWorkouts).insert(CompletedWorkoutsCompanion.insert(
+        workoutId: workoutId,
+        startedAt: now,
+        completedAt: Value(now),
+        status: WorkoutStatus.skipped,
+        skipReason: Value(reason),
+      ));
+      final workout = await (select(workouts)
+            ..where((row) => row.id.equals(workoutId)))
+          .getSingle();
+      final week = await (select(weeks)
+            ..where((row) => row.id.equals(workout.weekId)))
+          .getSingle();
+      await _markMesocycleCompleteIfFinished(week.mesocycleId);
+    });
   }
 
   Future<void> setPersistence(

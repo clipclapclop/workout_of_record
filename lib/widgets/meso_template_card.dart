@@ -148,6 +148,7 @@ class MesoTemplateCard extends StatelessWidget {
                 ),
               if (actions.isNotEmpty)
                 PopupMenuButton<_TemplateCardAction>(
+                  tooltip: 'Template actions',
                   onSelected: (action) => actions[action]!(),
                   itemBuilder: (context) => [
                     if (onEdit != null)

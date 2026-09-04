@@ -1,0 +1,15 @@
+{
+  "id": "final-polish-cleanup",
+  "summary": "Safely block deletion of templates used by mesocycles, make workout finish and skip bookkeeping atomic, and align release guidance with the protected workflow.",
+  "audience": "user",
+  "releaseNote": "Used templates are now protected from deletion, and workout finish or skip bookkeeping rolls back safely if it cannot be completed.",
+  "docs": {
+    "impact": "updated",
+    "paths": [
+      "README.md",
+      "docs/guides/mesocycles.md"
+    ],
+    "reason": ""
+  },
+  "screenshots": []
+}

@@ -1246,7 +1246,17 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     );
     if (confirmed != true || !mounted) return;
 
-    await db.finishWorkout(widget.completedWorkoutId);
+    try {
+      await db.finishWorkout(widget.completedWorkoutId);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Couldn’t finish workout. Try again.'),
+        ),
+      );
+      return;
+    }
     await AppPreferences.setCurrentCompletedWorkoutId(null);
 
     _maybeBackupInBackground();

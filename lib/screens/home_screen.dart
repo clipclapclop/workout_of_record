@@ -233,8 +233,18 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (selected == null || !mounted) return;
-    await db.skipWorkout(workout.id, selected!);
-    setState(() => _resultFuture = _init());
+    try {
+      await db.skipWorkout(workout.id, selected!);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Couldn’t skip workout. Try again.'),
+        ),
+      );
+      return;
+    }
+    if (mounted) setState(() => _resultFuture = _init());
   }
 
   String _formatProgress(MesoProgressInfo p) {

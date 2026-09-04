@@ -13,10 +13,14 @@ class MesoTemplateListScreen extends StatefulWidget {
     super.key,
     this.activeWorkoutId,
     this.activeWorkoutName,
+    this.loadTemplates,
+    this.deleteTemplate,
   });
 
   final int? activeWorkoutId;
   final String? activeWorkoutName;
+  final Future<List<MesoTemplateWithHistory>> Function()? loadTemplates;
+  final Future<void> Function(int)? deleteTemplate;
 
   @override
   State<MesoTemplateListScreen> createState() => _MesoTemplateListScreenState();
@@ -26,15 +30,18 @@ class _MesoTemplateListScreenState extends State<MesoTemplateListScreen> {
   late Future<List<MesoTemplateWithHistory>> _templatesFuture;
   MesoTemplateSort _sort = MesoTemplateSort.lastUsed;
 
+  Future<List<MesoTemplateWithHistory>> _loadTemplates() =>
+      widget.loadTemplates?.call() ?? db.getMesoTemplatesWithHistory();
+
   @override
   void initState() {
     super.initState();
-    _templatesFuture = db.getMesoTemplatesWithHistory();
+    _templatesFuture = _loadTemplates();
   }
 
   void _reload() {
     setState(() {
-      _templatesFuture = db.getMesoTemplatesWithHistory();
+      _templatesFuture = _loadTemplates();
     });
   }
 
@@ -93,13 +100,24 @@ class _MesoTemplateListScreenState extends State<MesoTemplateListScreen> {
     if (confirmed != true || !mounted) return;
 
     try {
-      await db.deleteMesoTemplate(t.id);
+      await (widget.deleteTemplate?.call(t.id) ??
+          db.deleteMesoTemplate(t.id));
+      if (!mounted) return;
       _reload();
     } on TemplateInUseException {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('This template is used by the active mesocycle and cannot be deleted.'),
+          content: Text(
+            'This template has been used by a mesocycle and cannot be deleted.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Couldn’t delete template. Try again.'),
         ),
       );
     }

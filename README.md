@@ -87,16 +87,16 @@ Preparation should leave you with:
 
 Preparation does not publish anything. Review the changes and commit them before running the publisher. The release command deliberately refuses a dirty working tree.
 
-## Validate and publish manually
+## Direct publication recovery only
 
-From a clean `main` branch, run:
+Normal publication goes through the protected Repflow release operation described above. Run the publisher directly only for an explicitly authorized recovery under [`docs/maintainer/releasing.md`](docs/maintainer/releasing.md). From a clean `main` branch, the recovery commands are:
 
 ```bash
 ./tool/release --dry-run
 ./tool/release
 ```
 
-The dry run performs the same local validation and signed arm64 APK build without pushing, tagging, publishing, or deploying documentation. The publish command then:
+The dry run performs the same local validation and signed arm64 APK build without pushing, tagging, publishing, or deploying documentation. The recovery publish command then:
 
 1. pushes `main` and an annotated `v<version>` tag to canonical Forgejo;
 2. creates or resumes a draft Forgejo Release, uploads and re-downloads the APK and checksum for exact comparison, then publishes the canonical release;
