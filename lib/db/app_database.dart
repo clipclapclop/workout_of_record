@@ -1159,7 +1159,9 @@ class AppDatabase extends _$AppDatabase {
         cw.status == WorkoutStatus.active &&
         cw.completedAt == null &&
         plannedWorkout == null) {
-      throw const WorkoutDataIntegrityException.notResettable();
+      // Starting this same scheduled workout calls generatePlannedWorkout
+      // before initializeWorkout, so a wholly missing plan can be rebuilt.
+      throw const WorkoutDataIntegrityException.resettable();
     }
 
     Future<T> requireIntactAttemptData<T>(Future<T> read) async {
@@ -1233,7 +1235,7 @@ class AppDatabase extends _$AppDatabase {
           throw StateError('The workout references a missing movement.');
         }
         if (plannedWorkout == null) {
-          throw const WorkoutDataIntegrityException.notResettable();
+          throw const WorkoutDataIntegrityException.resettable();
         }
         final plannedReference = await (select(plannedExercises)
               ..where((exercise) =>

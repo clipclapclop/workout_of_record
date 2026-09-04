@@ -818,7 +818,8 @@ void main() {
     );
   });
 
-  test('missing planned workout makes attempt damage non-resettable', () async {
+  test('missing planned workout can reset and regenerate the same workout',
+      () async {
     final database = _openMemoryDatabase();
     addTearDown(database.close);
     final fixture = await _startWorkout(database);
@@ -848,10 +849,21 @@ void main() {
         isA<WorkoutDataIntegrityException>().having(
           (error) => error.canReset,
           'canReset',
-          isFalse,
+          isTrue,
         ),
       ),
     );
+
+    await database.resetActiveWorkout(fixture.completedWorkoutId);
+    final sameWorkout = await database.getOrCreateNextWorkout(
+      fixture.mesocycleId,
+    );
+    expect(sameWorkout!.id, fixture.workoutId);
+    await database.generatePlannedWorkout(sameWorkout.id);
+    final restartedId = await database.initializeWorkout(sameWorkout.id);
+    final restarted = await database.getWorkoutData(restartedId);
+    expect(restarted.workout.id, fixture.workoutId);
+    expect(restarted.exercises, isNotEmpty);
   });
 
   test(
